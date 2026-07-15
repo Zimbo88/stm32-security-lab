@@ -1,0 +1,17 @@
+EXP006 RESET MATRIX
+
+A: Reset-Taster
+RCC_CSR: 0x04000000
+Flags:
+- PINRSTF
+
+B: Power cycle
+RCC_CSR: 0x0E000000
+Flags:
+- BORRSTF
+- PINRSTF
+- PORRSTF
+
+C: ST-Link/AIRCR software reset
+RCC_CSR:
+Flags:
