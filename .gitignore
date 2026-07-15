@@ -30,3 +30,8 @@ signing/**/firmware_signing_private.pem
 **/*corrupted*.bin
 **/*tampered*.bin
 **/*restored_readback*.bin
+
+# Deliberately corrupted and temporary test images
+**/*corrupted*.bin
+**/*tampered*.bin
+**/*restored_readback*.bin
