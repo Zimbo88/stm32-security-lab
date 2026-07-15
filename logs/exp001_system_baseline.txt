@@ -1,0 +1,11 @@
+2026-07-15T19:59:25+02:00
+Linux mathias-zimmermann-MS-7D32 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+v1.8.0
+Found 1 stlink programmers
+  version:    V2J37S7
+  serial:     57FF6E067182525511261687
+  flash:      1048576 (pagesize: 16384)
+  sram:       262144
+  chipid:     0x419
+  dev-type:   STM32F42x_F43x
+Bus 001 Device 014: ID 0483:3748 STMicroelectronics ST-LINK/V2
