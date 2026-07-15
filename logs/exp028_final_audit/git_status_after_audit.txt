@@ -1,0 +1,3 @@
+?? logic/
+?? logs/board_verification/
+?? logs/exp028_final_audit/git_status_after_audit.txt
