@@ -1,0 +1,38 @@
+EXP027B RDP LEVEL 1 RESULT
+
+Activation:
+- OpenOCD command: stm32f2x lock 0
+- OpenOCD reported: stm32f2x locked
+- Complete power cycle performed
+
+Normal boot:
+- Secure bootloader started
+- Signed image version: 2
+- Minimum accepted version: 2
+- SHA-512 and Ed25519 verification: OK
+- Application started successfully
+- Application heartbeat observed
+
+External read test using st-flash:
+- A 256-byte output file was produced
+- Returned bytes did not match the known bootloader binary
+- Reported Flash size was invalid and inconsistent with the physical MCU
+- Protected user Flash was not correctly disclosed
+
+External read test using OpenOCD:
+- OpenOCD reported: Device Security Bit Set
+- Flash size probing became inaccurate
+- Direct read from 0x08000000 did not produce valid user-Flash contents
+- Debug session entered an invalid/HardFault state
+
+Protection state:
+- RDP Level 1 is active
+- Sector 0 WRP was configured before RDP1 activation
+- Normal internal execution remains operational
+- External user-Flash readout is blocked
+
+Important:
+- Do not execute stm32f2x unlock 0 unless intentionally starting the
+  destructive RDP1-to-RDP0 recovery experiment.
+- Returning to RDP Level 0 causes user-Flash mass erase.
+- Never select RDP Level 2.
