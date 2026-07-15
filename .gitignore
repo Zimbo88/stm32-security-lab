@@ -10,3 +10,8 @@
 *~
 *.swp
 .vscode/
+
+# Firmware signing secrets
+signing/**/firmware_signing_private.pem
+*.private.pem
+*.key
