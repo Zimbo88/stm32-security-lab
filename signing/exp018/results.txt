@@ -1,0 +1,21 @@
+EXP018 SIGNED IMAGE FORMAT – HOST VALIDATION
+
+Image layout:
+- 0x000..0x05F: 96-byte signed manifest
+- 0x060..0x09F: 64-byte Ed25519 signature
+- 0x0A0..0x1FF: reserved padding
+- 0x200 onward: application payload
+- Flash image base: 0x08008000
+- Application vector address: 0x08008200
+
+Signed manifest:
+- Fixed metadata: 32 bytes
+- Payload SHA-512: 64 bytes
+- Total: 96 bytes
+
+Results:
+- Manifest signature verification: PASS
+- Payload SHA-512 verification: PASS
+- One-byte payload modification: REJECTED by SHA-512 comparison
+
+No STM32 flash was modified by this experiment.
