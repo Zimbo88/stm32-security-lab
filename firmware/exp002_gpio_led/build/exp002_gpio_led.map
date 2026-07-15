@@ -1,0 +1,145 @@
+
+Discarded input sections
+
+ .text          0x00000000        0x0 build/startup.o
+ .data          0x00000000        0x0 build/startup.o
+ .bss           0x00000000        0x0 build/startup.o
+ .group         0x00000000        0xc build/main.o
+ .group         0x00000000        0xc build/main.o
+ .text          0x00000000        0x0 build/main.o
+ .data          0x00000000        0x0 build/main.o
+ .bss           0x00000000        0x0 build/main.o
+
+Memory Configuration
+
+Name             Origin             Length             Attributes
+FLASH            0x08000000         0x00100000         xr
+RAM              0x20000000         0x00020000         xrw
+*default*        0x00000000         0xffffffff
+
+Linker script and memory map
+
+LOAD build/startup.o
+LOAD build/main.o
+                0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+
+.isr_vector     0x08000000       0x40
+                0x08000000                        . = ALIGN (0x4)
+ *(.isr_vector)
+ .isr_vector    0x08000000       0x40 build/startup.o
+                0x08000040                        . = ALIGN (0x4)
+
+.text           0x08000040      0x1dc
+                0x08000040                        . = ALIGN (0x4)
+ *(.text*)
+ .text.Reset_Handler
+                0x08000040       0x40 build/startup.o
+                0x08000040                Reset_Handler
+ .text.Default_Handler
+                0x08000080        0x4 build/startup.o
+                0x08000080                Default_Handler
+ .text.delay_cycles
+                0x08000084       0x22 build/main.o
+ .text.gpio_output_init
+                0x080000a6       0x98 build/main.o
+ .text.toggle_pin
+                0x0800013e       0x3a build/main.o
+ .text.main     0x08000178       0xa4 build/main.o
+                0x08000178                main
+ *(.rodata*)
+                0x0800021c                        . = ALIGN (0x4)
+                0x0800021c                        _etext = .
+
+.glue_7         0x0800021c        0x0
+ .glue_7        0x0800021c        0x0 linker stubs
+
+.glue_7t        0x0800021c        0x0
+ .glue_7t       0x0800021c        0x0 linker stubs
+
+.vfp11_veneer   0x0800021c        0x0
+ .vfp11_veneer  0x0800021c        0x0 linker stubs
+
+.v4_bx          0x0800021c        0x0
+ .v4_bx         0x0800021c        0x0 linker stubs
+
+.iplt           0x0800021c        0x0
+ .iplt          0x0800021c        0x0 build/startup.o
+
+.rel.dyn        0x0800021c        0x0
+ .rel.iplt      0x0800021c        0x0 build/startup.o
+
+.data           0x20000000        0x0 load address 0x0800021c
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _sdata = .
+ *(.data*)
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _edata = .
+
+.igot.plt       0x20000000        0x0
+ .igot.plt      0x20000000        0x0 build/startup.o
+
+.bss            0x20000000        0x0
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _sbss = .
+ *(.bss*)
+ *(COMMON)
+                0x20000000                        . = ALIGN (0x4)
+                0x20000000                        _ebss = .
+                0x20000000                        . = ALIGN (0x8)
+                0x20000000                        _end = .
+OUTPUT(build/exp002_gpio_led.elf elf32-littlearm)
+LOAD linker stubs
+
+.ARM.attributes
+                0x00000000       0x2f
+ .ARM.attributes
+                0x00000000       0x21 build/startup.o
+ .ARM.attributes
+                0x00000021       0x2e build/main.o
+
+.comment        0x00000000       0x26
+ .comment       0x00000000       0x26 build/main.o
+                                 0x27 (size before relaxing)
+
+.debug_line     0x00000000      0x1cf
+ .debug_line    0x00000000       0x72 build/startup.o
+ .debug_line    0x00000072      0x15d build/main.o
+
+.debug_line_str
+                0x00000000       0x53
+ .debug_line_str
+                0x00000000       0x53 build/startup.o
+
+.debug_info     0x00000000      0x170
+ .debug_info    0x00000000       0x3b build/startup.o
+ .debug_info    0x0000003b      0x135 build/main.o
+
+.debug_abbrev   0x00000000       0xec
+ .debug_abbrev  0x00000000       0x26 build/startup.o
+ .debug_abbrev  0x00000026       0xc6 build/main.o
+
+.debug_aranges  0x00000000       0x60
+ .debug_aranges
+                0x00000000       0x28 build/startup.o
+ .debug_aranges
+                0x00000028       0x38 build/main.o
+
+.debug_str      0x00000000     0x39fc
+ .debug_str     0x00000000     0x39fc build/startup.o
+                                 0x7d (size before relaxing)
+ .debug_str     0x000039fc     0x3b2e build/main.o
+
+.debug_rnglists
+                0x00000000       0x40
+ .debug_rnglists
+                0x00000000       0x19 build/startup.o
+ .debug_rnglists
+                0x00000019       0x27 build/main.o
+
+.debug_macro    0x00000000      0xe94
+ .debug_macro   0x00000000       0x86 build/main.o
+ .debug_macro   0x00000086      0xac0 build/main.o
+ .debug_macro   0x00000b46      0x34e build/main.o
+
+.debug_frame    0x00000000       0xa4
+ .debug_frame   0x00000000       0xa4 build/main.o
