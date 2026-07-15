@@ -1,0 +1,23 @@
+EXP015 CRC TAMPER REJECTION TEST
+
+Original stored CRC32:
+0x9776FFA9
+
+Manipulation:
+- One payload byte modified
+- Image offset: 0x0220
+- Original byte: 0x81
+- Modified byte: 0x80
+- Header and stored CRC32 remained unchanged
+
+Observed result:
+- Computed CRC32: 0x9A33415D
+- Validation: CRC MISMATCH
+- Application was not started
+- Bootloader halted safely
+- No application heartbeat appeared
+
+Recovery:
+- Original packed image reflashed
+- Readback comparison passed
+- CRC validation returned to OK
