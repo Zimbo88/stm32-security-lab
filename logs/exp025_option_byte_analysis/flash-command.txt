@@ -1,0 +1,20 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : auto-selecting first available session transport "hla_swd". To override use 'transport select <transport>'.
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+flash
+  flash bank bank_id driver_name base_address size_bytes chip_width_bytes
+            bus_width_bytes target [driver_options ...]
+  flash banks
+  flash init
+  flash list
+gdb_flash_program ('enable'|'disable')
+nand
+program <filename> [address] [pre-verify] [verify] [reset] [exit]
+stm32f2x
+  stm32f2x lock bank_id
+  stm32f2x mass_erase bank_id
+  stm32f2x unlock bank_id
+

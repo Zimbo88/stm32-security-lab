@@ -1,0 +1,10 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : auto-selecting first available session transport "hla_swd". To override use 'transport select <transport>'.
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+#0 : stm32f4x.flash (stm32f2x) at 0x00000000, size 0x00000000, buswidth 0, chipwidth 0
+#1 : stm32f4x.otp (stm32f2x) at 0x1fff7800, size 0x00000000, buswidth 0, chipwidth 0
+
+shutdown command invoked

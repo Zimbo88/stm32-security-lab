@@ -1,0 +1,17 @@
+EXP025 OPTION BYTE TOOL ANALYSIS
+
+Purpose:
+- Determine which option-byte related commands are available.
+- No flash or option bytes were modified.
+
+Collected:
+- st-flash help
+- st-info help
+- OpenOCD version
+- OpenOCD command list
+- flash bank information
+- STM32F4 command availability
+
+Result:
+- Read-only investigation only.
+- Device configuration unchanged.

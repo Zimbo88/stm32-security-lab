@@ -1,0 +1,17 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : auto-selecting first available session transport "hla_swd". To override use 'transport select <transport>'.
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+stm32f2x
+  stm32f2x lock bank_id
+  stm32f2x mass_erase bank_id
+  stm32f2x optcr2_write bank_id optcr2
+  stm32f2x options_read bank_id
+  stm32f2x options_write bank_id user_options [ boot_add0 boot_add1 ]
+  stm32f2x otp bank_id
+  stm32f2x unlock bank_id
+embedded:startup.tcl:1610: Error: 
+in procedure 'stm32f4x' 
+at file "embedded:startup.tcl", line 1610
