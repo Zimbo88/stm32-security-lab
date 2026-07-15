@@ -1,0 +1,22 @@
+EXP016 HOST-SIDE SIGNATURE BASELINE
+
+Algorithm:
+- Ed25519
+
+Signed object:
+- /home/mathias-zimmermann/stm32-security-lab/firmware/exp014_application_crc/build/exp014_application_crc_image.bin
+
+Artifacts:
+- Private key: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/firmware_signing_private.pem
+- Public key: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/firmware_signing_public.pem
+- Signature: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/exp014_application_crc_image.sig
+- Tampered image: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/exp014_application_crc_image_tampered.bin
+
+Results:
+- Original image signature: PASS
+- One-byte modified image signature: REJECTED
+
+Important:
+- This experiment verifies signatures on the host only.
+- The STM32 bootloader still enforces CRC32 only.
+- The private key must never be embedded in firmware or committed to Git.

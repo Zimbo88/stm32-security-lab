@@ -1,0 +1,30 @@
+== OpenSSL ==
+OpenSSL 3.0.13 30 Jan 2024 (Library: OpenSSL 3.0.13 30 Jan 2024)
+
+== Ed25519-Schlüsselpaar erzeugen ==
+
+== Image-Hashes ==
+a845de6b300a93e7929d86ba56eb06598b003192268b386f3603dc45bf400724  /home/mathias-zimmermann/stm32-security-lab/firmware/exp014_application_crc/build/exp014_application_crc_image.bin
+ab759067c1f98fadaeb71100ac8c46fc8db9449703cda69bc8d1186637e8db3c  /home/mathias-zimmermann/stm32-security-lab/signing/exp016/firmware_signing_public.pem
+
+== Image signieren ==
+Signaturgröße: 64 Bytes
+00000000: b0 78 39 5b d4 ed c8 73 a6 4d b0 72 b1 a5 e3 d2  .x9[...s.M.r....
+00000010: 10 07 dd f9 19 01 c5 f5 2f db a8 ae 9d 5b 14 e8  ......../....[..
+00000020: 85 5b e8 d0 aa f9 46 08 8a ce 02 5c dc c8 24 b3  .[....F....\..$.
+00000030: 59 74 31 aa 86 17 85 1e 57 e0 99 ca 3c 20 ff 0e  Yt1.....W...< ..
+
+== Originalsignatur prüfen ==
+Signature Verified Successfully
+
+== Manipulierte Kopie erzeugen ==
+Offset:      0x0220
+Original:    0x81
+Manipuliert: 0x80
+
+== Manipuliertes Image muss abgelehnt werden ==
+Signature Verification Failure
+PASS: Manipuliertes Image wurde von der Signaturprüfung abgelehnt.
+
+Ergebnisse: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/results.txt
+WICHTIG: Privaten Schlüssel nicht zu Git hinzufügen.
