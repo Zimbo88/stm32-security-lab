@@ -13,5 +13,7 @@ Flags:
 - PORRSTF
 
 C: ST-Link/AIRCR software reset
-RCC_CSR:
+RCC_CSR: 0x14000000
 Flags:
+- PINRSTF
+- SFTRSTF
