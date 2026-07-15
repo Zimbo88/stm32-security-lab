@@ -1,0 +1,3 @@
+Antwortlänge: 1
+Antwort hex: 79
+Ergebnis: ACK 0x79 – ROM-Bootloader erkannt.

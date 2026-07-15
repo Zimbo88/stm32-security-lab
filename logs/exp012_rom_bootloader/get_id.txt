@@ -1,0 +1,4 @@
+N-Feld:        1
+Produkt-ID:    04 19
+Produkt-ID 16: 0x0419
+Final ACK:     0x79
