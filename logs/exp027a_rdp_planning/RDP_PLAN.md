@@ -69,3 +69,16 @@ Proceed only if all conditions are true:
 - The exact RDP1 command is independently verified.
 - The exact RDP0 recovery command is independently verified.
 - The expected mass-erase behavior is accepted.
+
+## Go/no-go conditions for EXP027B
+
+Proceed only if all conditions are true:
+
+- Full Flash backup hashes pass.
+- Recovery archive hash passes.
+- Current option registers are documented.
+- Sector-0 WRP is confirmed.
+- Signed application boots successfully.
+- The exact RDP1 command is independently verified.
+- The exact RDP0 recovery command is independently verified.
+- The expected mass-erase behavior is accepted.
