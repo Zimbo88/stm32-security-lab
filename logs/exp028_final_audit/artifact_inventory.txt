@@ -1,0 +1,57 @@
+EXP028 SECURITY LAB ARTIFACT INVENTORY
+
+== Firmware projects ==
+exp002_gpio_led
+exp003_uart
+exp004_register_explorer
+exp005_system_identity
+exp007_memory_map
+exp008_clock_explorer
+exp009_pll_84mhz
+exp010_mpu_fault
+exp013_application
+exp013_bootloader
+exp014_application_crc
+exp014_bootloader_crc
+exp019_signed_bootloader
+exp022_rollback_floor
+
+== Signing artifacts ==
+signing/exp016/exp014_application_crc_image.sig  64 bytes
+signing/exp016/exp014_application_crc_image_tampered.bin  1508 bytes
+signing/exp016/firmware_signing_private.pem  119 bytes
+signing/exp016/firmware_signing_public.pem  113 bytes
+signing/exp016/image.sha256  181 bytes
+signing/exp016/public_key.sha256  153 bytes
+signing/exp016/results.txt  912 bytes
+signing/exp017/firmware_public_key.h  382 bytes
+signing/exp017/firmware_signing_public.der  44 bytes
+signing/exp017/firmware_signing_public.raw  32 bytes
+signing/exp018/artifacts.sha256  580 bytes
+signing/exp018/exp018_signed_application_image.bin  1508 bytes
+signing/exp018/exp018_signed_application_image_tampered.bin  1508 bytes
+signing/exp018/exp020_signed_image_readback.bin  1508 bytes
+signing/exp018/manifest.bin  96 bytes
+signing/exp018/manifest.sig  64 bytes
+signing/exp018/results.txt  576 bytes
+signing/exp018/signed_header.bin  512 bytes
+signing/exp021/invalid_signature_valid_payload.bin  1508 bytes
+signing/exp021/modified_manifest.bin  96 bytes
+signing/exp021/original_signature.bin  64 bytes
+signing/exp021/restored_readback.bin  1508 bytes
+signing/exp022/images.sha256  306 bytes
+signing/exp022/manifest_v2.bin  96 bytes
+signing/exp022/manifest_v2.sig  64 bytes
+signing/exp022/payload.bin  996 bytes
+signing/exp022/results.txt  391 bytes
+signing/exp022/signed_image_v2.bin  1508 bytes
+signing/exp022/version2_readback.bin  1508 bytes
+
+== Recovery artifacts ==
+baseline/exp024_recovery/full_flash_1MiB.bin  1048576 bytes
+baseline/exp024_recovery/option_registers.txt  561 bytes
+baseline/exp024_recovery/option_register_values.txt  136 bytes
+baseline/exp024_recovery/RECOVERY.md  1123 bytes
+baseline/exp024_recovery/sector0_bootloader_16KiB.bin  16384 bytes
+baseline/exp024_recovery/sector2_signed_image_16KiB.bin  16384 bytes
+baseline/exp024_recovery/SHA256SUMS  583 bytes
