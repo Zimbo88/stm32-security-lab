@@ -39,7 +39,8 @@
 
 ### Integrity
 
-A modified payload was rejected by the integrity check.
+A modified application payload was rejected. The bootloader did not transfer
+control to the application.
 
 ### Authenticity
 
@@ -48,40 +49,48 @@ Ed25519 signature was invalid.
 
 ### Rollback prevention
 
-Correctly signed image version 1 was rejected because the minimum accepted
-version is 2.
+A correctly signed image with version 1 was rejected because the minimum
+accepted version was 2.
 
-Correctly signed image version 2 was accepted and executed.
+A correctly signed image with version 2 was accepted and executed.
 
 ### Bootloader write protection
 
 Flash sector 0 is write protected.
 
-Attempts to erase or overwrite the bootloader failed.
+An attempted erase or overwrite of the bootloader failed. A subsequent
+readback comparison confirmed that the bootloader remained unchanged.
 
-The application sector remained updateable.
+The application sector remained writable before RDP Level 1 was enabled.
 
 ### Readout protection
 
 RDP Level 1 is active.
 
-Normal internal boot remains functional.
+Normal internal boot remains functional. External user-Flash readback did not
+disclose the original bootloader data.
 
-External user-Flash readback did not disclose the original bootloader contents.
+OpenOCD reported:
 
-OpenOCD reported that the device security bit was set.
+    Device Security Bit Set
+
+Flash-size detection by external tools became unreliable under protection,
+which is consistent with inaccessible protected device information.
 
 ## Current device state
 
-- Secure bootloader installed
-- Signed application version 2 installed
+- Secure bootloader installed at 0x08000000
+- Signed application version 2 installed at 0x08008000
+- Application vector table at 0x08008200
 - Sector-0 write protection active
 - RDP Level 1 active
-- Secure boot and application heartbeat operational
+- SHA-512 and Ed25519 verification operational
+- Rollback minimum version set to 2
+- Application heartbeat operational
 
 ## Recovery material
 
-The recovery package contains:
+The EXP024 recovery package contains:
 
 - Full 1 MiB Flash backup
 - Sector-0 bootloader backup
@@ -92,25 +101,57 @@ The recovery package contains:
 - Recovery documentation
 - Compressed recovery archive
 
+All recorded recovery hashes passed during the final audit.
+
 ## Recovery warning
 
 Returning from RDP Level 1 to RDP Level 0 causes the internal user Flash to be
 mass-erased.
 
-After unlocking, the bootloader and application must be restored and sector-0
-write protection must be reapplied.
+After unlocking:
+
+1. Restore the bootloader at 0x08000000.
+2. Restore the signed image at 0x08008000.
+3. Reapply sector-0 write protection.
+4. Verify all option bytes.
+5. Verify secure boot over UART.
 
 RDP Level 2 must never be selected in this laboratory.
+
+## Private-key handling
+
+The firmware signing private key exists locally on the development host but is
+excluded by `.gitignore`.
+
+The final Git audit found no tracked filename matching the private signing key,
+a `.key` suffix, or the configured private-key naming pattern.
 
 ## Security limitations
 
 - The rollback minimum is compiled into the bootloader rather than stored in
   protected monotonic hardware state.
-- Physical fault injection and invasive attacks were not evaluated.
+- Physical fault injection was not evaluated.
+- Invasive attacks were not evaluated.
 - Side-channel resistance was not evaluated.
 - Availability attacks remain possible.
-- The UART output reveals firmware metadata and should be reduced or disabled
+- UART output exposes firmware metadata and should be disabled or restricted
   in a production configuration.
 - Key rotation and revocation are not implemented.
-- Secure firmware transport and update authorization are outside the current
-  implementation.
+- Secure firmware transport is outside the current implementation.
+- Update authorization beyond signature verification is not implemented.
+- RDP Level 1 is reversible only through a destructive return to Level 0.
+
+## Final assessment
+
+The laboratory implementation demonstrates a functioning STM32F429 secure
+boot chain combining:
+
+- SHA-512 payload integrity
+- Ed25519 firmware authenticity
+- signed-image version enforcement
+- bootloader sector write protection
+- RDP Level 1 readout protection
+- documented recovery material
+
+The installed signed version-2 application boots successfully while invalid,
+modified, and rollback images are rejected.
