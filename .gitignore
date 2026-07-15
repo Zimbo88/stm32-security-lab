@@ -1,0 +1,12 @@
+# Compiler output
+**/build/*.o
+**/build/*.elf
+**/build/*.map
+
+# Temporary readbacks
+**/build/*readback*.bin
+
+# Editor files
+*~
+*.swp
+.vscode/
