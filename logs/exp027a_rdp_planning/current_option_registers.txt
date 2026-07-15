@@ -1,0 +1,19 @@
+EXP027A CURRENT OPTION REGISTER STATE
+
+FLASH_OPTCR:
+0x???????? 
+
+FLASH_OPTCR1:
+0x????????
+
+Expected policy:
+- RDP Level 0
+- Sector 0 write protected
+- Other sectors unprotected
+
+Measured using:
+- OpenOCD 0.12.0
+- ST-Link SWD
+- Read-only mdw commands
+
+No option bytes were changed.
