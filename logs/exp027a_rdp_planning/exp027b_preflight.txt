@@ -1,0 +1,23 @@
+== Recovery hashes ==
+baseline/exp024_recovery/full_flash_1MiB.bin: OK
+baseline/exp024_recovery/sector0_bootloader_16KiB.bin: OK
+baseline/exp024_recovery/sector2_signed_image_16KiB.bin: OK
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.bin: OK
+signing/exp022/signed_image_v2.bin: OK
+
+== Recovery archive ==
+baseline/exp024_recovery.tar.gz: OK
+
+== Required files ==
+
+== Hardware connection ==
+Found 1 stlink programmers
+  version:    V2J37S7
+  serial:     57FF6E067182525511261687
+  flash:      1048576 (pagesize: 16384)
+  sram:       262144
+  chipid:     0x419
+  dev-type:   STM32F42x_F43x
+
+GO: EXP027B prerequisites passed.
+No option bytes were modified.
