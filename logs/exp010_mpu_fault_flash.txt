@@ -1,0 +1,16 @@
+arm-none-eabi-size build/exp010_mpu_fault.elf
+   text	   data	    bss	    dec	    hex	filename
+   3516	      8	      0	   3524	    dc4	build/exp010_mpu_fault.elf
+st-flash --reset write build/exp010_mpu_fault.bin 0x08000000
+st-flash 1.8.0
+2026-07-15T21:37:01 INFO common.c: STM32F42x_F43x: 256 KiB SRAM, 1024 KiB flash in at least 16 KiB pages.
+file build/exp010_mpu_fault.bin md5 checksum: e6c45eccb68354d2b8f84adaf75c127d, stlink checksum: 0x00046a8e
+2026-07-15T21:37:01 INFO common_flash.c: Attempting to write 3524 (0xdc4) bytes to stm32 address: 134217728 (0x8000000)
+EraseFlash - Sector:0x0 Size:0x4000 -> Flash page at 0x8000000 erased (size: 0x4000)
+2026-07-15T21:37:01 INFO flash_loader.c: Starting Flash write for F2/F4/F7/L4
+2026-07-15T21:37:01 INFO flash_loader.c: Successfully loaded flash loader in sram
+2026-07-15T21:37:01 INFO flash_loader.c: Clear DFSR
+2026-07-15T21:37:01 INFO flash_loader.c: enabling 32-bit flash writes
+2026-07-15T21:37:01 INFO common_flash.c: Starting verification of write complete
+2026-07-15T21:37:01 INFO common_flash.c: Flash written and verified! jolly good!
+2026-07-15T21:37:01 INFO common.c: NRST is not connected --> using software reset via AIRCR
