@@ -1,0 +1,30 @@
+EXP023 OPTION REGISTER READOUT
+
+FLASH_OPTCR address:
+0x40023C14
+
+FLASH_OPTCR value:
+0x0FFFAAED
+
+FLASH_OPTCR1 address:
+0x40023C18
+
+FLASH_OPTCR1 value:
+0x0FFF0000
+
+Decoded protection state:
+- RDP option byte: 0xAA
+- Read protection: Level 0 / disabled
+- nWRP bits: 0xFFF
+- Flash sector write protection: disabled for all represented sectors
+- Option control register lock: active
+- SWD debug access: available
+- Bootloader Flash readback: successful
+
+Method:
+- OpenOCD 0.12.0
+- ST-Link SWD
+- Target halted
+- Read-only mdw commands
+
+No option bytes were modified.

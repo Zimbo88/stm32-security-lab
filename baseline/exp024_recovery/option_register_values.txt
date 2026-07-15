@@ -1,0 +1,5 @@
+FLASH_OPTCR  0x40023C14 = 0x0FFFAAED
+FLASH_OPTCR1 0x40023C18 = 0x0FFF0000
+
+RDP: 0xAA / Level 0
+nWRP: 0xFFF / no sector write protection
