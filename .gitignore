@@ -35,3 +35,6 @@ signing/**/firmware_signing_private.pem
 **/*corrupted*.bin
 **/*tampered*.bin
 **/*restored_readback*.bin
+
+# Temporary flash readbacks
+**/*readback*.bin

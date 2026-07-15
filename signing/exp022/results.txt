@@ -1,0 +1,15 @@
+EXP022 ROLLBACK TEST PREPARATION
+
+Bootloader:
+- Project: firmware/exp022_rollback_floor
+- Minimum accepted image version: 2
+
+Test images:
+- Old correctly signed image version 1:
+  signing/exp018/exp018_signed_application_image.bin
+- New correctly signed image version 2:
+  signing/exp022/signed_image_v2.bin
+
+Expected:
+- Version 1 -> ROLLBACK VERSION REJECTED
+- Version 2 -> Verification OK

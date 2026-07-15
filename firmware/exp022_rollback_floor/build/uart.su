@@ -1,0 +1,5 @@
+src/uart.c:26:6:uart_init_115200_hsi16	0	static
+src/uart.c:52:6:uart_putc	0	static
+src/uart.c:59:6:uart_puts	8	static
+src/uart.c:69:6:uart_put_hex32	16	static
+src/uart.c:78:6:uart_put_u32	32	static
