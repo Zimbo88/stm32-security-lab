@@ -1,0 +1,17 @@
+arm-none-eabi-size build/exp013_application.elf
+   text	   data	    bss	    dec	    hex	filename
+    880	      0	      0	    880	    370	build/exp013_application.elf
+st-flash --reset write build/exp013_application.bin 0x08008000
+st-flash 1.8.0
+2026-07-15T22:15:42 INFO common.c: STM32F42x_F43x: 256 KiB SRAM, 1024 KiB flash in at least 16 KiB pages.
+file build/exp013_application.bin md5 checksum: 842bb8667f4f7b65ef3095a683ccafc9, stlink checksum: 0x000112fe
+2026-07-15T22:15:42 INFO common_flash.c: Attempting to write 880 (0x370) bytes to stm32 address: 134250496 (0x8008000)
+EraseFlash - Sector:0x2 Size:0x4000 -> Flash page at 0x8008000 erased (size: 0x4000)
+2026-07-15T22:15:42 INFO flash_loader.c: Starting Flash write for F2/F4/F7/L4
+2026-07-15T22:15:42 INFO flash_loader.c: Successfully loaded flash loader in sram
+2026-07-15T22:15:42 INFO flash_loader.c: Clear DFSR
+2026-07-15T22:15:42 INFO flash_loader.c: Clear CFSR
+2026-07-15T22:15:42 INFO flash_loader.c: enabling 32-bit flash writes
+2026-07-15T22:15:42 INFO common_flash.c: Starting verification of write complete
+2026-07-15T22:15:42 INFO common_flash.c: Flash written and verified! jolly good!
+2026-07-15T22:15:42 INFO common.c: NRST is not connected --> using software reset via AIRCR
