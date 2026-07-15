@@ -1,0 +1,21 @@
+EXP023 OPTION REGISTER READOUT
+
+FLASH_OPTCR address:
+0x40023C14
+
+FLASH_OPTCR value:
+0x???????? 
+
+FLASH_OPTCR1 address:
+0x40023C18
+
+FLASH_OPTCR1 value:
+0x????????
+
+Method:
+- OpenOCD 0.12.0
+- ST-Link SWD
+- Target halted
+- Read-only mdw commands
+
+No option bytes were modified.
