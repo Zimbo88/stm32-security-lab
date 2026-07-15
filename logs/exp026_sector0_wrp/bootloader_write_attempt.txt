@@ -1,0 +1,8 @@
+st-flash 1.8.0
+2026-07-15T23:12:17 INFO common.c: STM32F42x_F43x: 256 KiB SRAM, 1024 KiB flash in at least 16 KiB pages.
+file firmware/exp022_rollback_floor/build/exp022_rollback_floor.bin md5 checksum: 94f47e6554686998a92b62c425d7b8f, stlink checksum: 0x00156f3f
+2026-07-15T23:12:17 INFO common_flash.c: Attempting to write 12596 (0x3134) bytes to stm32 address: 134217728 (0x8000000)
+EraseFlash - Sector:0x0 Size:0x4000 2026-07-15T23:12:17 ERROR common_flash.c: Flash memory is write protected
+2026-07-15T23:12:17 WARN common_flash.c: Failed to erase_flash_page(0x8000000) == -1
+2026-07-15T23:12:17 ERROR common_flash.c: Failed to erase the flash prior to writing
+stlink_fwrite_flash() == -1

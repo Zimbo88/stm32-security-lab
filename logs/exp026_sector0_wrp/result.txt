@@ -1,0 +1,27 @@
+EXP026 SECTOR 0 WRITE PROTECTION RESULT
+
+Before:
+- Flash sector 0: not protected
+- Flash sectors 1 through 11: not protected
+
+Protection operation:
+- OpenOCD command: flash protect 0 0 0 on
+- Target: Flash bank 0, sector 0 only
+
+After:
+- Flash sector 0: protected
+- Flash sectors 1 through 11: not protected
+- SWD connection remained available
+- RDP remained at Level 0
+
+Negative test:
+- Bootloader erase/write attempt failed
+- Error: Flash memory is write protected
+- Bootloader readback remained unchanged
+- Result: PASS
+
+Positive test:
+- Signed application at 0x08008000 remained writable
+- Application readback comparison passed
+- Secure boot verification remained OK
+- Result: PASS

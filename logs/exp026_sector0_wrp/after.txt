@@ -1,0 +1,40 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : auto-selecting first available session transport "hla_swd". To override use 'transport select <transport>'.
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+Info : clock speed 2000 kHz
+Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748
+Info : Target voltage: 3.187377
+Info : [stm32f4x.cpu] Cortex-M4 r0p1 processor detected
+Info : [stm32f4x.cpu] target has 6 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32f4x.cpu on 3333
+Info : Listening on port 3333 for gdb connections
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+[stm32f4x.cpu] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0x08000040 msp: 0x20020000
+Info : device id = 0x20036419
+Info : flash size = 1024 KiB
+Info : Single Bank 1024 kiB STM32F42x/43x/469/479 found
+flash 'stm32f2x' found at 0x08000000
+
+#0 : stm32f2x at 0x08000000, size 0x00100000, buswidth 0, chipwidth 0
+	#  0: 0x00000000 (0x4000 16kB) protected
+	#  1: 0x00004000 (0x4000 16kB) not protected
+	#  2: 0x00008000 (0x4000 16kB) not protected
+	#  3: 0x0000c000 (0x4000 16kB) not protected
+	#  4: 0x00010000 (0x10000 64kB) not protected
+	#  5: 0x00020000 (0x20000 128kB) not protected
+	#  6: 0x00040000 (0x20000 128kB) not protected
+	#  7: 0x00060000 (0x20000 128kB) not protected
+	#  8: 0x00080000 (0x20000 128kB) not protected
+	#  9: 0x000a0000 (0x20000 128kB) not protected
+	# 10: 0x000c0000 (0x20000 128kB) not protected
+	# 11: 0x000e0000 (0x20000 128kB) not protected
+STM32F4xx - Rev: unknown (0x2003)
+
+stm32f2x user_options 0x0EC
+
+shutdown command invoked
