@@ -1,0 +1,16 @@
+Component: Monocypher
+Version: 4.0.3
+Source release:
+https://github.com/LoupVaillant/Monocypher/archive/refs/tags/4.0.3.tar.gz
+
+Required files:
+- src/monocypher.c
+- src/monocypher.h
+- src/optional/monocypher-ed25519.c
+- src/optional/monocypher-ed25519.h
+
+Purpose:
+Ed25519 verification inside the STM32F429 bootloader.
+
+Licensing:
+CC0-1.0 or 2-clause BSD, according to the upstream project.
