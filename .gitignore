@@ -38,3 +38,6 @@ signing/**/firmware_signing_private.pem
 
 # Temporary flash readbacks
 **/*readback*.bin
+
+# Generated signature-test artifacts
+signing/exp021/*.bin
