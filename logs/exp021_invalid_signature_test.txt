@@ -1,0 +1,27 @@
+EXP021 INVALID ED25519 SIGNATURE TEST
+
+Test preparation:
+- Original signed image version: 1
+- Modified signed image version: 2
+- Only manifest byte at image offset 0x08 was changed
+- Application payload remained unchanged
+- Stored SHA-512 remained valid for the payload
+
+Host-side result:
+- Ed25519 signature verification: FAILURE
+
+STM32 bootloader result:
+- Magic: 0x31474953
+- Header version: 1
+- Image version: 2
+- Payload SHA-512: valid
+- Verification: ED25519 SIGNATURE INVALID
+- Application was not started
+- Bootloader halted safely
+- No application heartbeat appeared
+
+Recovery:
+- Original signed image restored
+- Readback comparison passed
+- Verification returned to OK
+- Application started successfully
