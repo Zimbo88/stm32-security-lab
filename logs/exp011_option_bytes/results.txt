@@ -1,0 +1,30 @@
+EXP011 OPTION BYTE READ-ONLY BASELINE
+
+FLASH_OPTCR:
+Address: 0x40023C14
+Value:   0x0FFFAAED
+
+Decoded:
+- RDP = 0xAA
+- RDP level = Level 0
+- Readout protection = disabled
+- nWRP = 0x0FFF
+- Sector write protection = not active
+- WDG_SW = 1
+- nRST_STOP = 1
+- nRST_STDBY = 1
+- BOR_LEV = 0b11
+- OPTLOCK = 1
+
+FLASH_OPTCR1:
+Address: 0x40023C18
+Value:   0x0FFF0000
+
+Method:
+- OpenOCD 0.12.0
+- ST-LINK/V2
+- SWD
+- Read-only mdw commands
+
+No option bytes were modified.
+No RDP setting was changed.
