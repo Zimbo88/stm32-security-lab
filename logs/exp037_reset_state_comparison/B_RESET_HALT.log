@@ -1,0 +1,59 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+B_RESET_HALT
+RESET_HALT
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+Info : clock speed 1000 kHz
+Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748
+Info : Target voltage: 3.187377
+Info : [stm32f4x.cpu] Cortex-M4 r0p1 processor detected
+Info : [stm32f4x.cpu] target has 6 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32f4x.cpu on 3333
+Info : Listening on port 3333 for gdb connections
+[stm32f4x.cpu] halted due to breakpoint, current mode: Handler HardFault
+xPSR: 0x21000003 pc: 0xfffffffe msp: 0x2001ffc0
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+[stm32f4x.cpu] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+=== EXP037 STATE SNAPSHOT ===
+SNAPSHOT|B_RESET_HALT
+RESET_MODE|RESET_HALT
+FORMAT: NAME|ADDRESS_OR_REGISTER|STATUS|VALUE
+CORE_PC|REG:pc|OK|0xfffffffe
+CORE_MSP|REG:msp|OK|0xfffffffc
+CORE_PSP|REG:psp|OK|0x00000000
+CORE_XPSR|REG:xpsr|FAIL
+CORE_CONTROL|REG:control|OK|0x00
+CORE_PRIMASK|REG:primask|OK|0x00
+CORE_BASEPRI|REG:basepri|OK|0x00
+CORE_FAULTMASK|REG:faultmask|OK|0x01
+SCB_CPUID|0xE000ED00|OK|0x410fc241
+SCB_ICSR|0xE000ED04|OK|0x3000
+SCB_VTOR|0xE000ED08|OK|0x0
+SCB_AIRCR|0xE000ED0C|OK|0xfa050000
+SCB_SCR|0xE000ED10|OK|0x0
+SCB_CCR|0xE000ED14|OK|0x200
+SCB_SHCSR|0xE000ED24|OK|0x0
+SCB_CFSR|0xE000ED28|OK|0x0
+SCB_HFSR|0xE000ED2C|OK|0x2
+SCB_DFSR|0xE000ED30|OK|0x8
+SCB_MMFAR|0xE000ED34|OK|0xe000edf8
+SCB_BFAR|0xE000ED38|OK|0xe000edf8
+SCB_AFSR|0xE000ED3C|OK|0x0
+COREDEBUG_DHCSR|0xE000EDF0|OK|0x30003
+COREDEBUG_DEMCR|0xE000EDFC|OK|0x1000000
+DBGMCU_IDCODE|0xE0042000|OK|0x20036419
+FLASH_SR|0x40023C0C|OK|0x0
+FLASH_CR|0x40023C10|OK|0x80000000
+FLASH_OPTCR|0x40023C14|OK|0xffe00ed
+FLASH_OPTCR1|0x40023C18|OK|0xfff0000
+RCC_CR|0x40023800|OK|0x5f83
+RCC_CFGR|0x40023808|OK|0x0
+RCC_CSR|0x40023874|OK|0x1e000000
+PWR_CR|0x40007000|OK|0xc000
+SYSCFG_MEMRMP|0x40013800|OK|0x0
+EXP037_SNAPSHOT_COMPLETE|B_RESET_HALT
+shutdown command invoked
