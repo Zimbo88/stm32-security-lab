@@ -1,22 +1,22 @@
-#include "board.h"
 #include "board_clock.h"
+#include "board.h"
 
-uint32_t board_sysclk_hz(void)
+void board_clock_init(void)
+{
+    /*
+     * EXP063:
+     * Intentionally keep the STM32 in its reset clock configuration.
+     *
+     * After reset:
+     *   - HSI = 16 MHz
+     *   - PLL disabled
+     *   - HSE disabled
+     *
+     * Future experiments will configure the clock tree here.
+     */
+}
+
+uint32_t board_clock_get_sysclk_hz(void)
 {
     return BOARD_HSI_HZ;
-}
-
-uint32_t board_hclk_hz(void)
-{
-    return board_sysclk_hz();
-}
-
-uint32_t board_pclk1_hz(void)
-{
-    return board_hclk_hz();
-}
-
-uint32_t board_pclk2_hz(void)
-{
-    return board_hclk_hz();
 }

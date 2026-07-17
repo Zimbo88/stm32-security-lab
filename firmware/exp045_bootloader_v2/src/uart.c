@@ -23,6 +23,11 @@
 #define USART_CR1_TE  (1UL << 3)
 #define USART_CR1_RE  (1UL << 2)
 
+void uart_init(void)
+{
+    uart_init_115200_hsi16();
+}
+
 void uart_init_115200_hsi16(void)
 {
     RCC_AHB1ENR |= (1UL << 0);

@@ -3,9 +3,8 @@
 
 #include <stdint.h>
 
-uint32_t board_sysclk_hz(void);
-uint32_t board_hclk_hz(void);
-uint32_t board_pclk1_hz(void);
-uint32_t board_pclk2_hz(void);
+void board_clock_init(void);
+
+uint32_t board_clock_get_sysclk_hz(void);
 
 #endif

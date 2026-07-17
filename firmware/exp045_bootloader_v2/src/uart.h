@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+void uart_init(void);
 void uart_init_115200_hsi16(void);
 void uart_putc(char c);
 void uart_puts(const char *s);
