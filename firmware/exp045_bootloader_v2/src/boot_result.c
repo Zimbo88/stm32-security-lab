@@ -1,5 +1,6 @@
 #include "boot_result.h"
 
+#include "led_show.h"
 #include "uart.h"
 
 void boot_result_print(verify_status_t status)
@@ -14,6 +15,5 @@ _Noreturn void boot_result_halt(void)
     uart_puts("Application will NOT be started.\n");
     uart_puts("Bootloader halted safely.\n");
 
-    for (;;) {
-    }
+    led_show_retro_loop();
 }
