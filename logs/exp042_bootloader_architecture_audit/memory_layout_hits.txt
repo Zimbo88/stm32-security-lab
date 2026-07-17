@@ -1,0 +1,453 @@
+firmware/exp013_bootloader/src/boot.h:6:#define APP_BASE 0x08008000UL
+firmware/exp013_bootloader/src/main.c:31:        uart_puts("Bootloader halted; flash application at 0x08008000.\n");
+firmware/exp013_bootloader/src/boot.c:28:        (msp >= 0x20000000UL) && (msp <= 0x20020000UL);
+firmware/exp013_bootloader/linker.ld:5:    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 16K
+firmware/exp013_bootloader/linker.ld:6:    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+firmware/exp013_bootloader/linker.ld:9:_estack = ORIGIN(RAM) + LENGTH(RAM);
+firmware/exp013_bootloader/build/exp013_bootloader.map:38:FLASH            0x08000000         0x00004000         xr
+firmware/exp013_bootloader/build/exp013_bootloader.map:39:RAM              0x20000000         0x00020000         xrw
+firmware/exp013_bootloader/build/exp013_bootloader.map:49:                0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+firmware/exp013_bootloader/build/exp013_bootloader.map:51:.isr_vector     0x08000000       0x40
+firmware/exp013_bootloader/build/exp013_bootloader.map:52:                0x08000000                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:54: .isr_vector    0x08000000       0x40 build/startup.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:55:                0x08000040                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:57:.text           0x08000040      0x538
+firmware/exp013_bootloader/build/exp013_bootloader.map:58:                0x08000040                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:61:                0x08000040       0x40 build/startup.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:62:                0x08000040                Reset_Handler
+firmware/exp013_bootloader/build/exp013_bootloader.map:64:                0x08000080        0x4 build/startup.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:65:                0x08000080                Default_Handler
+firmware/exp013_bootloader/build/exp013_bootloader.map:67:                0x08000084       0x14 build/boot.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:69:                0x08000098       0x14 build/boot.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:71:                0x080000ac       0x84 build/boot.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:72:                0x080000ac                boot_application_is_valid
+firmware/exp013_bootloader/build/exp013_bootloader.map:74:                0x08000130       0x70 build/boot.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:75:                0x08000130                boot_jump_to_application
+firmware/exp013_bootloader/build/exp013_bootloader.map:77:                0x080001a0       0x26 build/delay.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:78:                0x080001a0                delay_cycles
+firmware/exp013_bootloader/build/exp013_bootloader.map:79: *fill*         0x080001c6        0x2 
+firmware/exp013_bootloader/build/exp013_bootloader.map:80: .text.main     0x080001c8       0xd0 build/main.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:81:                0x080001c8                main
+firmware/exp013_bootloader/build/exp013_bootloader.map:83:                0x08000298       0xd8 build/uart.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:84:                0x08000298                uart_init_115200_hsi16
+firmware/exp013_bootloader/build/exp013_bootloader.map:86:                0x08000370       0x30 build/uart.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:87:                0x08000370                uart_putc
+firmware/exp013_bootloader/build/exp013_bootloader.map:89:                0x080003a0       0x38 build/uart.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:90:                0x080003a0                uart_puts
+firmware/exp013_bootloader/build/exp013_bootloader.map:92:                0x080003d8       0x48 build/uart.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:93:                0x080003d8                uart_put_hex32
+firmware/exp013_bootloader/build/exp013_bootloader.map:95: .rodata        0x08000420      0x140 build/main.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:96: .rodata        0x08000560        0x3 build/uart.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:97: *fill*         0x08000563        0x1 
+firmware/exp013_bootloader/build/exp013_bootloader.map:98: .rodata.hex.0  0x08000564       0x11 build/uart.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:99:                0x08000578                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:100: *fill*         0x08000575        0x3 
+firmware/exp013_bootloader/build/exp013_bootloader.map:101:                0x08000578                        _etext = .
+firmware/exp013_bootloader/build/exp013_bootloader.map:103:.glue_7         0x08000578        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:104: .glue_7        0x08000578        0x0 linker stubs
+firmware/exp013_bootloader/build/exp013_bootloader.map:106:.glue_7t        0x08000578        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:107: .glue_7t       0x08000578        0x0 linker stubs
+firmware/exp013_bootloader/build/exp013_bootloader.map:109:.vfp11_veneer   0x08000578        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:110: .vfp11_veneer  0x08000578        0x0 linker stubs
+firmware/exp013_bootloader/build/exp013_bootloader.map:112:.v4_bx          0x08000578        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:113: .v4_bx         0x08000578        0x0 linker stubs
+firmware/exp013_bootloader/build/exp013_bootloader.map:115:.iplt           0x08000578        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:116: .iplt          0x08000578        0x0 build/startup.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:118:.rel.dyn        0x08000578        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:119: .rel.iplt      0x08000578        0x0 build/startup.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:121:.data           0x20000000        0x0 load address 0x08000578
+firmware/exp013_bootloader/build/exp013_bootloader.map:122:                0x20000000                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:123:                0x20000000                        _sdata = .
+firmware/exp013_bootloader/build/exp013_bootloader.map:125:                0x20000000                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:126:                0x20000000                        _edata = .
+firmware/exp013_bootloader/build/exp013_bootloader.map:128:.igot.plt       0x20000000        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:129: .igot.plt      0x20000000        0x0 build/startup.o
+firmware/exp013_bootloader/build/exp013_bootloader.map:131:.bss            0x20000000        0x0
+firmware/exp013_bootloader/build/exp013_bootloader.map:132:                0x20000000                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:133:                0x20000000                        _sbss = .
+firmware/exp013_bootloader/build/exp013_bootloader.map:136:                0x20000000                        . = ALIGN (0x4)
+firmware/exp013_bootloader/build/exp013_bootloader.map:137:                0x20000000                        _ebss = .
+firmware/exp013_bootloader/Makefile:41:	st-flash --reset write $(BUILD)/$(PROJECT).bin 0x08000000
+firmware/exp014_bootloader_crc/src/image.c:56:    if ((msp < 0x20000000UL) || (msp > 0x20020000UL)) {
+firmware/exp014_bootloader_crc/src/image.h:6:#define IMAGE_HEADER_ADDRESS 0x08008000UL
+firmware/exp014_bootloader_crc/src/image.h:7:#define IMAGE_VECTOR_ADDRESS 0x08008200UL
+firmware/exp014_bootloader_crc/linker.ld:5:    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 16K
+firmware/exp014_bootloader_crc/linker.ld:6:    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+firmware/exp014_bootloader_crc/linker.ld:9:_estack = ORIGIN(RAM) + LENGTH(RAM);
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:39:FLASH            0x08000000         0x00004000         xr
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:40:RAM              0x20000000         0x00020000         xrw
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:50:                0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:52:.isr_vector     0x08000000       0x40
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:53:                0x08000000                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:55: .isr_vector    0x08000000       0x40 build/startup.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:56:                0x08000040                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:58:.text           0x08000040      0x8c0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:59:                0x08000040                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:62:                0x08000040       0x40 build/startup.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:63:                0x08000040                Reset_Handler
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:65:                0x08000080        0x4 build/startup.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:66:                0x08000080                Default_Handler
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:68:                0x08000084       0x26 build/delay.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:69:                0x08000084                delay_cycles
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:70: *fill*         0x080000aa        0x2 
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:71: .text.header   0x080000ac       0x14 build/image.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:73:                0x080000c0       0x70 build/image.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:75:                0x08000130       0xec build/image.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:76:                0x08000130                image_validate
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:78:                0x0800021c       0x88 build/image.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:79:                0x0800021c                image_status_text
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:81:                0x080002a4       0x88 build/image.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:82:                0x080002a4                image_jump
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:83: .text.main     0x0800032c      0x154 build/main.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:84:                0x0800032c                main
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:86:                0x08000480       0xd8 build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:87:                0x08000480                uart_init_115200_hsi16
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:89:                0x08000558       0x30 build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:90:                0x08000558                uart_putc
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:92:                0x08000588       0x38 build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:93:                0x08000588                uart_puts
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:95:                0x080005c0       0x48 build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:96:                0x080005c0                uart_put_hex32
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:98:                0x08000608       0x7c build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:99:                0x08000608                uart_put_u32
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:101: .rodata        0x08000684       0x84 build/image.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:102: .rodata        0x08000708      0x1df build/main.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:103: *fill*         0x080008e7        0x1 
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:104: .rodata        0x080008e8        0x3 build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:105: *fill*         0x080008eb        0x1 
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:107:                0x080008ec       0x11 build/uart.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:108:                0x08000900                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:109: *fill*         0x080008fd        0x3 
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:110:                0x08000900                        _etext = .
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:112:.glue_7         0x08000900        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:113: .glue_7        0x08000900        0x0 linker stubs
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:115:.glue_7t        0x08000900        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:116: .glue_7t       0x08000900        0x0 linker stubs
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:118:.vfp11_veneer   0x08000900        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:119: .vfp11_veneer  0x08000900        0x0 linker stubs
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:121:.v4_bx          0x08000900        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:122: .v4_bx         0x08000900        0x0 linker stubs
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:124:.iplt           0x08000900        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:125: .iplt          0x08000900        0x0 build/startup.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:127:.rel.dyn        0x08000900        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:128: .rel.iplt      0x08000900        0x0 build/startup.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:130:.data           0x20000000        0x0 load address 0x08000900
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:131:                0x20000000                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:132:                0x20000000                        _sdata = .
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:134:                0x20000000                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:135:                0x20000000                        _edata = .
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:137:.igot.plt       0x20000000        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:138: .igot.plt      0x20000000        0x0 build/startup.o
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:140:.bss            0x20000000        0x0
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:141:                0x20000000                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:142:                0x20000000                        _sbss = .
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:145:                0x20000000                        . = ALIGN (0x4)
+firmware/exp014_bootloader_crc/build/exp014_bootloader_crc.map:146:                0x20000000                        _ebss = .
+firmware/exp014_bootloader_crc/Makefile:41:	st-flash --reset write $(BUILD)/exp014_bootloader_crc.bin 0x08000000
+firmware/exp019_signed_bootloader/src/signed_image.c:57:    if ((msp < 0x20000000UL) || (msp > 0x20020000UL)) {
+firmware/exp019_signed_bootloader/src/signed_image.h:6:#define SIGNED_IMAGE_BASE      0x08008000UL
+firmware/exp019_signed_bootloader/src/signed_image.h:9:#define PAYLOAD_ADDRESS        0x08008200UL
+firmware/exp019_signed_bootloader/linker.ld:5:    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 32K
+firmware/exp019_signed_bootloader/linker.ld:6:    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+firmware/exp019_signed_bootloader/linker.ld:9:_estack = ORIGIN(RAM) + LENGTH(RAM);
+firmware/exp019_signed_bootloader/README.md:12:- 0x08000000–0x08007FFF: bootloader (sectors 0 and 1, max 32 KiB)
+firmware/exp019_signed_bootloader/README.md:13:- 0x08008000: signed image header
+firmware/exp019_signed_bootloader/README.md:14:- 0x08008200: application vector table and payload
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:251:FLASH            0x08000000         0x00008000         xr
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:252:RAM              0x20000000         0x00020000         xrw
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:265:                0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:267:.isr_vector     0x08000000       0x40
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:268:                0x08000000                        . = ALIGN (0x4)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:270: .isr_vector    0x08000000       0x40 build/startup.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:271:                0x08000040                        . = ALIGN (0x4)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:273:.text           0x08000040     0x30a0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:274:                0x08000040                        . = ALIGN (0x4)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:277:                0x08000040       0x40 build/startup.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:278:                0x08000040                Reset_Handler
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:280:                0x08000080        0x4 build/startup.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:281:                0x08000080                Default_Handler
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:283:                0x08000084       0x14 build/delay.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:284:                0x08000084                delay_cycles
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:286:                0x08000098      0x108 build/main.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:287:                0x08000098                main
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:288: .text.memset   0x080001a0       0x12 build/minilib.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:289:                0x080001a0                memset
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:291:                0x080001b2       0x10 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:293:                0x080001c2        0x4 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:295:                0x080001c6       0x16 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:297:                0x080001dc       0x10 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:299:                0x080001ec       0x1a build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:301:                0x08000206       0x18 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:302: .text.x16      0x0800021e       0x3a build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:303: .text.x32      0x08000258       0x20 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:304: .text.fe_0     0x08000278       0x10 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:305: .text.fe_1     0x08000288       0x14 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:306: .text.fe_copy  0x0800029c       0x12 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:307: .text.fe_neg   0x080002ae       0x14 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:308: .text.fe_add   0x080002c2       0x1a build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:309: .text.fe_sub   0x080002dc       0x1a build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:311:                0x080002f6       0x96 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:313:                0x0800038c      0x22c build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:315:                0x080005b8      0x1d2 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:316: .text.fe_mul   0x0800078a      0x564 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:317: .text.fe_sq    0x08000cee      0x39c build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:319:                0x0800108a       0x18 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:320: *fill*         0x080010a2        0x2 
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:322:                0x080010a4       0x30 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:324:                0x080010d4       0x4c build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:325: .text.ge_zero  0x08001120       0x24 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:327:                0x08001144       0x38 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:328: .text.ge_add   0x0800117c       0xb0 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:329: .text.ge_madd  0x0800122c       0xa6 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:331:                0x080012d2       0xa6 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:333:                0x08001378       0x24 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:335:                0x0800139c       0xb6 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:337:                0x08001452       0x12 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:338:                0x08001452                crypto_verify32
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:340:                0x08001464       0x2c build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:341:                0x08001464                crypto_verify64
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:343:                0x08001490       0x10 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:344:                0x08001490                crypto_wipe
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:346:                0x080014a0       0xf4 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:348:                0x08001594       0x36 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:349: *fill*         0x080015ca        0x2 
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:350: .text.invsqrt  0x080015cc      0x1d8 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:352:                0x080017a4       0x34 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:353: .text.mod_l    0x080017d8      0x100 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:355:                0x080018d8       0x22 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:356: *fill*         0x080018fa        0x2 
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:358:                0x080018fc       0x94 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:360:                0x08001990       0x56 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:362:                0x080019e6       0x22 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:363:                0x080019e6                crypto_eddsa_reduce
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:365:                0x08001a08      0x1b4 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:366:                0x08001a08                crypto_eddsa_check_equation
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:368:                0x08001bbc       0x20 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:370:                0x08001bdc      0x51c build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:372:                0x080020f8       0x36 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:374:                0x0800212e      0x172 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:376:                0x080022a0       0xb8 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:377:                0x080022a0                crypto_sha512_init
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:379:                0x08002358        0x8 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:380:                0x08002358                crypto_sha512_update
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:382:                0x08002360       0xc2 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:383:                0x08002360                crypto_sha512_final
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:385:                0x08002422       0x4a build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:387:                0x0800246c       0x22 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:388:                0x0800246c                crypto_sha512
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:390:                0x0800248e       0x2c build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:391:                0x0800248e                crypto_ed25519_check
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:392: *fill*         0x080024ba        0x2 
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:394:                0x080024bc       0xc0 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:395:                0x080024bc                signed_image_verify
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:397:                0x0800257c       0x18 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:398:                0x0800257c                signed_image_status_text
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:400:                0x08002594       0x74 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:401:                0x08002594                signed_image_jump
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:403:                0x08002608       0x84 build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:404:                0x08002608                uart_init_115200_hsi16
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:406:                0x0800268c       0x10 build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:407:                0x0800268c                uart_putc
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:409:                0x0800269c       0x1e build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:410:                0x0800269c                uart_puts
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:411: *fill*         0x080026ba        0x2 
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:413:                0x080026bc       0x2c build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:414:                0x080026bc                uart_put_hex32
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:416:                0x080026e8       0x42 build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:417:                0x080026e8                uart_put_u32
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:420:                0x0800272a      0x242 build/main.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:423:                0x0800296c       0x20 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:424: .rodata.r.6    0x0800298c       0x24 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:426:                0x080029b0      0x3c0 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:427: .rodata.L      0x08002d70       0x20 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:428: .rodata.D2     0x08002d90       0x28 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:429: .rodata.d      0x08002db8       0x28 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:431:                0x08002de0       0x28 build/monocypher.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:432: .rodata.K      0x08002e08      0x280 build/monocypher-ed25519.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:434:                0x08003088        0x8 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:436:                0x08003088       0x95 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:438:                0x08003088       0x24 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:440:                0x080030ac       0x20 build/signed_image.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:442:                0x080030cc        0x3 build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:444:                0x080030cc       0x11 build/uart.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:445:                0x08003120                        . = ALIGN (0x4)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:446: *fill*         0x080030dd        0x3 
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:447:                0x080030e0                        _etext = .
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:449:.glue_7         0x080030e0        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:450: .glue_7        0x080030e0        0x0 linker stubs
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:452:.glue_7t        0x080030e0        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:453: .glue_7t       0x080030e0        0x0 linker stubs
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:455:.vfp11_veneer   0x080030e0        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:456: .vfp11_veneer  0x080030e0        0x0 linker stubs
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:458:.v4_bx          0x080030e0        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:459: .v4_bx         0x080030e0        0x0 linker stubs
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:461:.iplt           0x080030e0        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:462: .iplt          0x080030e0        0x0 build/startup.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:464:.rel.dyn        0x080030e0        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:465: .rel.iplt      0x080030e0        0x0 build/startup.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:467:.data           0x20000000        0x0 load address 0x080030e0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:468:                0x20000000                        . = ALIGN (0x4)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:469:                0x20000000                        _sdata = .
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:471:                0x20000000                        . = ALIGN (0x4)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:472:                0x20000000                        _edata = .
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:474:.igot.plt       0x20000000        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:475: .igot.plt      0x20000000        0x0 build/startup.o
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:477:.bss            0x20000000        0x0
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:478:                0x20000000                        . = ALIGN (0x8)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:479:                0x20000000                        _sbss = .
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:482:                0x20000000                        . = ALIGN (0x8)
+firmware/exp019_signed_bootloader/build/exp019_signed_bootloader.map:483:                0x20000000                        _ebss = .
+firmware/exp019_signed_bootloader/Makefile:50:	st-flash --reset write $(BUILD)/$(PROJECT).bin 0x08000000
+firmware/exp022_rollback_floor/src/signed_image.c:61:    if ((msp < 0x20000000UL) || (msp > 0x20020000UL)) {
+firmware/exp022_rollback_floor/src/signed_image.h:6:#define SIGNED_IMAGE_BASE      0x08008000UL
+firmware/exp022_rollback_floor/src/signed_image.h:9:#define PAYLOAD_ADDRESS        0x08008200UL
+firmware/exp022_rollback_floor/linker.ld:5:    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 32K
+firmware/exp022_rollback_floor/linker.ld:6:    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+firmware/exp022_rollback_floor/linker.ld:9:_estack = ORIGIN(RAM) + LENGTH(RAM);
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:251:FLASH            0x08000000         0x00008000         xr
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:252:RAM              0x20000000         0x00020000         xrw
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:265:                0x20020000                        _estack = (ORIGIN (RAM) + LENGTH (RAM))
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:267:.isr_vector     0x08000000       0x40
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:268:                0x08000000                        . = ALIGN (0x4)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:270: .isr_vector    0x08000000       0x40 build/startup.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:271:                0x08000040                        . = ALIGN (0x4)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:273:.text           0x08000040     0x30f4
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:274:                0x08000040                        . = ALIGN (0x4)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:277:                0x08000040       0x40 build/startup.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:278:                0x08000040                Reset_Handler
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:280:                0x08000080        0x4 build/startup.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:281:                0x08000080                Default_Handler
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:283:                0x08000084       0x14 build/delay.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:284:                0x08000084                delay_cycles
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:286:                0x08000098      0x118 build/main.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:287:                0x08000098                main
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:288: .text.memset   0x080001b0       0x12 build/minilib.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:289:                0x080001b0                memset
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:291:                0x080001c2       0x10 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:293:                0x080001d2        0x4 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:295:                0x080001d6       0x16 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:297:                0x080001ec       0x10 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:299:                0x080001fc       0x1a build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:301:                0x08000216       0x18 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:302: .text.x16      0x0800022e       0x3a build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:303: .text.x32      0x08000268       0x20 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:304: .text.fe_0     0x08000288       0x10 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:305: .text.fe_1     0x08000298       0x14 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:306: .text.fe_copy  0x080002ac       0x12 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:307: .text.fe_neg   0x080002be       0x14 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:308: .text.fe_add   0x080002d2       0x1a build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:309: .text.fe_sub   0x080002ec       0x1a build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:311:                0x08000306       0x96 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:313:                0x0800039c      0x22c build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:315:                0x080005c8      0x1d2 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:316: .text.fe_mul   0x0800079a      0x564 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:317: .text.fe_sq    0x08000cfe      0x39c build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:319:                0x0800109a       0x18 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:320: *fill*         0x080010b2        0x2 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:322:                0x080010b4       0x30 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:324:                0x080010e4       0x4c build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:325: .text.ge_zero  0x08001130       0x24 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:327:                0x08001154       0x38 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:328: .text.ge_add   0x0800118c       0xb0 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:329: .text.ge_madd  0x0800123c       0xa6 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:331:                0x080012e2       0xa6 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:333:                0x08001388       0x24 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:335:                0x080013ac       0xb6 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:337:                0x08001462       0x12 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:338:                0x08001462                crypto_verify32
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:340:                0x08001474       0x2c build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:341:                0x08001474                crypto_verify64
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:343:                0x080014a0       0x10 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:344:                0x080014a0                crypto_wipe
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:346:                0x080014b0       0xf4 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:348:                0x080015a4       0x36 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:349: *fill*         0x080015da        0x2 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:350: .text.invsqrt  0x080015dc      0x1d8 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:352:                0x080017b4       0x34 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:353: .text.mod_l    0x080017e8      0x100 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:355:                0x080018e8       0x22 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:356: *fill*         0x0800190a        0x2 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:358:                0x0800190c       0x94 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:360:                0x080019a0       0x56 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:362:                0x080019f6       0x22 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:363:                0x080019f6                crypto_eddsa_reduce
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:365:                0x08001a18      0x1b4 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:366:                0x08001a18                crypto_eddsa_check_equation
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:368:                0x08001bcc       0x20 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:370:                0x08001bec      0x51c build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:372:                0x08002108       0x36 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:374:                0x0800213e      0x172 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:376:                0x080022b0       0xb8 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:377:                0x080022b0                crypto_sha512_init
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:379:                0x08002368        0x8 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:380:                0x08002368                crypto_sha512_update
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:382:                0x08002370       0xc2 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:383:                0x08002370                crypto_sha512_final
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:385:                0x08002432       0x4a build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:387:                0x0800247c       0x22 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:388:                0x0800247c                crypto_sha512
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:390:                0x0800249e       0x2c build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:391:                0x0800249e                crypto_ed25519_check
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:392: *fill*         0x080024ca        0x2 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:394:                0x080024cc       0xcc build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:395:                0x080024cc                signed_image_verify
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:397:                0x08002598       0x18 build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:398:                0x08002598                signed_image_status_text
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:400:                0x080025b0       0x74 build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:401:                0x080025b0                signed_image_jump
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:403:                0x08002624       0x84 build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:404:                0x08002624                uart_init_115200_hsi16
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:406:                0x080026a8       0x10 build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:407:                0x080026a8                uart_putc
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:409:                0x080026b8       0x1e build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:410:                0x080026b8                uart_puts
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:411: *fill*         0x080026d6        0x2 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:413:                0x080026d8       0x2c build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:414:                0x080026d8                uart_put_hex32
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:416:                0x08002704       0x42 build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:417:                0x08002704                uart_put_u32
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:420:                0x08002746      0x271 build/main.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:423:                0x080029b7       0x20 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:424: *fill*         0x080029d7        0x1 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:425: .rodata.r.6    0x080029d8       0x24 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:427:                0x080029fc      0x3c0 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:428: .rodata.L      0x08002dbc       0x20 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:429: .rodata.D2     0x08002ddc       0x28 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:430: .rodata.d      0x08002e04       0x28 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:432:                0x08002e2c       0x28 build/monocypher.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:433: *fill*         0x08002e54        0x4 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:434: .rodata.K      0x08002e58      0x280 build/monocypher-ed25519.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:436:                0x080030d8        0x8 build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:438:                0x080030d8       0xaf build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:440:                0x080030d8       0x28 build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:442:                0x08003100       0x20 build/signed_image.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:444:                0x08003120        0x3 build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:446:                0x08003120       0x11 build/uart.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:447:                0x08003188                        . = ALIGN (0x4)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:448: *fill*         0x08003131        0x3 
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:449:                0x08003134                        _etext = .
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:451:.glue_7         0x08003134        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:452: .glue_7        0x08003134        0x0 linker stubs
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:454:.glue_7t        0x08003134        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:455: .glue_7t       0x08003134        0x0 linker stubs
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:457:.vfp11_veneer   0x08003134        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:458: .vfp11_veneer  0x08003134        0x0 linker stubs
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:460:.v4_bx          0x08003134        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:461: .v4_bx         0x08003134        0x0 linker stubs
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:463:.iplt           0x08003134        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:464: .iplt          0x08003134        0x0 build/startup.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:466:.rel.dyn        0x08003134        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:467: .rel.iplt      0x08003134        0x0 build/startup.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:469:.data           0x20000000        0x0 load address 0x08003134
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:470:                0x20000000                        . = ALIGN (0x4)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:471:                0x20000000                        _sdata = .
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:473:                0x20000000                        . = ALIGN (0x4)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:474:                0x20000000                        _edata = .
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:476:.igot.plt       0x20000000        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:477: .igot.plt      0x20000000        0x0 build/startup.o
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:479:.bss            0x20000000        0x0
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:480:                0x20000000                        . = ALIGN (0x8)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:481:                0x20000000                        _sbss = .
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:484:                0x20000000                        . = ALIGN (0x8)
+firmware/exp022_rollback_floor/build/exp022_rollback_floor.map:485:                0x20000000                        _ebss = .
+firmware/exp022_rollback_floor/Makefile:50:	st-flash --reset write $(BUILD)/$(PROJECT).bin 0x08000000
