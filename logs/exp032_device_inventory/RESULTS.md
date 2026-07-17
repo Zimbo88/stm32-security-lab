@@ -2,125 +2,33 @@
 
 ## Connection
 
-- `Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748`
-- `Info : Target voltage: 3.187377`
-- `Info : [stm32f4x.cpu] Cortex-M4 r0p1 processor detected`
-- `Info : [stm32f4x.cpu] target has 6 breakpoints, 4 watchpoints`
 
 ## Core identification
 
-- SCB CPUID: `0x410FC241`
-- Implementer: `0x41`
-- Variant: `0`
-- Architecture field: `0xF`
-- Part number: `0xC24`
-- Revision: `1`
+- SCB CPUID: `not read`
 
 ## STM32 device identification
 
-- DBGMCU IDCODE: `0x20036419`
-- Device ID: `0x419`
-- Revision ID: `0x2003`
+- DBGMCU IDCODE: `not read`
 
 ## Flash protection state
 
-- FLASH_OPTCR: `0x0FFE00ED`
-- FLASH_OPTCR1: `0x0FFF0000`
-- RDP byte: `0x00`
-- Interpreted RDP state: **Level 1**
-- BOR level field: `3`
-- Watchdog selection bit: `software controlled`
-- STOP reset behavior bit nRST_STOP: `1`
-- STANDBY reset behavior bit nRST_STDBY: `1`
+- FLASH_OPTCR: `not read`
+- FLASH_OPTCR1: `not read`
 
 ## Reset state
 
-- RCC_CSR: `0x1E000000`
-- Active reset flags: `SFTRSTF`, `PORRSTF`, `PINRSTF`, `BORRSTF`
+- RCC_CSR: `not read`
+- Active reset flags: none decoded
 
 ## MPU
 
-- MPU_TYPE: `0x00000800`
-- Number of MPU regions: `8`
+- MPU_TYPE: `not read`
 
 ## Register inventory
 
 | Register | Address | Value |
 |---|---:|---:|
-| `SCB_CPUID` | `0xE000ED00` | `0x410fc241` |
-| `SCB_ICSR` | `0xE000ED04` | `0x3000` |
-| `SCB_VTOR` | `0xE000ED08` | `0x0` |
-| `SCB_AIRCR` | `0xE000ED0C` | `0xfa050000` |
-| `SCB_SCR` | `0xE000ED10` | `0x0` |
-| `SCB_CCR` | `0xE000ED14` | `0x200` |
-| `SCB_SHPR1` | `0xE000ED18` | `0x0` |
-| `SCB_SHPR2` | `0xE000ED1C` | `0x0` |
-| `SCB_SHPR3` | `0xE000ED20` | `0x0` |
-| `SCB_SHCSR` | `0xE000ED24` | `0x0` |
-| `SCB_CFSR` | `0xE000ED28` | `0x0` |
-| `SCB_HFSR` | `0xE000ED2C` | `0x2` |
-| `SCB_DFSR` | `0xE000ED30` | `0x8` |
-| `SCB_MMFAR` | `0xE000ED34` | `0xe000edf8` |
-| `SCB_BFAR` | `0xE000ED38` | `0xe000edf8` |
-| `SCB_AFSR` | `0xE000ED3C` | `0x0` |
-| `SCB_CPACR` | `0xE000ED88` | `0x0` |
-| `DBGMCU_IDCODE` | `0xE0042000` | `0x20036419` |
-| `DBGMCU_CR` | `0xE0042004` | `0x7` |
-| `DBGMCU_APB1_FZ` | `0xE0042008` | `0x1800` |
-| `DBGMCU_APB2_FZ` | `0xE004200C` | `0x0` |
-| `FLASH_ACR` | `0x40023C00` | `0x0` |
-| `FLASH_SR` | `0x40023C0C` | `0x0` |
-| `FLASH_CR` | `0x40023C10` | `0x80000000` |
-| `FLASH_OPTCR` | `0x40023C14` | `0xffe00ed` |
-| `FLASH_OPTCR1` | `0x40023C18` | `0xfff0000` |
-| `RCC_CR` | `0x40023800` | `0x5f83` |
-| `RCC_PLLCFGR` | `0x40023804` | `0x24003010` |
-| `RCC_CFGR` | `0x40023808` | `0x0` |
-| `RCC_CIR` | `0x4002380C` | `0x0` |
-| `RCC_AHB1RSTR` | `0x40023810` | `0x0` |
-| `RCC_AHB2RSTR` | `0x40023814` | `0x0` |
-| `RCC_AHB3RSTR` | `0x40023818` | `0x0` |
-| `RCC_APB1RSTR` | `0x40023820` | `0x0` |
-| `RCC_APB2RSTR` | `0x40023824` | `0x0` |
-| `RCC_AHB1ENR` | `0x40023830` | `0x100000` |
-| `RCC_AHB2ENR` | `0x40023834` | `0x0` |
-| `RCC_AHB3ENR` | `0x40023838` | `0x0` |
-| `RCC_APB1ENR` | `0x40023840` | `0x0` |
-| `RCC_APB2ENR` | `0x40023844` | `0x0` |
-| `RCC_AHB1LPENR` | `0x40023850` | `0x7eef97ff` |
-| `RCC_AHB2LPENR` | `0x40023854` | `0xf1` |
-| `RCC_AHB3LPENR` | `0x40023858` | `0x1` |
-| `RCC_APB1LPENR` | `0x40023860` | `0xf6fec9ff` |
-| `RCC_APB2LPENR` | `0x40023864` | `0x4777f33` |
-| `RCC_BDCR` | `0x40023870` | `0x0` |
-| `RCC_CSR` | `0x40023874` | `0x1e000000` |
-| `RCC_SSCGR` | `0x40023880` | `0x0` |
-| `RCC_PLLI2SCFGR` | `0x40023884` | `0x24003000` |
-| `RCC_PLLSAICFGR` | `0x40023888` | `0x24003000` |
-| `RCC_DCKCFGR` | `0x4002388C` | `0x0` |
-| `PWR_CR` | `0x40007000` | `0xc000` |
-| `PWR_CSR` | `0x40007004` | `0x0` |
-| `SYSCFG_MEMRMP` | `0x40013800` | `0x0` |
-| `SYSCFG_PMC` | `0x40013804` | `0x0` |
-| `SYSCFG_EXTICR1` | `0x40013808` | `0x0` |
-| `SYSCFG_EXTICR2` | `0x4001380C` | `0x0` |
-| `SYSCFG_EXTICR3` | `0x40013810` | `0x0` |
-| `SYSCFG_EXTICR4` | `0x40013814` | `0x0` |
-| `SYSCFG_CMPCR` | `0x40013820` | `0x0` |
-| `MPU_TYPE` | `0xE000ED90` | `0x800` |
-| `MPU_CTRL` | `0xE000ED94` | `0x0` |
-| `MPU_RNR` | `0xE000ED98` | `0x0` |
-| `MPU_RBAR` | `0xE000ED9C` | `0x0` |
-| `MPU_RASR` | `0xE000EDA0` | `0x0` |
-| `SYST_CSR` | `0xE000E010` | `0x0` |
-| `SYST_RVR` | `0xE000E014` | `0x0` |
-| `SYST_CVR` | `0xE000E018` | `0x0` |
-| `SYST_CALIB` | `0xE000E01C` | `0x4000493e` |
-| `FPU_FPCCR` | `0xE000EF34` | `0xc0000000` |
-| `FPU_FPCAR` | `0xE000EF38` | `0x0` |
-| `FPU_FPDSCR` | `0xE000EF3C` | `0x0` |
-| `FPU_MVFR0` | `0xE000EF40` | `0x10110021` |
-| `FPU_MVFR1` | `0xE000EF44` | `0x11000011` |
 
 ## System-memory observation
 
