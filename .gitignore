@@ -1,45 +1,10 @@
-# Compiler output
-**/build/*.o
-**/build/*.elf
-**/build/*.map
+# Generated firmware build directories
+firmware/*/build/
 
-# Temporary readbacks
-**/build/*readback*.bin
-
-# Editor files
-*~
-*.swp
-.vscode/
-
-# Firmware signing secrets
-signing/**/firmware_signing_private.pem
-*.private.pem
-*.key
-
-# Deliberately corrupted and temporary test images
-**/*corrupted*.bin
-**/*tampered*.bin
-**/*restored_readback*.bin
-
-# Deliberately corrupted and temporary test images
-**/*corrupted*.bin
-**/*tampered*.bin
-**/*restored_readback*.bin
-
-# Deliberately corrupted and temporary test images
-**/*corrupted*.bin
-**/*tampered*.bin
-**/*restored_readback*.bin
-
-# Deliberately corrupted and temporary test images
-**/*corrupted*.bin
-**/*tampered*.bin
-**/*restored_readback*.bin
-
-# Temporary flash readbacks
-**/*readback*.bin
-
-# Generated signature-test artifacts
-signing/exp021/*.bin
-__pycache__/
-*.pyc
+# Compiled embedded artifacts
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.su

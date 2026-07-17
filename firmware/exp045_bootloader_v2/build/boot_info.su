@@ -1,2 +1,0 @@
-src/boot_info.c:6:6:boot_info_print_banner	8	static
-src/boot_info.c:14:6:boot_info_print_manifest	8	static
