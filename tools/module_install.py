@@ -115,6 +115,8 @@ def _state(value: int) -> InstallState:
 def encode_record(record: CatalogRecord) -> bytes:
     if record.kind not in (INSTALL_RECORD_KIND_STATE, INSTALL_RECORD_KIND_REVOCATION):
         raise InstallError("invalid catalog record kind")
+    if record.sequence == 0:
+        raise InstallError("invalid catalog sequence")
     if len(record.signer_key_id) != 16:
         raise InstallError("invalid signer key id")
     if len(record.fingerprint) != 32:
@@ -193,6 +195,8 @@ def decode_record(raw: bytes) -> CatalogRecord:
     ) = struct.unpack(INSTALL_RECORD_BODY_FORMAT, body)
     if magic != INSTALL_RECORD_MAGIC or version != INSTALL_RECORD_VERSION or reserved0 != 0:
         raise InstallError("catalog record identity")
+    if sequence == 0:
+        raise InstallError("invalid catalog sequence")
     state = _state(state_value)
     record = CatalogRecord(
         kind,
@@ -600,7 +604,12 @@ class ModuleInstaller:
 
     def _next_sequence(self) -> int:
         records = self.recover().records
-        return 1 if not records else max(record.sequence for record in records) + 1
+        if not records:
+            return 1
+        sequence = max(record.sequence for record in records)
+        if sequence >= 0xFFFFFFFF:
+            raise InstallError("catalog sequence exhausted")
+        return sequence + 1
 
 
 def _load_public_key(value: str) -> bytes:

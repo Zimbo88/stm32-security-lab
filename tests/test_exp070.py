@@ -15,8 +15,10 @@ from bytecode_asm import assemble_text
 from bytecode_vm import CAP_OUTPUT, CAP_RCC_READ
 from module_format import TYPE_BYTECODE, build_package
 from module_install import (
+    INSTALL_RECORD_KIND_STATE,
     INSTALL_RECORD_BODY_SIZE,
     INSTALL_RECORD_SIZE,
+    SLOT_A,
     SLOT_B,
     SLOT_NONE,
     CatalogRecord,
@@ -192,9 +194,80 @@ class Exp070InstallTests(unittest.TestCase):
         self.assertNotIn(0xFFFF, recover_catalog(bytes(flash.catalog)).latest_by_module)
 
         flash.write_partial_slot(MODULE_ID, SLOT_B, _package(key, 2), 24)
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegex(ValueError, "truncated header"):
             installer.verify(MODULE_ID)
         self.assertEqual(installer.current_confirmed_package(MODULE_ID), confirmed_package)
+
+    def test_catalog_sequence_zero_and_wraparound_fail_closed(self):
+        key = SigningKey.generate()
+        signer = hashlib.sha256(bytes(key.verify_key)).digest()[:16]
+        zero_sequence = CatalogRecord(
+            INSTALL_RECORD_KIND_STATE,
+            0,
+            MODULE_ID,
+            1,
+            0,
+            InstallState.VERIFIED,
+            SLOT_NONE,
+            SLOT_A,
+            0,
+            0,
+            signer,
+            b"\x11" * 32,
+        )
+        with self.assertRaisesRegex(InstallError, "sequence"):
+            encode_record(zero_sequence)
+
+        malformed = bytearray(
+            encode_record(
+                CatalogRecord(
+                    INSTALL_RECORD_KIND_STATE,
+                    1,
+                    MODULE_ID,
+                    1,
+                    0,
+                    InstallState.VERIFIED,
+                    SLOT_NONE,
+                    SLOT_A,
+                    0,
+                    0,
+                    signer,
+                    b"\x22" * 32,
+                )
+            )
+        )
+        struct.pack_into("<I", malformed, 8, 0)
+        struct.pack_into(
+            "<I",
+            malformed,
+            INSTALL_RECORD_BODY_SIZE,
+            zlib.crc32(malformed[:INSTALL_RECORD_BODY_SIZE]) & 0xFFFFFFFF,
+        )
+        flash = SimulatedFlash()
+        flash.append_partial_catalog(bytes(malformed), INSTALL_RECORD_SIZE)
+        self.assertNotIn(MODULE_ID, recover_catalog(bytes(flash.catalog)).latest_by_module)
+
+        flash = SimulatedFlash()
+        flash.append_catalog(
+            encode_record(
+                CatalogRecord(
+                    INSTALL_RECORD_KIND_STATE,
+                    0xFFFFFFFF,
+                    MODULE_ID,
+                    1,
+                    0,
+                    InstallState.VERIFIED,
+                    SLOT_NONE,
+                    SLOT_A,
+                    0,
+                    0,
+                    signer,
+                    b"\x33" * 32,
+                )
+            )
+        )
+        with self.assertRaisesRegex(InstallError, "sequence exhausted"):
+            _installer(flash, key).install(_package(key, 1))
 
     def test_anti_rollback_signer_revocation_and_key_separation(self):
         key = SigningKey.generate()

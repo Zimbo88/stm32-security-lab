@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import unittest
+import zlib
 from dataclasses import replace
 from pathlib import Path
 
@@ -70,6 +71,38 @@ class Exp067ModuleFormatTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "invalid signature"):
             parse_package(old_buggy_package, bytes(key.verify_key))
+
+    def test_unsigned_gap_between_header_and_capabilities_is_rejected(self):
+        key, package = _signed_test_package()
+        header = module_format._unpack(package)
+        capability_end = header.capability_offset + header.capability_size
+        capabilities = package[header.capability_offset:capability_end]
+        payload = package[header.payload_offset:]
+        gap = b"\x5a" * module_format.CAPABILITY_SIZE
+
+        shifted = replace(
+            header,
+            total_size=header.total_size + len(gap),
+            capability_offset=header.capability_offset + len(gap),
+            payload_offset=header.payload_offset + len(gap),
+            header_crc32=0,
+            signature=b"\0" * 64,
+        )
+        shifted = replace(
+            shifted,
+            header_crc32=zlib.crc32(module_format._header_for_crc(shifted)) & module_format.UINT32_MAX,
+        )
+        signed = module_format._header_for_signature(shifted) + capabilities + payload
+        shifted = replace(shifted, signature=key.sign(signed).signature)
+        package_with_gap = (
+            module_format._pack_header(shifted, signature_zero=False, crc_zero=False)
+            + gap
+            + capabilities
+            + payload
+        )
+
+        with self.assertRaisesRegex(ValueError, "noncanonical region layout"):
+            parse_package(package_with_gap, bytes(key.verify_key))
 
     def test_duplicate_and_unsupported_capabilities_are_rejected(self):
         key = SigningKey.generate()
@@ -181,6 +214,15 @@ class Exp067ModuleFormatTests(unittest.TestCase):
                 )
                 self.assertIn("module_id=0x00000042", inspect.stdout)
                 self.assertIn("signature_verified=yes", inspect.stdout)
+
+    def test_host_tools_with_shebang_are_executable(self):
+        for relative in (
+            "tools/module_pack.py",
+            "tools/module_verify.py",
+            "tools/module_inspect.py",
+        ):
+            with self.subTest(tool=relative):
+                self.assertTrue((ROOT / relative).stat().st_mode & 0o111)
 
 
 class Exp067CatalogTests(unittest.TestCase):

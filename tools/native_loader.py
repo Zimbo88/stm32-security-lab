@@ -132,11 +132,13 @@ class PlatformAPI:
         seen_ids: set[int] = set()
         seen_names: set[str] = set()
         for entry in self.entries:
+            if entry.service_id <= 0 or not entry.name:
+                raise NativeLoaderError("malformed API table")
             if entry.service_id in seen_ids or entry.name in seen_names:
                 raise NativeLoaderError("malformed API table")
             if entry.required_capability not in SUPPORTED_NATIVE_CAPABILITIES:
                 raise NativeLoaderError("malformed API table")
-            if entry.max_args > 4:
+            if entry.max_args < 0 or entry.max_args > 4:
                 raise NativeLoaderError("malformed API table")
             seen_ids.add(entry.service_id)
             seen_names.add(entry.name)
@@ -174,7 +176,8 @@ class NativeHost:
         return self.rcc[index]
 
     def emit(self, channel: int, value: int) -> None:
-        assert self.outputs is not None
+        if self.outputs is None:
+            raise NativeLoaderError("native host output unavailable")
         self.outputs.append((channel & 0xFFFFFFFF, value & 0xFFFFFFFF))
 
 
@@ -271,7 +274,8 @@ def build_native_payload(
     payload.extend(rodata)
     payload.extend(b"\0" * (data_offset - len(payload)))
     payload.extend(data)
-    assert len(payload) == total_size
+    if len(payload) != total_size:
+        raise NativeLoaderError("internal native payload size mismatch")
     validate_native_payload(bytes(payload))
     return bytes(payload)
 
@@ -307,6 +311,8 @@ def validate_native_payload(payload: bytes) -> NativeImage:
         raise NativeLoaderError("malformed API table")
     if header.simulation_id not in (SIM_NONE, SIM_RCC_ANALYSIS):
         raise NativeLoaderError("unknown native simulation")
+    if header.code_offset != NATIVE_HEADER_SIZE:
+        raise NativeLoaderError("malformed native offsets")
 
     code_end = _region("code", header.code_offset, header.code_size, header.total_size, alignment=4)
     rodata_end = _region("rodata", header.rodata_offset, header.rodata_size, header.total_size, alignment=4)
@@ -315,6 +321,12 @@ def validate_native_payload(payload: bytes) -> NativeImage:
         raise NativeLoaderError("overlapping native regions")
     if header.rodata_offset != _align4(code_end) or header.data_offset != _align4(rodata_end):
         raise NativeLoaderError("malformed native offsets")
+    if data_end != header.total_size:
+        raise NativeLoaderError("unexpected trailing native data")
+    if payload[code_end:header.rodata_offset] != b"\0" * (header.rodata_offset - code_end):
+        raise NativeLoaderError("nonzero native padding")
+    if payload[rodata_end:header.data_offset] != b"\0" * (header.data_offset - rodata_end):
+        raise NativeLoaderError("nonzero native padding")
 
     if header.code_size == 0 or header.code_size > MAX_CODE_SIZE:
         raise NativeLoaderError("invalid native code size")
@@ -435,6 +447,10 @@ class NativeModuleManager:
 
     def initialize(self) -> LoadedModule:
         module = self._require_loaded()
+        if module.state == LifecycleState.QUARANTINED:
+            raise NativeLoaderError("module quarantined")
+        if module.state not in (LifecycleState.LOADED, LifecycleState.STOPPED):
+            raise NativeLoaderError("module is not ready to initialize")
         if self.host.force_init_failure:
             return self._failure("initialize failed")
         self.loaded = replace(module, state=LifecycleState.INITIALIZED)
@@ -442,6 +458,8 @@ class NativeModuleManager:
 
     def run(self) -> LoadedModule:
         module = self._require_loaded()
+        if module.state == LifecycleState.QUARANTINED:
+            raise NativeLoaderError("module quarantined")
         if module.state not in (LifecycleState.INITIALIZED, LifecycleState.STOPPED):
             return self._failure("run before initialize")
         if self.host.force_run_failure:
@@ -486,6 +504,8 @@ class NativeModuleManager:
 
     def _failure(self, reason: str) -> LoadedModule:
         module = self._require_loaded()
+        if module.state == LifecycleState.QUARANTINED:
+            raise NativeLoaderError("module quarantined")
         failures = module.failures + 1
         if failures >= self.failure_threshold:
             self.loaded = replace(

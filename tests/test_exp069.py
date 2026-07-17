@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
 
 from bytecode_asm import assemble_text
-from bytecode_vm import CAP_OUTPUT, CAP_RCC_READ, run_package
+from bytecode_vm import CAP_OUTPUT, CAP_RCC_READ, VMError, run_package
 from module_format import TYPE_BYTECODE, TYPE_NATIVE, build_package
 from nacl.signing import SigningKey
 from native_loader import (
@@ -140,9 +140,9 @@ class Exp069NativeLoaderTests(unittest.TestCase):
         with self.assertRaisesRegex(NativeLoaderError, "overlapping|malformed native offsets"):
             load_native_package(package, bytes(key.verify_key))
 
-        overflow = _replace_native_header(valid_payload, code_offset=0xFFFFFFF0)
+        overflow = _replace_native_header(valid_payload, rodata_offset=0xFFFFFFF0)
         _, package, _ = _native_package(key, payload=overflow)
-        with self.assertRaisesRegex(NativeLoaderError, "invalid code range"):
+        with self.assertRaisesRegex(NativeLoaderError, "invalid rodata range"):
             load_native_package(package, bytes(key.verify_key))
 
         unaligned_entry = _replace_native_header(valid_payload, entry_offset=1)
@@ -181,6 +181,26 @@ class Exp069NativeLoaderTests(unittest.TestCase):
             entry_offset=native_header.entry_offset,
         )
         with self.assertRaisesRegex(NativeLoaderError, "entry outside code"):
+            load_native_package(package, bytes(key.verify_key))
+
+    def test_native_padding_and_trailing_bytes_are_rejected(self):
+        key = SigningKey.generate()
+        padded = bytearray(build_native_payload(code=b"\x00\xbf", rodata=b"A"))
+        padded_header = unpack_native_header(padded)
+        self.assertLess(padded_header.code_offset + padded_header.code_size, padded_header.rodata_offset)
+        padded[padded_header.code_offset + padded_header.code_size] = 0xA5
+        _, package, _ = _native_package(key, payload=bytes(padded))
+
+        with self.assertRaisesRegex(NativeLoaderError, "native padding"):
+            load_native_package(package, bytes(key.verify_key))
+
+        valid_payload = build_rcc_analysis_native_payload()
+        valid_header = unpack_native_header(valid_payload)
+        trailing_header = replace(valid_header, total_size=valid_header.total_size + 4)
+        trailing = pack_native_header(trailing_header) + valid_payload[valid_header.header_size:] + (b"\0" * 4)
+        _, package, _ = _native_package(key, module_id=0x6902, payload=trailing)
+
+        with self.assertRaisesRegex(NativeLoaderError, "trailing native data"):
             load_native_package(package, bytes(key.verify_key))
 
     def test_forbidden_capability_and_excessive_resources_are_rejected(self):
@@ -255,9 +275,17 @@ class Exp069NativeLoaderTests(unittest.TestCase):
         self.assertEqual(quarantined.state, LifecycleState.QUARANTINED)
         self.assertEqual(quarantined.failures, 2)
 
+        with self.assertRaisesRegex(NativeLoaderError, "quarantined"):
+            manager.run()
+        self.assertEqual(manager.loaded.failures, 2)
+
+        with self.assertRaisesRegex(NativeLoaderError, "quarantined"):
+            manager.initialize()
+        self.assertEqual(manager.loaded.state, LifecycleState.QUARANTINED)
+
     def test_exp068_rejects_native_and_native_loader_rejects_bytecode(self):
         key, native_package, _ = _native_package()
-        with self.assertRaisesRegex(Exception, "native modules"):
+        with self.assertRaisesRegex(VMError, "native modules"):
             run_package(native_package, bytes(key.verify_key))
 
         bytecode = assemble_text("HALT\n").bytecode

@@ -228,6 +228,19 @@ class Exp068BytecodeVMTests(unittest.TestCase):
         result = BytecodeVM(instruction_budget=4).execute(program, capabilities=set())
         self.assertEqual(result.stack, (0xFFFF,))
 
+    def test_syscall_outputs_do_not_leak_between_executions(self):
+        host = SyscallHost(rcc=(0x3, 0x0, 0x0))
+        vm = BytecodeVM(instruction_budget=64, host=host)
+        emitting = assemble_text(RCC_MODULE.read_text()).bytecode
+        halt_only = assemble_text("HALT\n").bytecode
+
+        first = vm.execute(emitting, capabilities={CAP_RCC_READ, CAP_OUTPUT})
+        self.assertNotEqual(first.outputs, ())
+
+        second = vm.execute(halt_only, capabilities=set())
+        self.assertEqual(second.outputs, ())
+        self.assertEqual(host.outputs, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -233,6 +233,8 @@ def parse_package(
         raise ValueError("incompatible abi")
     if header.module_version < min_module_version:
         raise ValueError("rollback version")
+    if header.capability_offset != HEADER_SIZE:
+        raise ValueError("noncanonical region layout")
 
     capability_end = _region_end(
         "capability",

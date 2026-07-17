@@ -21,7 +21,8 @@ Each state record includes sequence, module ID, module version, monotonic
 minimum accepted version, state, active slot, candidate slot, failure count,
 result, signer key ID, and package fingerprint.
 State records accept only slot A, slot B, or no slot; malformed slot IDs fail
-closed during decode.
+closed during decode. Sequence zero is invalid, and attempts to append after
+the maximum uint32 sequence fail closed rather than wrapping.
 
 ## State machine
 

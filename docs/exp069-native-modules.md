@@ -21,8 +21,10 @@ Fields validated by `tools/native_loader.py` include:
 - platform API version,
 - simulation ID used by the host-side validator.
 
-The loader requires aligned, ordered, non-overlapping regions. Code size must be
-nonzero and halfword-aligned. The entry offset must be halfword-aligned and
+The loader requires aligned, ordered, non-overlapping regions. The code region
+must begin immediately after the `NMV1` header, inter-region padding must be
+zero-filled, and trailing bytes after initial data are rejected. Code size must
+be nonzero and halfword-aligned. The entry offset must be halfword-aligned and
 inside the code region. Resource limits are intentionally small:
 
 - code: 4096 bytes,
@@ -69,7 +71,9 @@ The host-side lifecycle is:
 6. quarantine after repeated failures.
 
 The failure threshold is configurable. Repeated initialization or run failures
-move the module to `QUARANTINED` and prevent normal execution.
+move the module to `QUARANTINED` and prevent normal execution. Quarantine is a
+terminal state for the loaded module: later initialize or run attempts are
+rejected unless a new module is explicitly verified and loaded.
 
 ## Example module
 

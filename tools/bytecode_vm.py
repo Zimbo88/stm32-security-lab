@@ -247,6 +247,7 @@ class BytecodeVM:
         self.host = host if host is not None else SyscallHost()
 
     def execute(self, blob: bytes, *, capabilities: Iterable[int]) -> ExecutionResult:
+        self.host.outputs.clear()
         program = parse_program(blob)
         stack_limit = min(program.max_stack, self.max_stack)
         capabilities_set = frozenset(int(cap) for cap in capabilities)
