@@ -41,3 +41,5 @@ signing/**/firmware_signing_private.pem
 
 # Generated signature-test artifacts
 signing/exp021/*.bin
+__pycache__/
+*.pyc
