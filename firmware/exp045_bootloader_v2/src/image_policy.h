@@ -1,0 +1,8 @@
+#ifndef IMAGE_POLICY_H
+#define IMAGE_POLICY_H
+
+#define SIGNED_IMAGE_MAGIC     0x31474953UL
+#define SIGNED_HEADER_VERSION  1UL
+#define MIN_IMAGE_VERSION      2UL
+
+#endif

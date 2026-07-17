@@ -4,10 +4,8 @@
 #include <stdint.h>
 
 #include "flash_layout.h"
+#include "image_policy.h"
 
-#define SIGNED_IMAGE_MAGIC     0x31474953UL
-#define SIGNED_HEADER_VERSION  1UL
-#define MIN_IMAGE_VERSION      2UL
 
 typedef struct {
     uint32_t magic;
