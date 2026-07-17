@@ -2,6 +2,7 @@
 
 #include "boot_info.h"
 #include "boot_policy.h"
+#include "boot_result.h"
 #include "delay.h"
 #include "signed_image.h"
 #include "uart.h"
@@ -17,15 +18,10 @@ int main(void)
 
     const verify_status_t status = boot_policy_verify();
 
-    uart_puts("Verification     = ");
-    uart_puts(signed_image_status_text(status));
-    uart_puts("\n");
+    boot_result_print(status);
 
     if (status != VERIFY_OK) {
-        uart_puts("Application will NOT be started.\n");
-        uart_puts("Bootloader halted safely.\n");
-        for (;;) {
-        }
+        boot_result_halt();
     }
 
     uart_puts("Signature and payload hash accepted.\n");
