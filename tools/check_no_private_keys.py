@@ -10,9 +10,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 PRIVATE_KEY_PATTERNS = (
-    re.compile(rb"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----"),
-    re.compile(rb"-----BEGIN OPENSSH PRIVATE KEY-----"),
-    re.compile(rb"-----BEGIN ENCRYPTED PRIVATE KEY-----"),
+    re.compile(b"-----BEGIN " + b"[A-Z0-9 ]*PRIVATE KEY" + b"-----"),
+    re.compile(b"-----BEGIN " + b"OPENSSH PRIVATE KEY" + b"-----"),
+    re.compile(b"-----BEGIN " + b"ENCRYPTED PRIVATE KEY" + b"-----"),
 )
 
 SENSITIVE_PATH_PATTERNS = (
