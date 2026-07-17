@@ -27,7 +27,25 @@ def main() -> None:
     parser.add_argument("--application", required=True, type=Path)
     parser.add_argument("--seed", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--image-version",
+        type=int,
+        default=IMAGE_VERSION,
+        help=f"Image version stored in the signed manifest (default: {IMAGE_VERSION})",
+    )
+    parser.add_argument(
+        "--header-version",
+        type=int,
+        default=SIGNED_HEADER_VERSION,
+        help=f"Header version stored in the signed manifest (default: {SIGNED_HEADER_VERSION})",
+    )
     args = parser.parse_args()
+
+    if not (0 <= args.image_version <= 0xFFFFFFFF):
+        raise SystemExit("--image-version must be between 0 and 4294967295")
+
+    if not (0 <= args.header_version <= 0xFFFFFFFF):
+        raise SystemExit("--header-version must be between 0 and 4294967295")
 
     application = args.application.read_bytes()
     seed = args.seed.read_bytes()
@@ -70,8 +88,8 @@ def main() -> None:
     manifest = struct.pack(
         "<8I64s",
         SIGNED_IMAGE_MAGIC,
-        SIGNED_HEADER_VERSION,
-        IMAGE_VERSION,
+        args.header_version,
+        args.image_version,
         APPLICATION_BASE,
         len(application),
         0,
@@ -111,6 +129,8 @@ def main() -> None:
     print(f"Manifest address : 0x{SIGNED_IMAGE_BASE:08X}")
     print(f"Signature address: 0x{SIGNED_IMAGE_BASE + MANIFEST_SIZE:08X}")
     print(f"Application addr : 0x{APPLICATION_BASE:08X}")
+    print(f"Header version   : {args.header_version}")
+    print(f"Image version    : {args.image_version}")
     print(f"Application size : {len(application)} bytes")
     print(f"Combined size    : {len(combined_image)} bytes")
     print(f"Initial MSP      : 0x{initial_msp:08X}")
