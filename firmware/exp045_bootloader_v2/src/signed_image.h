@@ -3,14 +3,11 @@
 
 #include <stdint.h>
 
-#define SIGNED_IMAGE_BASE      0x08008000UL
-#define SIGNED_MANIFEST_SIZE   96UL
-#define SIGNATURE_ADDRESS      (SIGNED_IMAGE_BASE + 0x60UL)
-#define PAYLOAD_ADDRESS        0x08008200UL
+#include "flash_layout.h"
+
 #define SIGNED_IMAGE_MAGIC     0x31474953UL
 #define SIGNED_HEADER_VERSION  1UL
 #define MIN_IMAGE_VERSION      2UL
-#define MAX_PAYLOAD_SIZE       (0x08100000UL - PAYLOAD_ADDRESS)
 
 typedef struct {
     uint32_t magic;

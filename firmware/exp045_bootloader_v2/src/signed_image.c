@@ -45,7 +45,7 @@ verify_status_t signed_image_verify(void)
         return VERIFY_ROLLBACK_VERSION;
     }
 
-    if (m->vector_address != PAYLOAD_ADDRESS) {
+    if (m->vector_address != APPLICATION_BASE_ADDRESS) {
         return VERIFY_BAD_VECTOR_ADDRESS;
     }
 
