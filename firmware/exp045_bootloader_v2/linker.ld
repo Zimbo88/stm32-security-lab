@@ -1,9 +1,10 @@
 ENTRY(Reset_Handler)
+INCLUDE ../common/stm32f429_memory_layout.ld
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08000000, LENGTH = 32K
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+    FLASH (rx)  : ORIGIN = STM32F429_BOOTLOADER_BASE, LENGTH = STM32F429_BOOTLOADER_SIZE
+    RAM   (rwx) : ORIGIN = STM32F429_MAIN_SRAM_BASE, LENGTH = STM32F429_MAIN_SRAM_SUPPORTED_SIZE
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);
@@ -57,5 +58,10 @@ SECTIONS
     ASSERT(
         _flash_image_end <= _flash_region_end,
         "ERROR: bootloader flash image exceeds reserved 32 KiB region"
+    )
+
+    ASSERT(
+        _flash_region_end == STM32F429_BOOTLOADER_END,
+        "ERROR: bootloader linker region diverges from target memory layout"
     )
 }

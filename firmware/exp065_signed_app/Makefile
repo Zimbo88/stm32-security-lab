@@ -1,6 +1,8 @@
 PROJECT := exp065_signed_app
 BUILD   := build
 SRC     := src
+COMMON  := ../common
+include $(COMMON)/stm32f429_memory_layout.mk
 
 CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -9,7 +11,7 @@ SIZE    := arm-none-eabi-size
 CPUFLAGS := -mcpu=cortex-m4 -mthumb
 CFLAGS   := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding \
             -fdata-sections -ffunction-sections -fno-builtin \
-            -Wall -Wextra -Werror -I$(SRC)
+            -Wall -Wextra -Werror -I$(SRC) -I$(COMMON)
 ASFLAGS  := $(CPUFLAGS) -x assembler-with-cpp -g3
 LDFLAGS  := $(CPUFLAGS) -T linker.ld -nostdlib \
             -Wl,--gc-sections -Wl,-Map=$(BUILD)/$(PROJECT).map
@@ -36,7 +38,7 @@ $(BUILD)/startup.o: $(SRC)/startup.s | $(BUILD)
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD)/$(PROJECT).elf: $(OBJECTS) linker.ld
+$(BUILD)/$(PROJECT).elf: $(OBJECTS) linker.ld $(COMMON)/stm32f429_memory_layout.ld
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 
 $(APPLICATION_BIN): $(BUILD)/$(PROJECT).elf

@@ -107,6 +107,16 @@ static void print_snapshot(const char *name, uint32_t value)
     newline();
 }
 
+static void print_address_range(const char *name, uint32_t start, uint32_t end)
+{
+    uart_puts(name);
+    uart_putc(' ');
+    uart_put_hex32(start);
+    uart_putc('-');
+    uart_put_hex32(end - 1UL);
+    newline();
+}
+
 static void print_unavailable(void)
 {
     uart_puts("unavailable: group intentionally not sampled in EXP066\n");
@@ -326,12 +336,30 @@ static void dispatch_command(const char *command)
     } else if (is_unavailable_register_group(command)) {
         print_unavailable();
     } else if (eq(command, "memory regions")) {
-        uart_puts(
-            "bootloader 0x08000000-0x08007FFF\n"
-            "manifest 0x08008000-0x0800805F\n"
-            "signature 0x08008060-0x0800809F\n"
-            "application 0x08008200-0x080FFFFF\n"
-            "SRAM 0x20000000-0x2001FFFF\n"
+        print_address_range(
+            "bootloader",
+            STM32F429_BOOTLOADER_BASE,
+            STM32F429_BOOTLOADER_END
+        );
+        print_address_range(
+            "manifest",
+            STM32F429_SIGNED_IMAGE_BASE,
+            STM32F429_SIGNATURE_BASE
+        );
+        print_address_range(
+            "signature",
+            STM32F429_SIGNATURE_BASE,
+            STM32F429_SIGNATURE_BASE + STM32F429_SIGNED_SIGNATURE_SIZE
+        );
+        print_address_range(
+            "application",
+            STM32F429_APPLICATION_BASE,
+            STM32F429_APPLICATION_FLASH_END
+        );
+        print_address_range(
+            "SRAM",
+            STM32F429_MAIN_SRAM_BASE,
+            STM32F429_MAIN_SRAM_SUPPORTED_END
         );
     } else if (eq(command, "log show")) {
         log_show();

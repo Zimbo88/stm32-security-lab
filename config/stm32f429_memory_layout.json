@@ -1,0 +1,32 @@
+{
+  "target": "STM32F429IGT6",
+  "flash": {
+    "base": "0x08000000",
+    "total_size": "0x00200000",
+    "bank1_size": "0x00100000"
+  },
+  "main_sram": {
+    "base": "0x20000000",
+    "supported_size": "0x00020000",
+    "device_size": "0x00040000"
+  },
+  "ccm": {
+    "base": "0x10000000",
+    "size": "0x00010000",
+    "application_supported": false
+  },
+  "bootloader": {
+    "base": "0x08000000",
+    "size": "0x00008000"
+  },
+  "signed_image": {
+    "manifest_size": "0x00000060",
+    "signature_size": "0x00000040",
+    "header_size": "0x00000200"
+  },
+  "policy": {
+    "minimum_payload_size": "0x00000008",
+    "manifest_flags_allowed_mask": "0x00000000",
+    "msp_alignment": "0x00000008"
+  }
+}

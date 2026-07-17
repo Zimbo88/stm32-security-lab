@@ -5,21 +5,30 @@ from __future__ import annotations
 import argparse
 import hashlib
 import struct
+import sys
 from pathlib import Path
 
 from nacl.signing import SigningKey
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "tools"))
+
+from stm32f429_layout import LAYOUT  # noqa: E402
 
 
 SIGNED_IMAGE_MAGIC = 0x31474953
 SIGNED_HEADER_VERSION = 1
 IMAGE_VERSION = 2
 
-SIGNED_IMAGE_BASE = 0x08008000
-APPLICATION_BASE = 0x08008200
+SIGNED_IMAGE_BASE = LAYOUT["signed_image_base"]
+APPLICATION_BASE = LAYOUT["application_base"]
+APPLICATION_MSP_BASE = LAYOUT["application_msp_base"]
+APPLICATION_MSP_END = LAYOUT["application_msp_end"]
 
-MANIFEST_SIZE = 96
-SIGNATURE_SIZE = 64
-APPLICATION_OFFSET = APPLICATION_BASE - SIGNED_IMAGE_BASE
+MANIFEST_SIZE = LAYOUT["signed_manifest_size"]
+SIGNATURE_SIZE = LAYOUT["signed_signature_size"]
+APPLICATION_OFFSET = LAYOUT["signed_image_header_size"]
 
 
 def main() -> None:
@@ -60,7 +69,7 @@ def main() -> None:
 
     initial_msp, reset_vector = struct.unpack_from("<II", application, 0)
 
-    if not (0x20000000 <= initial_msp <= 0x20040000):
+    if not (APPLICATION_MSP_BASE <= initial_msp <= APPLICATION_MSP_END):
         raise SystemExit(
             f"Initial MSP is outside SRAM: 0x{initial_msp:08X}"
         )

@@ -10,7 +10,17 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).parents[1]
 PROJECT = ROOT / "firmware" / "exp066_research_platform_core"
-APPLICATION_BASE = 0x08008200
+COMMON = ROOT / "firmware" / "common"
+APPLICATION_BASE = int(
+    next(
+        line.split()[2][:-2]
+        for line in (COMMON / "stm32f429_memory_layout.h").read_text(
+            encoding="ascii"
+        ).splitlines()
+        if line.startswith("#define STM32F429_APPLICATION_BASE ")
+    ),
+    16,
+)
 
 
 def _run(command: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -26,6 +36,7 @@ def _run(command: list[str], *, cwd: Path | None = None) -> subprocess.Completed
 def _build_project_copy(tmpdir: Path) -> Path:
     work = tmpdir / "exp066_research_platform_core"
     shutil.copytree(PROJECT, work)
+    shutil.copytree(COMMON, tmpdir / "common")
     _run(["make", "-C", str(work), "all"])
     return work / "build" / "exp066_research_platform_core.elf"
 

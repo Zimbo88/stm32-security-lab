@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "stm32f429_memory_layout.h"
+
 /*---------------------------------------------------------------------------
  * Board identification
  *---------------------------------------------------------------------------*/
@@ -23,18 +25,21 @@
  * Internal memories
  *---------------------------------------------------------------------------*/
 
-#define BOARD_FLASH_BASE        0x08000000UL
-#define BOARD_FLASH_SIZE        (2UL * 1024UL * 1024UL)
+#define BOARD_FLASH_BASE        STM32F429_FLASH_BASE
+#define BOARD_FLASH_SIZE        STM32F429_FLASH_TOTAL_SIZE
 
-#define BOARD_FLASH_BANK1_BASE  0x08000000UL
-#define BOARD_FLASH_BANK2_BASE  0x08100000UL
-#define BOARD_FLASH_END         (BOARD_FLASH_BASE + BOARD_FLASH_SIZE)
+#define BOARD_FLASH_BANK1_BASE  STM32F429_FLASH_BANK1_BASE
+#define BOARD_FLASH_BANK2_BASE  STM32F429_FLASH_BANK1_END
+#define BOARD_FLASH_END         STM32F429_FLASH_END
 
-#define BOARD_SRAM_BASE         0x20000000UL
-#define BOARD_SRAM_SIZE         (256UL * 1024UL)
+#define BOARD_SRAM_BASE         STM32F429_MAIN_SRAM_BASE
+#define BOARD_SRAM_SIZE         STM32F429_MAIN_SRAM_SUPPORTED_SIZE
+#define BOARD_SRAM_END          STM32F429_MAIN_SRAM_SUPPORTED_END
+#define BOARD_SRAM_DEVICE_SIZE  STM32F429_MAIN_SRAM_DEVICE_SIZE
+#define BOARD_SRAM_DEVICE_END   STM32F429_MAIN_SRAM_DEVICE_END
 
-#define BOARD_CCM_BASE          0x10000000UL
-#define BOARD_CCM_SIZE          (64UL * 1024UL)
+#define BOARD_CCM_BASE          STM32F429_CCM_BASE
+#define BOARD_CCM_SIZE          STM32F429_CCM_SIZE
 
 /*---------------------------------------------------------------------------
  * External memories
@@ -47,12 +52,12 @@
  * Bootloader memory layout
  *---------------------------------------------------------------------------*/
 
-#define BOARD_BOOTLOADER_SIZE   (32UL * 1024UL)
+#define BOARD_BOOTLOADER_SIZE   STM32F429_BOOTLOADER_SIZE
 
-#define BOARD_BOOTLOADER_BASE   BOARD_FLASH_BASE
-#define BOARD_BOOTLOADER_END    (BOARD_BOOTLOADER_BASE + BOARD_BOOTLOADER_SIZE)
+#define BOARD_BOOTLOADER_BASE   STM32F429_BOOTLOADER_BASE
+#define BOARD_BOOTLOADER_END    STM32F429_BOOTLOADER_END
 
-#define BOARD_SIGNED_IMAGE_BASE BOARD_BOOTLOADER_END
-#define BOARD_APPLICATION_BASE  0x08008200UL
+#define BOARD_SIGNED_IMAGE_BASE STM32F429_SIGNED_IMAGE_BASE
+#define BOARD_APPLICATION_BASE  STM32F429_APPLICATION_BASE
 
 #endif

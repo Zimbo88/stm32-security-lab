@@ -1,9 +1,10 @@
 ENTRY(Reset_Handler)
+INCLUDE ../common/stm32f429_memory_layout.ld
 
 MEMORY
 {
-    FLASH (rx)  : ORIGIN = 0x08008200, LENGTH = 0x000F7E00
-    RAM   (rwx) : ORIGIN = 0x20000000, LENGTH = 128K
+    FLASH (rx)  : ORIGIN = STM32F429_APPLICATION_BASE, LENGTH = STM32F429_APPLICATION_PAYLOAD_MAX_SIZE
+    RAM   (rwx) : ORIGIN = STM32F429_MAIN_SRAM_BASE, LENGTH = STM32F429_MAIN_SRAM_SUPPORTED_SIZE
 }
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);
@@ -46,4 +47,9 @@ SECTIONS
     } > RAM
 
     _flash_image_end = LOADADDR(.data) + SIZEOF(.data);
+
+    ASSERT(ADDR(.isr_vector) == STM32F429_APPLICATION_BASE, "vector table address changed")
+    ASSERT(_flash_image_end <= ORIGIN(FLASH) + LENGTH(FLASH), "application exceeds Flash")
+    ASSERT(_ebss <= ORIGIN(RAM) + LENGTH(RAM), "application exceeds SRAM")
+    ASSERT((_estack & 7) == 0, "stack must be 8-byte aligned")
 }

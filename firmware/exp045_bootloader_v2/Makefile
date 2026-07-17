@@ -1,6 +1,8 @@
 PROJECT := exp045_bootloader_v2
 BUILD   := build
 SRC     := src
+COMMON  := ../common
+include $(COMMON)/stm32f429_memory_layout.mk
 
 CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -10,7 +12,7 @@ NM      := arm-none-eabi-nm
 CPUFLAGS := -mcpu=cortex-m4 -mthumb
 CFLAGS   := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding \
             -fdata-sections -ffunction-sections -fno-builtin \
-            -Wall -Wextra -Werror -fstack-usage -I$(SRC) -Iinclude
+            -Wall -Wextra -Werror -fstack-usage -I$(SRC) -Iinclude -I$(COMMON)
 ASFLAGS  := $(CPUFLAGS) -x assembler-with-cpp -g3
 LDFLAGS  := $(CPUFLAGS) -T linker.ld -nostdlib \
             -Wl,--gc-sections -Wl,-Map=$(BUILD)/$(PROJECT).map
@@ -33,7 +35,7 @@ $(BUILD)/startup.o: $(SRC)/startup.s | $(BUILD)
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD)/$(PROJECT).elf: $(OBJECTS) linker.ld
+$(BUILD)/$(PROJECT).elf: $(OBJECTS) linker.ld $(COMMON)/stm32f429_memory_layout.ld
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 
 $(BUILD)/$(PROJECT).bin: $(BUILD)/$(PROJECT).elf
@@ -42,7 +44,7 @@ $(BUILD)/$(PROJECT).bin: $(BUILD)/$(PROJECT).elf
 sizecheck: $(BUILD)/$(PROJECT).bin
 	@size=$$(stat -c %s $<); \
 	echo "Bootloader binary size: $$size bytes"; \
-	if [ $$size -gt 32768 ]; then \
+	if [ $$size -gt $(STM32F429_BOOTLOADER_SIZE_BYTES) ]; then \
 	    echo "FEHLER: Bootloader überschreitet 32 KiB."; \
 	    exit 1; \
 	fi
@@ -54,7 +56,7 @@ clean:
 	rm -rf $(BUILD)
 
 # EXP053: Keep the bootloader inside the reserved 32 KiB flash region.
-BOOTLOADER_MAX_SIZE_BYTES := 32768
+BOOTLOADER_MAX_SIZE_BYTES := $(STM32F429_BOOTLOADER_SIZE_BYTES)
 BOOTLOADER_BINARY := $(BUILD)/$(PROJECT).bin
 
 .PHONY: check-size
