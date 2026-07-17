@@ -9,7 +9,7 @@
 #include "signed_image.h"
 #include "uart.h"
 
-void boot_sequence_execute(void)
+_Noreturn void boot_sequence_execute(void)
 {
     boot_info_print_banner();
 

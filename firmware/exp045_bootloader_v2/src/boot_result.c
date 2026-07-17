@@ -9,7 +9,7 @@ void boot_result_print(verify_status_t status)
     uart_puts("\n");
 }
 
-void boot_result_halt(void)
+_Noreturn void boot_result_halt(void)
 {
     uart_puts("Application will NOT be started.\n");
     uart_puts("Bootloader halted safely.\n");
