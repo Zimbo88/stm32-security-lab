@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import struct
 import sys
+import tempfile
 from pathlib import Path
 
 from nacl.signing import SigningKey
@@ -25,10 +27,237 @@ SIGNED_IMAGE_BASE = LAYOUT["signed_image_base"]
 APPLICATION_BASE = LAYOUT["application_base"]
 APPLICATION_MSP_BASE = LAYOUT["application_msp_base"]
 APPLICATION_MSP_END = LAYOUT["application_msp_end"]
+APPLICATION_MSP_ALIGNMENT = LAYOUT["application_msp_alignment"]
+APPLICATION_FLASH_END = LAYOUT["application_flash_end"]
+APPLICATION_MIN_SIZE = LAYOUT["application_min_payload_size"]
+MAX_PAYLOAD_SIZE = LAYOUT["application_payload_max_size"]
+SIGNED_IMAGE_FLAGS_ALLOWED_MASK = LAYOUT["signed_image_flags_allowed_mask"]
 
 MANIFEST_SIZE = LAYOUT["signed_manifest_size"]
 SIGNATURE_SIZE = LAYOUT["signed_signature_size"]
 APPLICATION_OFFSET = LAYOUT["signed_image_header_size"]
+UINT32_MAX = 0xFFFFFFFF
+MANIFEST_STRUCT = struct.Struct("<8I64s")
+
+
+class SigningError(ValueError):
+    pass
+
+
+def require_u32(value: int, name: str) -> int:
+    if not isinstance(value, int):
+        raise SigningError(f"{name} must be an integer")
+    if not (0 <= value <= UINT32_MAX):
+        raise SigningError(f"{name} must be between 0 and {UINT32_MAX}")
+    return value
+
+
+def checked_u32_add(left: int, right: int, name: str) -> int:
+    require_u32(left, f"{name} base")
+    require_u32(right, f"{name} size")
+
+    if right > UINT32_MAX - left:
+        raise SigningError(f"{name} overflows the 32-bit address space")
+
+    return left + right
+
+
+def read_file(path: Path, label: str) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise SigningError(f"Failed to read {label} '{path}': {exc}") from exc
+
+
+def validate_seed(seed: bytes) -> None:
+    if len(seed) != 32:
+        raise SigningError(f"Ed25519 seed must contain 32 bytes, got {len(seed)}")
+
+
+def validate_payload_size(application_size: int) -> int:
+    require_u32(application_size, "Application size")
+
+    if application_size < APPLICATION_MIN_SIZE:
+        raise SigningError("Application is too small to contain a vector table")
+
+    if application_size > MAX_PAYLOAD_SIZE:
+        raise SigningError(
+            "Application exceeds bootloader-supported application region: "
+            f"{application_size} bytes > {MAX_PAYLOAD_SIZE} bytes"
+        )
+
+    payload_end = checked_u32_add(
+        APPLICATION_BASE,
+        application_size,
+        "Application address range",
+    )
+
+    if payload_end > APPLICATION_FLASH_END:
+        raise SigningError(
+            "Application extends beyond supported flash region: "
+            f"0x{payload_end:08X} > 0x{APPLICATION_FLASH_END:08X}"
+        )
+
+    return payload_end
+
+
+def validate_vector_table(application: bytes) -> tuple[int, int]:
+    payload_end = validate_payload_size(len(application))
+    initial_msp, reset_vector = struct.unpack_from("<II", application, 0)
+
+    if not (APPLICATION_MSP_BASE < initial_msp <= APPLICATION_MSP_END):
+        raise SigningError(
+            "Initial MSP is outside supported SRAM range: "
+            f"0x{initial_msp:08X}"
+        )
+
+    if (initial_msp & (APPLICATION_MSP_ALIGNMENT - 1)) != 0:
+        raise SigningError(
+            "Initial MSP is not aligned to "
+            f"{APPLICATION_MSP_ALIGNMENT} bytes: 0x{initial_msp:08X}"
+        )
+
+    if (reset_vector & 1) == 0:
+        raise SigningError(
+            f"Reset vector does not have the Thumb bit: 0x{reset_vector:08X}"
+        )
+
+    reset_address = reset_vector & ~1
+
+    if not (APPLICATION_BASE <= reset_address < payload_end):
+        raise SigningError(
+            "Reset vector is outside application payload: "
+            f"0x{reset_vector:08X}"
+        )
+
+    return initial_msp, reset_vector
+
+
+def build_manifest(
+    *,
+    image_version: int,
+    header_version: int,
+    image_size: int,
+    payload_hash: bytes,
+    flags: int = 0,
+    reserved0: int = 0,
+    reserved1: int = 0,
+) -> bytes:
+    require_u32(header_version, "Header version")
+    require_u32(image_version, "Image version")
+    require_u32(image_size, "Application size")
+    require_u32(flags, "Manifest flags")
+    require_u32(reserved0, "Reserved field 0")
+    require_u32(reserved1, "Reserved field 1")
+
+    if header_version != SIGNED_HEADER_VERSION:
+        raise SigningError(
+            "Unsupported signed-image header version: "
+            f"{header_version} (expected {SIGNED_HEADER_VERSION})"
+        )
+
+    unsupported_flags = flags & ~SIGNED_IMAGE_FLAGS_ALLOWED_MASK
+    if unsupported_flags != 0:
+        raise SigningError(
+            "Unsupported signed-image flags: "
+            f"0x{unsupported_flags:08X}"
+        )
+
+    if reserved0 != 0 or reserved1 != 0:
+        raise SigningError("Reserved manifest fields must be zero")
+
+    if len(payload_hash) != 64:
+        raise SigningError(
+            f"Payload SHA-512 must contain 64 bytes, got {len(payload_hash)}"
+        )
+
+    manifest = MANIFEST_STRUCT.pack(
+        SIGNED_IMAGE_MAGIC,
+        header_version,
+        image_version,
+        APPLICATION_BASE,
+        image_size,
+        flags,
+        reserved0,
+        reserved1,
+        payload_hash,
+    )
+
+    if len(manifest) != MANIFEST_SIZE:
+        raise SigningError(f"Internal manifest-size error: {len(manifest)}")
+
+    return manifest
+
+
+def build_signed_image(
+    application: bytes,
+    seed: bytes,
+    *,
+    image_version: int = IMAGE_VERSION,
+    header_version: int = SIGNED_HEADER_VERSION,
+    flags: int = 0,
+    reserved0: int = 0,
+    reserved1: int = 0,
+) -> tuple[bytes, bytes, int, int]:
+    validate_seed(seed)
+    initial_msp, reset_vector = validate_vector_table(application)
+    payload_hash = hashlib.sha512(application).digest()
+    manifest = build_manifest(
+        image_version=image_version,
+        header_version=header_version,
+        image_size=len(application),
+        payload_hash=payload_hash,
+        flags=flags,
+        reserved0=reserved0,
+        reserved1=reserved1,
+    )
+
+    signing_key = SigningKey(seed)
+    signature = signing_key.sign(manifest).signature
+
+    if len(signature) != SIGNATURE_SIZE:
+        raise SigningError(f"Internal signature-size error: {len(signature)}")
+
+    padding_size = APPLICATION_OFFSET - MANIFEST_SIZE - SIGNATURE_SIZE
+
+    if padding_size < 0:
+        raise SigningError("Application overlaps manifest or signature")
+
+    combined_image = (
+        manifest
+        + signature
+        + (b"\xFF" * padding_size)
+        + application
+    )
+
+    return combined_image, payload_hash, initial_msp, reset_vector
+
+
+def write_output_atomically(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    temp_name = ""
+    try:
+        fd, temp_name = tempfile.mkstemp(
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+        )
+        temp_path = Path(temp_name)
+
+        with os.fdopen(fd, "wb") as temp_file:
+            temp_file.write(data)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+
+        os.replace(temp_path, path)
+    except OSError as exc:
+        if temp_name:
+            try:
+                Path(temp_name).unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise SigningError(f"Failed to write output atomically: {exc}") from exc
 
 
 def main() -> None:
@@ -56,84 +285,21 @@ def main() -> None:
     if not (0 <= args.header_version <= 0xFFFFFFFF):
         raise SystemExit("--header-version must be between 0 and 4294967295")
 
-    application = args.application.read_bytes()
-    seed = args.seed.read_bytes()
-
-    if len(seed) != 32:
-        raise SystemExit(
-            f"Ed25519 seed must contain 32 bytes, got {len(seed)}"
+    try:
+        application = read_file(args.application, "application")
+        seed = read_file(args.seed, "Ed25519 seed")
+        combined_image, payload_hash, initial_msp, reset_vector = (
+            build_signed_image(
+                application,
+                seed,
+                image_version=args.image_version,
+                header_version=args.header_version,
+            )
         )
-
-    if len(application) < 8:
-        raise SystemExit("Application is too small to contain a vector table")
-
-    initial_msp, reset_vector = struct.unpack_from("<II", application, 0)
-
-    if not (APPLICATION_MSP_BASE <= initial_msp <= APPLICATION_MSP_END):
-        raise SystemExit(
-            f"Initial MSP is outside SRAM: 0x{initial_msp:08X}"
-        )
-
-    if (reset_vector & 1) == 0:
-        raise SystemExit(
-            f"Reset vector does not have the Thumb bit: "
-            f"0x{reset_vector:08X}"
-        )
-
-    reset_address = reset_vector & ~1
-
-    if not (
-        APPLICATION_BASE
-        <= reset_address
-        < APPLICATION_BASE + len(application)
-    ):
-        raise SystemExit(
-            f"Reset vector is outside application: "
-            f"0x{reset_vector:08X}"
-        )
-
-    payload_hash = hashlib.sha512(application).digest()
-
-    manifest = struct.pack(
-        "<8I64s",
-        SIGNED_IMAGE_MAGIC,
-        args.header_version,
-        args.image_version,
-        APPLICATION_BASE,
-        len(application),
-        0,
-        0,
-        0,
-        payload_hash,
-    )
-
-    if len(manifest) != MANIFEST_SIZE:
-        raise SystemExit(
-            f"Internal manifest-size error: {len(manifest)}"
-        )
-
-    signing_key = SigningKey(seed)
-    signature = signing_key.sign(manifest).signature
-
-    if len(signature) != SIGNATURE_SIZE:
-        raise SystemExit(
-            f"Internal signature-size error: {len(signature)}"
-        )
-
-    padding_size = APPLICATION_OFFSET - MANIFEST_SIZE - SIGNATURE_SIZE
-
-    if padding_size < 0:
-        raise SystemExit("Application overlaps manifest or signature")
-
-    combined_image = (
-        manifest
-        + signature
-        + (b"\xFF" * padding_size)
-        + application
-    )
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(combined_image)
+        write_output_atomically(args.output, combined_image)
+        public_key = bytes(SigningKey(seed).verify_key)
+    except SigningError as exc:
+        raise SystemExit(str(exc)) from exc
 
     print(f"Manifest address : 0x{SIGNED_IMAGE_BASE:08X}")
     print(f"Signature address: 0x{SIGNED_IMAGE_BASE + MANIFEST_SIZE:08X}")
@@ -145,7 +311,7 @@ def main() -> None:
     print(f"Initial MSP      : 0x{initial_msp:08X}")
     print(f"Reset vector     : 0x{reset_vector:08X}")
     print(f"Payload SHA-512  : {payload_hash.hex()}")
-    print(f"Public key       : {bytes(signing_key.verify_key).hex()}")
+    print(f"Public key       : {public_key.hex()}")
     print(f"Output           : {args.output}")
 
 

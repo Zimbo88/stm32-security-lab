@@ -22,9 +22,9 @@ OBJECTS   := $(BUILD)/startup.o $(OBJECTS_C)
 
 APPLICATION_BIN := $(BUILD)/$(PROJECT).bin
 SIGNED_IMAGE    := $(BUILD)/$(PROJECT)_signed.bin
-SIGNING_SEED    := keys/firmware_signing_seed.bin
+SIGNING_SEED    ?=
 
-.PHONY: all clean signed report
+.PHONY: all clean signed report require-signing-seed
 
 all: $(APPLICATION_BIN)
 	$(SIZE) $(BUILD)/$(PROJECT).elf
@@ -44,10 +44,20 @@ $(BUILD)/$(PROJECT).elf: $(OBJECTS) linker.ld $(COMMON)/stm32f429_memory_layout.
 $(APPLICATION_BIN): $(BUILD)/$(PROJECT).elf
 	$(OBJCOPY) -O binary $< $@
 
-signed: $(APPLICATION_BIN) $(SIGNING_SEED)
+require-signing-seed:
+	@test -n "$(SIGNING_SEED)" || { \
+		echo "ERROR: set SIGNING_SEED to an explicit Ed25519 seed path"; \
+		exit 1; \
+	}
+	@test -f "$(SIGNING_SEED)" || { \
+		echo "ERROR: SIGNING_SEED does not name a file: $(SIGNING_SEED)"; \
+		exit 1; \
+	}
+
+signed: $(APPLICATION_BIN) require-signing-seed
 	python3 tools/build_signed_image.py \
 	    --application $(APPLICATION_BIN) \
-	    --seed $(SIGNING_SEED) \
+	    --seed "$(SIGNING_SEED)" \
 	    --output $(SIGNED_IMAGE)
 
 report: signed

@@ -19,9 +19,9 @@ ELF := $(BUILD)/$(PROJECT).elf
 BIN := $(BUILD)/$(PROJECT).bin
 SIGNED := $(BUILD)/$(PROJECT)_signed.bin
 SIGNER ?= ../exp065_signed_app/tools/build_signed_image.py
-SIGNING_SEED ?= ../exp065_signed_app/keys/firmware_signing_seed.bin
+SIGNING_SEED ?=
 
-.PHONY: all clean report signed verify-layout
+.PHONY: all clean report signed verify-layout require-signing-seed
 all: $(BIN) verify-layout
 	$(SIZE) $(ELF)
 $(BUILD):
@@ -37,8 +37,17 @@ $(BIN): $(ELF)
 verify-layout: $(ELF)
 	@address=$$($(OBJDUMP) -h $(ELF) | awk '$$2 == ".isr_vector" {print $$4}'); \
 	 test "$$address" = "$(STM32F429_APPLICATION_BASE_HEX)" || { echo "ERROR: vector at $$address"; exit 1; }
-signed: $(BIN)
-	python3 $(SIGNER) --application $(BIN) --seed $(SIGNING_SEED) --output $(SIGNED)
+require-signing-seed:
+	@test -n "$(SIGNING_SEED)" || { \
+		echo "ERROR: set SIGNING_SEED to an explicit Ed25519 seed path"; \
+		exit 1; \
+	}
+	@test -f "$(SIGNING_SEED)" || { \
+		echo "ERROR: SIGNING_SEED does not name a file: $(SIGNING_SEED)"; \
+		exit 1; \
+	}
+signed: $(BIN) require-signing-seed
+	python3 $(SIGNER) --application $(BIN) --seed "$(SIGNING_SEED)" --output $(SIGNED)
 report: signed
 	@wc -c $(BIN) $(SIGNED)
 	@$(SIZE) -A $(ELF)
