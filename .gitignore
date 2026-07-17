@@ -8,3 +8,11 @@ firmware/*/build/
 *.map
 *.o
 *.su
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Private signing keys
+*_private.pem
+*.key
