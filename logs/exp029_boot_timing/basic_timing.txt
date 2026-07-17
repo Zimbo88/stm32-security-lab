@@ -1,0 +1,29 @@
+EXP029 BASIC TIMING
+Samplerate:       8000000 Hz
+Samples:          8000000
+Capture duration: 1.000000 s
+
+NRST: 2 edges
+  sample  4680311, time 0.585038875 s, 1 -> 0
+  sample  6171771, time 0.771471375 s, 0 -> 1
+
+UART TX: 2525 edges
+  sample  6172231, time 0.771528875 s, 1 -> 0
+  sample  6172262, time 0.771532750 s, 0 -> 1
+  sample  6173017, time 0.771627125 s, 1 -> 0
+  sample  6173086, time 0.771635750 s, 0 -> 1
+  sample  6173156, time 0.771644500 s, 1 -> 0
+  sample  6173225, time 0.771653125 s, 0 -> 1
+  sample  6173364, time 0.771670500 s, 1 -> 0
+  sample  6173641, time 0.771705125 s, 0 -> 1
+  sample  6173711, time 0.771713875 s, 1 -> 0
+  sample  6173849, time 0.771731125 s, 0 -> 1
+
+PH12 heartbeat: 1 edges
+  sample  4680333, time 0.585041625 s, 0 -> 1
+
+Calculated results:
+NRST falling: 0.585038875 s
+NRST rising:  0.771471375 s
+Reset pulse:  186.433 ms
+Reset release -> first UART edge: 0.058 ms

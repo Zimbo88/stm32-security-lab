@@ -1,0 +1,12 @@
+Samplerate: 8000000
+Channels: 8
+- D0: logic
+- D1: logic
+- D2: logic
+- D3: logic
+- D4: logic
+- D5: logic
+- D6: logic
+- D7: logic
+Logic unitsize: 1
+Logic sample count: 16000000
