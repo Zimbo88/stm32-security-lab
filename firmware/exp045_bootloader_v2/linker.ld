@@ -8,6 +8,9 @@ MEMORY
 
 _estack = ORIGIN(RAM) + LENGTH(RAM);
 
+_flash_region_start = ORIGIN(FLASH);
+_flash_region_end = ORIGIN(FLASH) + LENGTH(FLASH);
+
 SECTIONS
 {
     .isr_vector :
@@ -44,4 +47,15 @@ SECTIONS
         . = ALIGN(8);
         _ebss = .;
     } > RAM
+
+    /*
+     * Include the initial values of .data because they are stored in flash
+     * even though the section executes from RAM.
+     */
+    _flash_image_end = LOADADDR(.data) + SIZEOF(.data);
+
+    ASSERT(
+        _flash_image_end <= _flash_region_end,
+        "ERROR: bootloader flash image exceeds reserved 32 KiB region"
+    )
 }
