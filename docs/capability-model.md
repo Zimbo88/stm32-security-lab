@@ -15,3 +15,5 @@ No capability permits native execution, arbitrary memory access, arbitrary
 register access, Flash writes, option-byte changes, or RDP changes.
 
 EXP069 rejects native packages containing any capability outside this table.
+EXP070 applies the same allowlist before marking either bytecode or native
+packages installable.

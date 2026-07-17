@@ -36,3 +36,12 @@ EXP069 host tool:
   package. It rejects bytecode packages, malformed native payloads, unknown
   capabilities, wrong signer identity, incompatible ABI/platform versions, and
   rollback versions.
+
+EXP070 host tool:
+
+- `tools/module_install.py` models atomic A/B installation against a
+  JSON-backed simulated Flash image. It supports `list`, `inspect`, `install`,
+  `verify`, `activate`, `confirm`, `rollback`, `quarantine`,
+  `remove-candidate`, `revoke-signer`, and `catalog-recovery`. Commands operate
+  on module IDs and predefined slots only; they do not accept raw Flash
+  addresses.
