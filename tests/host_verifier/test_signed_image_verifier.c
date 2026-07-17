@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -8,10 +9,10 @@
 #define TEST_PAYLOAD_SIZE 256U
 
 static uint8_t manifest[SIGNED_MANIFEST_SIZE];
-static uint8_t signature[STM32F429_SIGNED_SIGNATURE_SIZE];
-static uint8_t payload[TEST_PAYLOAD_SIZE];
+static uint8_t signature[SIGNED_SIGNATURE_SIZE];
+static uint8_t payload[MAX_PAYLOAD_SIZE];
 static uint8_t secret_key[64];
-static uint8_t public_key[32];
+static uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE];
 static int failures;
 
 static void store_le32(uint8_t out[4], uint32_t value)
@@ -69,18 +70,78 @@ static void write_manifest(
     uint32_t flags,
     uint32_t reserved0,
     uint32_t reserved1,
-    const uint8_t payload_hash[64]
+    const uint8_t payload_hash[SIGNED_PAYLOAD_HASH_SIZE]
 )
 {
-    store_le32(&manifest[0], magic);
-    store_le32(&manifest[4], header_version);
-    store_le32(&manifest[8], image_version);
-    store_le32(&manifest[12], vector_address);
-    store_le32(&manifest[16], image_size);
-    store_le32(&manifest[20], flags);
-    store_le32(&manifest[24], reserved0);
-    store_le32(&manifest[28], reserved1);
-    memcpy(&manifest[32], payload_hash, 64U);
+    store_le32(&manifest[offsetof(signed_manifest_t, magic)], magic);
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, header_version)],
+        header_version
+    );
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, image_version)],
+        image_version
+    );
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, vector_address)],
+        vector_address
+    );
+    store_le32(&manifest[offsetof(signed_manifest_t, image_size)], image_size);
+    store_le32(&manifest[offsetof(signed_manifest_t, flags)], flags);
+    store_le32(&manifest[offsetof(signed_manifest_t, reserved0)], reserved0);
+    store_le32(&manifest[offsetof(signed_manifest_t, reserved1)], reserved1);
+    memcpy(
+        &manifest[offsetof(signed_manifest_t, payload_sha512)],
+        payload_hash,
+        SIGNED_PAYLOAD_HASH_SIZE
+    );
+}
+
+static size_t bounded_payload_length(uint32_t image_size)
+{
+    if (image_size > (uint32_t)sizeof(payload)) {
+        return sizeof(payload);
+    }
+
+    return (size_t)image_size;
+}
+
+static void build_image_with_vector_address(
+    uint32_t image_version,
+    uint32_t vector_address,
+    uint32_t image_size,
+    uint32_t msp,
+    uint32_t reset,
+    uint32_t flags,
+    uint32_t reserved0,
+    uint32_t reserved1
+)
+{
+    uint8_t payload_hash[SIGNED_PAYLOAD_HASH_SIZE];
+    const size_t hash_length = bounded_payload_length(image_size);
+    size_t init_length = hash_length;
+
+    if (init_length < APPLICATION_VECTOR_MIN_SIZE) {
+        init_length = APPLICATION_VECTOR_MIN_SIZE;
+    }
+
+    memset(payload, 0xA5, init_length);
+    store_le32(&payload[0], msp);
+    store_le32(&payload[4], reset);
+
+    crypto_sha512(payload_hash, payload, hash_length);
+    write_manifest(
+        SIGNED_IMAGE_MAGIC,
+        SIGNED_HEADER_VERSION,
+        image_version,
+        vector_address,
+        image_size,
+        flags,
+        reserved0,
+        reserved1,
+        payload_hash
+    );
+    crypto_ed25519_sign(signature, secret_key, manifest, SIGNED_MANIFEST_SIZE);
 }
 
 static void build_image(
@@ -93,25 +154,16 @@ static void build_image(
     uint32_t reserved1
 )
 {
-    uint8_t payload_hash[64];
-
-    memset(payload, 0xA5, sizeof(payload));
-    store_le32(&payload[0], msp);
-    store_le32(&payload[4], reset);
-
-    crypto_sha512(payload_hash, payload, (size_t)TEST_PAYLOAD_SIZE);
-    write_manifest(
-        SIGNED_IMAGE_MAGIC,
-        SIGNED_HEADER_VERSION,
+    build_image_with_vector_address(
         image_version,
         APPLICATION_BASE_ADDRESS,
         image_size,
+        msp,
+        reset,
         flags,
         reserved0,
-        reserved1,
-        payload_hash
+        reserved1
     );
-    crypto_ed25519_sign(signature, secret_key, manifest, SIGNED_MANIFEST_SIZE);
 }
 
 static void build_valid_image(void)
@@ -138,6 +190,20 @@ static verify_status_t verify_current(size_t payload_capacity)
     );
 }
 
+static signed_image_jump_context_t valid_jump_context(uint32_t image_size)
+{
+    signed_image_jump_context_t context;
+
+    context.vector_address = APPLICATION_BASE_ADDRESS;
+    context.image_size = image_size;
+    context.payload_end = APPLICATION_BASE_ADDRESS + image_size;
+    context.initial_msp = APPLICATION_MSP_END;
+    context.reset_vector = APPLICATION_BASE_ADDRESS | 1UL;
+    context.reset_address = APPLICATION_BASE_ADDRESS;
+
+    return context;
+}
+
 static void test_enum_values_are_stable(void)
 {
     expect_int("VERIFY_OK", 0, (int)VERIFY_OK);
@@ -158,20 +224,184 @@ static void test_enum_values_are_stable(void)
 static void test_valid_image(void)
 {
     build_valid_image();
-    expect_status("valid image", VERIFY_OK, verify_current(sizeof(payload)));
+    expect_status("valid image", VERIFY_OK, verify_current(TEST_PAYLOAD_SIZE));
+}
+
+static void test_null_inputs_are_rejected(void)
+{
+    build_valid_image();
+    expect_status(
+        "null manifest",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        signed_image_verify_buffer(
+            NULL,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key
+        )
+    );
+    expect_status(
+        "null signature",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        signed_image_verify_buffer(
+            manifest,
+            NULL,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key
+        )
+    );
+    expect_status(
+        "null payload",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        signed_image_verify_buffer(
+            manifest,
+            signature,
+            NULL,
+            TEST_PAYLOAD_SIZE,
+            public_key
+        )
+    );
+    expect_status(
+        "null public key",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        signed_image_verify_buffer(
+            manifest,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            NULL
+        )
+    );
+}
+
+static void test_minimum_payload_length(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        APPLICATION_VECTOR_MIN_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "minimum payload length",
+        VERIFY_OK,
+        verify_current(APPLICATION_VECTOR_MIN_SIZE)
+    );
+}
+
+static void test_payload_capacity_one_byte_short(void)
+{
+    build_valid_image();
+    expect_status(
+        "payload capacity one byte short",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        verify_current(TEST_PAYLOAD_SIZE - 1U)
+    );
+}
+
+static void test_maximum_payload_length(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        MAX_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "maximum payload length",
+        VERIFY_OK,
+        verify_current(MAX_PAYLOAD_SIZE)
+    );
+}
+
+static void test_payload_one_byte_too_large(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        MAX_PAYLOAD_SIZE + 1UL,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "payload one byte too large",
+        VERIFY_BAD_SIZE,
+        verify_current(MAX_PAYLOAD_SIZE)
+    );
+}
+
+static void test_jump_context_revalidation(void)
+{
+    signed_image_jump_context_t context = valid_jump_context(TEST_PAYLOAD_SIZE);
+
+    expect_status(
+        "valid jump context",
+        VERIFY_OK,
+        signed_image_jump(&context)
+    );
+    expect_status(
+        "null jump context",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        signed_image_jump(NULL)
+    );
+
+    context = valid_jump_context(TEST_PAYLOAD_SIZE);
+    context.initial_msp = APPLICATION_MSP_END - 4UL;
+    expect_status(
+        "jump context bad MSP",
+        VERIFY_BAD_STACK,
+        signed_image_jump(&context)
+    );
+
+    context = valid_jump_context(TEST_PAYLOAD_SIZE);
+    context.reset_vector = APPLICATION_BASE_ADDRESS;
+    expect_status(
+        "jump context bad reset",
+        VERIFY_BAD_RESET_VECTOR,
+        signed_image_jump(&context)
+    );
+
+    context = valid_jump_context(TEST_PAYLOAD_SIZE);
+    context.payload_end += APPLICATION_MSP_ALIGNMENT;
+    expect_status(
+        "jump context inconsistent payload end",
+        VERIFY_BAD_PAYLOAD_RANGE,
+        signed_image_jump(&context)
+    );
+
+    context = valid_jump_context(TEST_PAYLOAD_SIZE);
+    context.vector_address += APPLICATION_VTOR_ALIGNMENT;
+    expect_status(
+        "jump context bad vector address",
+        VERIFY_BAD_VECTOR_ADDRESS,
+        signed_image_jump(&context)
+    );
 }
 
 static void test_bad_magic(void)
 {
     build_valid_image();
-    manifest[0] ^= 0x01U;
+    manifest[offsetof(signed_manifest_t, magic)] ^= 0x01U;
     expect_status("bad magic", VERIFY_BAD_MAGIC, verify_current(sizeof(payload)));
 }
 
 static void test_unsupported_header_version(void)
 {
     build_valid_image();
-    store_le32(&manifest[4], SIGNED_HEADER_VERSION + 1UL);
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, header_version)],
+        SIGNED_HEADER_VERSION + 1UL
+    );
     expect_status(
         "unsupported header version",
         VERIFY_BAD_HEADER_VERSION,
@@ -182,7 +412,10 @@ static void test_unsupported_header_version(void)
 static void test_invalid_payload_length(void)
 {
     build_valid_image();
-    store_le32(&manifest[16], APPLICATION_MIN_SIZE - 1UL);
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, image_size)],
+        APPLICATION_MIN_SIZE - 1UL
+    );
     expect_status(
         "invalid payload length",
         VERIFY_BAD_SIZE,
@@ -190,10 +423,29 @@ static void test_invalid_payload_length(void)
     );
 }
 
+static void test_bad_vector_address(void)
+{
+    build_image_with_vector_address(
+        MIN_IMAGE_VERSION,
+        APPLICATION_BASE_ADDRESS + APPLICATION_VTOR_ALIGNMENT,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "bad manifest vector address",
+        VERIFY_BAD_VECTOR_ADDRESS,
+        verify_current(TEST_PAYLOAD_SIZE)
+    );
+}
+
 static void test_address_overflow(void)
 {
     build_valid_image();
-    store_le32(&manifest[16], UINT32_MAX);
+    store_le32(&manifest[offsetof(signed_manifest_t, image_size)], UINT32_MAX);
     expect_status(
         "address overflow",
         VERIFY_BAD_PAYLOAD_RANGE,
@@ -215,6 +467,74 @@ static void test_bad_msp(void)
     expect_status("bad MSP", VERIFY_BAD_STACK, verify_current(sizeof(payload)));
 }
 
+static void test_lowest_aligned_msp(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_BASE + APPLICATION_MSP_ALIGNMENT,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "lowest aligned MSP",
+        VERIFY_OK,
+        verify_current(TEST_PAYLOAD_SIZE)
+    );
+}
+
+static void test_highest_msp(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status("highest MSP", VERIFY_OK, verify_current(TEST_PAYLOAD_SIZE));
+}
+
+static void test_msp_above_supported_sram(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END + APPLICATION_MSP_ALIGNMENT,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "MSP above supported SRAM",
+        VERIFY_BAD_STACK,
+        verify_current(sizeof(payload))
+    );
+}
+
+static void test_unaligned_msp(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END - 4UL,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "unaligned MSP",
+        VERIFY_BAD_STACK,
+        verify_current(sizeof(payload))
+    );
+}
+
 static void test_bad_reset_vector(void)
 {
     build_image(
@@ -228,6 +548,42 @@ static void test_bad_reset_vector(void)
     );
     expect_status(
         "bad reset vector",
+        VERIFY_BAD_RESET_VECTOR,
+        verify_current(sizeof(payload))
+    );
+}
+
+static void test_last_payload_reset_vector(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        (APPLICATION_BASE_ADDRESS + TEST_PAYLOAD_SIZE - 2UL) | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "last payload reset vector",
+        VERIFY_OK,
+        verify_current(TEST_PAYLOAD_SIZE)
+    );
+}
+
+static void test_reset_vector_before_payload(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        (APPLICATION_BASE_ADDRESS - 2UL) | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "reset before payload",
         VERIFY_BAD_RESET_VECTOR,
         verify_current(sizeof(payload))
     );
@@ -248,6 +604,24 @@ static void test_reset_vector_outside_payload(void)
         "reset outside payload",
         VERIFY_BAD_RESET_VECTOR,
         verify_current(sizeof(payload))
+    );
+}
+
+static void test_reset_vector_at_flash_end(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        MAX_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_FLASH_END | 1UL,
+        0U,
+        0U,
+        0U
+    );
+    expect_status(
+        "reset at flash end",
+        VERIFY_BAD_RESET_VECTOR,
+        verify_current(MAX_PAYLOAD_SIZE)
     );
 }
 
@@ -291,6 +665,24 @@ static void test_unsupported_flags(void)
     );
 }
 
+static void test_unsupported_high_flag_bit(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0x80000000UL,
+        0U,
+        0U
+    );
+    expect_status(
+        "unsupported high flag bit",
+        VERIFY_BAD_FLAGS,
+        verify_current(sizeof(payload))
+    );
+}
+
 static void test_noncanonical_reserved_fields(void)
 {
     build_image(
@@ -304,6 +696,24 @@ static void test_noncanonical_reserved_fields(void)
     );
     expect_status(
         "noncanonical reserved fields",
+        VERIFY_BAD_RESERVED,
+        verify_current(sizeof(payload))
+    );
+}
+
+static void test_noncanonical_reserved1(void)
+{
+    build_image(
+        MIN_IMAGE_VERSION,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        APPLICATION_BASE_ADDRESS | 1UL,
+        0U,
+        0U,
+        1U
+    );
+    expect_status(
+        "noncanonical reserved1",
         VERIFY_BAD_RESERVED,
         verify_current(sizeof(payload))
     );
@@ -333,17 +743,33 @@ int main(void)
 
     test_enum_values_are_stable();
     test_valid_image();
+    test_null_inputs_are_rejected();
+    test_minimum_payload_length();
+    test_payload_capacity_one_byte_short();
+    test_maximum_payload_length();
+    test_payload_one_byte_too_large();
+    test_jump_context_revalidation();
     test_bad_magic();
     test_unsupported_header_version();
     test_invalid_payload_length();
+    test_bad_vector_address();
     test_address_overflow();
     test_bad_msp();
+    test_lowest_aligned_msp();
+    test_highest_msp();
+    test_msp_above_supported_sram();
+    test_unaligned_msp();
     test_bad_reset_vector();
+    test_last_payload_reset_vector();
+    test_reset_vector_before_payload();
     test_reset_vector_outside_payload();
+    test_reset_vector_at_flash_end();
     test_modified_payload();
     test_modified_signature();
     test_unsupported_flags();
+    test_unsupported_high_flag_bit();
     test_noncanonical_reserved_fields();
+    test_noncanonical_reserved1();
     test_rollback_rejection();
 
     if (failures != 0) {
