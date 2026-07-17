@@ -29,7 +29,10 @@ typedef enum {
     VERIFY_BAD_STACK,
     VERIFY_BAD_RESET_VECTOR,
     VERIFY_BAD_PAYLOAD_HASH,
-    VERIFY_BAD_SIGNATURE
+    VERIFY_BAD_SIGNATURE,
+    VERIFY_BAD_FLAGS,
+    VERIFY_BAD_RESERVED,
+    VERIFY_BAD_PAYLOAD_RANGE
 } verify_status_t;
 
 verify_status_t signed_image_verify(void);
