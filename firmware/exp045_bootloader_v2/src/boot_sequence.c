@@ -80,11 +80,21 @@ _Noreturn void boot_sequence_execute(void)
         boot_result_halt();
     }
 
+    signed_image_jump_context_t jump_context;
+    const verify_status_t jump_prepare_status =
+        signed_image_prepare_jump(&jump_context);
+
+    if (jump_prepare_status != VERIFY_OK) {
+        boot_result_print(jump_prepare_status);
+        boot_result_halt();
+    }
+
     uart_puts("Signature and payload hash accepted.\n");
     uart_puts("Jumping to application...\n");
     delay_cycles(4000000U);
 
-    signed_image_jump();
+    const verify_status_t jump_status = signed_image_jump(&jump_context);
+    boot_result_print(jump_status);
 
     boot_result_halt();
 }
