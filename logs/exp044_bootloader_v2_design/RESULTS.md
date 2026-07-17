@@ -1,87 +1,88 @@
 # EXP044 – Bootloader v2 Architecture Design
 
-## Ziel
+## Objective
 
-Entwurf eines wartbaren Secure-Boot-Systems für das Laborboard.
-Das Board soll signierte Firmware starten, kontrolliert aktualisiert werden
-und nach Experimenten weiterhin wiederverwendbar bleiben.
+Design a maintainable secure boot system for the laboratory board.
+The board shall boot signed firmware, support controlled updates,
+and remain reusable after security experiments.
 
-## Vertrauensanker
+## Trust Anchors
 
-- Der Bootloader enthält ausschließlich öffentliche Verifikationsschlüssel.
-- Private Signaturschlüssel verbleiben außerhalb des Mikrocontrollers.
-- Nur korrekt signierte Firmware darf gestartet oder installiert werden.
+- The bootloader contains public verification keys only.
+- Private signing keys remain outside the microcontroller.
+- Only correctly signed firmware may be installed or executed.
 
-## Betriebsmodi
+## Operating Modes
 
 ### Normal Boot
 
-- Manifest und Payload werden vollständig geprüft.
-- Nur bei erfolgreicher Prüfung erfolgt der Sprung zur Anwendung.
-- Fehler führen zu einem fail-closed Zustand.
+- The manifest and payload are fully verified.
+- The application is started only after successful verification.
+- Any verification failure results in a fail-closed state.
 
 ### Authenticated Update
 
-- Updates werden zunächst vollständig empfangen.
-- Länge, Zielbereich, Versionsnummer, Hash und Signatur werden geprüft.
-- Erst danach darf Flash gelöscht oder programmiert werden.
-- Der Bootloaderbereich bleibt vom Update ausgeschlossen.
+- Updates are fully received before installation begins.
+- Length, destination range, image version, hash, and signature are verified.
+- Flash erase or programming is allowed only after validation.
+- The bootloader flash region is excluded from application updates.
 
 ### Physical Recovery
 
-- Recovery wird nur durch eine dokumentierte physische Aktion aktiviert.
-- Beispiele: Recovery-Taster beim Reset oder definierter Jumper.
-- Auch im Recovery-Modus werden ausschließlich signierte Images akzeptiert.
-- Es existiert kein universeller Speicherlesebefehl.
+- Recovery mode is enabled only through a documented physical action.
+- Examples include holding a recovery button during reset or using a defined jumper.
+- Recovery mode accepts signed images only.
+- No universal memory-read command is provided.
 
-## Empfohlenes Flashlayout
+## Recommended Flash Layout
 
-- 0x08000000–0x08007FFF: Bootloader, 32 KiB
-- 0x08008000–0x080081FF: Manifest und Signaturbereich
-- 0x08008200–0x080FFFFF: Anwendungs-Payload
-- Bootloader und Anwendung dürfen sich nicht überschneiden.
+- 0x08000000–0x08007FFF: bootloader, 32 KiB
+- 0x08008000–0x080081FF: manifest and signature area
+- 0x08008200–0x080FFFFF: application payload
+- Bootloader and application regions must never overlap.
 
-## Verifikationsreihenfolge
+## Verification Order
 
-1. Manifest-Struktur und Formatversion
-2. Magic und unterstützter Algorithmus
-3. Zieladresse und Größenbegrenzung
-4. Image-Version und Rollback-Regel
-5. Initialer MSP und Reset-Vektor
-6. Payload-Hash
-7. Digitale Signatur
-8. Freigabe für Boot oder Installation
+1. Manifest structure and format version
+2. Magic value and supported algorithm
+3. Destination address and size limits
+4. Image version and rollback policy
+5. Initial MSP and reset vector
+6. Payload hash
+7. Digital signature
+8. Authorization for boot or installation
 
-## Rollback-Konzept
+## Rollback Design
 
-- Die bisherige compile-time Mindestversion wird zunächst beibehalten.
-- Eine spätere persistente Versionsuntergrenze benötigt atomare Updates.
-- Stromausfall darf den gespeicherten Zustand nicht unbrauchbar machen.
-- Eine Version darf niemals vor erfolgreicher Installation erhöht werden.
+- The current compile-time minimum version is retained initially.
+- A future persistent rollback floor requires atomic updates.
+- Power loss must not corrupt the stored rollback state.
+- The accepted minimum version must never be increased before installation succeeds.
 
-## Update-Sicherheitsregeln
+## Update Security Rules
 
-- Keine Schreiboperation ohne vollständig validierten Header.
-- Keine Adressen außerhalb des Anwendungsbereichs.
-- Schutz gegen Integerüberlauf bei Adresse plus Länge.
-- Begrenzte Paketgröße und definierte Timeouts.
-- Nach Programmierung erneute Hash- oder Signaturprüfung aus dem Flash.
+- No write operation without a fully validated image header.
+- No addresses outside the application region.
+- Address-plus-length calculations must be protected against integer overflow.
+- Packet size and communication timeouts must be bounded.
+- The programmed image must be verified again directly from flash.
 
-## Wiederverwendbarkeit des Laborboards
+## Laboratory Board Reusability
 
-- RDP Level 2 wird nicht verwendet.
-- Recovery und Wartung bleiben dokumentiert möglich.
-- Wiederherstellungsabbilder und Hashwerte werden versioniert archiviert.
-- Schutzänderungen erfolgen nur in separaten, ausdrücklich bestätigten Experimenten.
+- RDP Level 2 must not be enabled.
+- Documented recovery and maintenance remain available.
+- Recovery images and hashes are stored under version control.
+- Protection changes are performed only in separate, explicitly approved experiments.
 
-## Nicht-Ziele
+## Non-Goals
 
-- Kein versteckter Wartungszugang.
-- Kein unauthentifizierter Debug- oder Speicherzugriff.
-- Kein Mechanismus zur Umgehung aktivierter Schutzfunktionen.
+- No hidden maintenance access.
+- No unauthenticated debug or memory access.
+- No mechanism for bypassing enabled protection features.
 
-## Ergebnis
+## Result
 
-Die v2-Architektur trennt Boot, Update und physisch aktiviertes Recovery.
-Alle ausführbaren Images bleiben signaturpflichtig.
-EXP044 wurde vollständig offline durchgeführt.
+The bootloader v2 design separates normal boot, authenticated update,
+and physically activated recovery.
+All executable images remain signature-protected.
+EXP044 was performed entirely offline.
