@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "boot_info.h"
+#include "boot_mode.h"
 #include "boot_policy.h"
 #include "boot_result.h"
 #include "delay.h"
@@ -12,6 +13,13 @@ int main(void)
     uart_init_115200_hsi16();
 
     boot_info_print_banner();
+
+    const boot_mode_t mode = boot_mode_detect();
+
+    uart_puts("Boot mode        = ");
+    uart_puts(boot_mode_text(mode));
+    uart_puts("\n");
+
     boot_info_print_manifest();
 
     uart_puts("Computing SHA-512 and verifying Ed25519...\n");
