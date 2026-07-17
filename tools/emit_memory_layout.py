@@ -20,6 +20,122 @@ def _c_bool(value: bool) -> str:
     return "1U" if value else "0U"
 
 
+def _macro_name(prefix: str, name: str) -> str:
+    return f"{prefix}_{name.upper()}"
+
+
+def _render_sector_header(l: dict[str, object]) -> str:
+    lines = [
+        f"#define STM32F429_FLASH_SECTOR_COUNT {len(l['flash_sectors'])}UL",
+        "",
+    ]
+    for sector in l["flash_sectors"]:
+        sid = sector["id"]
+        lines.extend(
+            [
+                f"#define STM32F429_FLASH_SECTOR_{sid}_BANK {sector['bank']}UL",
+                f"#define STM32F429_FLASH_SECTOR_{sid}_BASE {_hex(sector['base'])}UL",
+                f"#define STM32F429_FLASH_SECTOR_{sid}_SIZE {_hex(sector['size'])}UL",
+                f"#define STM32F429_FLASH_SECTOR_{sid}_END {_hex(sector['end'])}UL",
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _render_sector_ld(l: dict[str, object]) -> str:
+    lines = [f"STM32F429_FLASH_SECTOR_COUNT = {len(l['flash_sectors'])};", ""]
+    for sector in l["flash_sectors"]:
+        sid = sector["id"]
+        lines.extend(
+            [
+                f"STM32F429_FLASH_SECTOR_{sid}_BANK = {sector['bank']};",
+                f"STM32F429_FLASH_SECTOR_{sid}_BASE = {_hex(sector['base'])};",
+                f"STM32F429_FLASH_SECTOR_{sid}_SIZE = {_hex(sector['size'])};",
+                f"STM32F429_FLASH_SECTOR_{sid}_END = {_hex(sector['end'])};",
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def _region_header(prefix: str, l: dict[str, object]) -> str:
+    keys = ("BASE", "SIZE", "END", "FIRST_SECTOR", "LAST_SECTOR")
+    values = (
+        l[f"{prefix.lower()}_base"],
+        l[f"{prefix.lower()}_size"],
+        l[f"{prefix.lower()}_end"],
+        l[f"{prefix.lower()}_first_sector"],
+        l[f"{prefix.lower()}_last_sector"],
+    )
+    lines = []
+    for key, value in zip(keys, values, strict=True):
+        suffix = "UL"
+        text = _hex(value) if key not in ("FIRST_SECTOR", "LAST_SECTOR") else str(value)
+        lines.append(f"#define {_macro_name('STM32F429', prefix)}_{key} {text}{suffix}")
+    return "\n".join(lines)
+
+
+def _region_ld(prefix: str, l: dict[str, object]) -> str:
+    keys = ("BASE", "SIZE", "END", "FIRST_SECTOR", "LAST_SECTOR")
+    values = (
+        l[f"{prefix.lower()}_base"],
+        l[f"{prefix.lower()}_size"],
+        l[f"{prefix.lower()}_end"],
+        l[f"{prefix.lower()}_first_sector"],
+        l[f"{prefix.lower()}_last_sector"],
+    )
+    lines = []
+    for key, value in zip(keys, values, strict=True):
+        text = _hex(value) if key not in ("FIRST_SECTOR", "LAST_SECTOR") else str(value)
+        lines.append(f"{_macro_name('STM32F429', prefix)}_{key} = {text};")
+    return "\n".join(lines)
+
+
+def _slot_header(name: str, l: dict[str, object]) -> str:
+    prefix = f"STM32F429_SLOT_{name.upper()}"
+    lower = f"slot_{name.lower()}"
+    fields = (
+        ("ID", l[lower]["id"]),
+        ("SIGNED_IMAGE_BASE", l[f"{lower}_signed_image_base"]),
+        ("MANIFEST_BASE", l[f"{lower}_manifest_base"]),
+        ("SIGNATURE_BASE", l[f"{lower}_signature_base"]),
+        ("PAYLOAD_BASE", l[f"{lower}_payload_base"]),
+        ("END", l[f"{lower}_end"]),
+        ("SIZE", l[f"{lower}_size"]),
+        ("PAYLOAD_MAX_SIZE", l[f"{lower}_payload_max_size"]),
+        ("FIRST_SECTOR", l[f"{lower}_first_sector"]),
+        ("LAST_SECTOR", l[f"{lower}_last_sector"]),
+    )
+    lines = []
+    for field, value in fields:
+        text = str(value) if field in ("ID", "FIRST_SECTOR", "LAST_SECTOR") else _hex(value)
+        lines.append(f"#define {prefix}_{field} {text}UL")
+    return "\n".join(lines)
+
+
+def _slot_ld(name: str, l: dict[str, object]) -> str:
+    prefix = f"STM32F429_SLOT_{name.upper()}"
+    lower = f"slot_{name.lower()}"
+    fields = (
+        ("ID", l[lower]["id"]),
+        ("SIGNED_IMAGE_BASE", l[f"{lower}_signed_image_base"]),
+        ("MANIFEST_BASE", l[f"{lower}_manifest_base"]),
+        ("SIGNATURE_BASE", l[f"{lower}_signature_base"]),
+        ("PAYLOAD_BASE", l[f"{lower}_payload_base"]),
+        ("END", l[f"{lower}_end"]),
+        ("SIZE", l[f"{lower}_size"]),
+        ("PAYLOAD_MAX_SIZE", l[f"{lower}_payload_max_size"]),
+        ("FIRST_SECTOR", l[f"{lower}_first_sector"]),
+        ("LAST_SECTOR", l[f"{lower}_last_sector"]),
+    )
+    lines = []
+    for field, value in fields:
+        text = str(value) if field in ("ID", "FIRST_SECTOR", "LAST_SECTOR") else _hex(value)
+        lines.append(f"{prefix}_{field} = {text};")
+    return "\n".join(lines)
+
+
 def render_header() -> str:
     l = LAYOUT
     return f"""/* Generated from config/stm32f429_memory_layout.json. */
@@ -32,10 +148,32 @@ def render_header() -> str:
 #define STM32F429_FLASH_BANK1_BASE {_hex(l["flash_bank1_base"])}UL
 #define STM32F429_FLASH_BANK1_SIZE {_hex(l["flash_bank1_size"])}UL
 #define STM32F429_FLASH_BANK1_END {_hex(l["flash_bank1_end"])}UL
+#define STM32F429_FLASH_BANK2_BASE {_hex(l["flash_bank2_base"])}UL
+#define STM32F429_FLASH_BANK2_SIZE {_hex(l["flash_bank2_size"])}UL
+#define STM32F429_FLASH_BANK2_END {_hex(l["flash_bank2_end"])}UL
+
+{_render_sector_header(l)}
 
 #define STM32F429_BOOTLOADER_BASE {_hex(l["bootloader_base"])}UL
 #define STM32F429_BOOTLOADER_SIZE {_hex(l["bootloader_size"])}UL
 #define STM32F429_BOOTLOADER_END {_hex(l["bootloader_end"])}UL
+#define STM32F429_BOOTLOADER_FIRST_SECTOR {l["bootloader_first_sector"]}UL
+#define STM32F429_BOOTLOADER_LAST_SECTOR {l["bootloader_last_sector"]}UL
+
+#define STM32F429_BOOT_METADATA_FORMAT_VERSION {l["boot_metadata_format_version"]}UL
+#define STM32F429_BOOT_METADATA_RECORD_SIZE {_hex(l["boot_metadata_record_size"])}UL
+
+{_region_header("BOOT_METADATA_A", l)}
+
+{_region_header("BOOT_METADATA_B", l)}
+
+{_region_header("UPDATE_METADATA", l)}
+
+{_slot_header("A", l)}
+
+{_slot_header("B", l)}
+
+{_region_header("RECOVERY", l)}
 
 #define STM32F429_SIGNED_IMAGE_BASE {_hex(l["signed_image_base"])}UL
 #define STM32F429_SIGNED_MANIFEST_SIZE {_hex(l["signed_manifest_size"])}UL
@@ -79,10 +217,32 @@ STM32F429_FLASH_END = {_hex(l["flash_end"])};
 STM32F429_FLASH_BANK1_BASE = {_hex(l["flash_bank1_base"])};
 STM32F429_FLASH_BANK1_SIZE = {_hex(l["flash_bank1_size"])};
 STM32F429_FLASH_BANK1_END = {_hex(l["flash_bank1_end"])};
+STM32F429_FLASH_BANK2_BASE = {_hex(l["flash_bank2_base"])};
+STM32F429_FLASH_BANK2_SIZE = {_hex(l["flash_bank2_size"])};
+STM32F429_FLASH_BANK2_END = {_hex(l["flash_bank2_end"])};
+
+{_render_sector_ld(l)}
 
 STM32F429_BOOTLOADER_BASE = {_hex(l["bootloader_base"])};
 STM32F429_BOOTLOADER_SIZE = {_hex(l["bootloader_size"])};
 STM32F429_BOOTLOADER_END = {_hex(l["bootloader_end"])};
+STM32F429_BOOTLOADER_FIRST_SECTOR = {l["bootloader_first_sector"]};
+STM32F429_BOOTLOADER_LAST_SECTOR = {l["bootloader_last_sector"]};
+
+STM32F429_BOOT_METADATA_FORMAT_VERSION = {l["boot_metadata_format_version"]};
+STM32F429_BOOT_METADATA_RECORD_SIZE = {_hex(l["boot_metadata_record_size"])};
+
+{_region_ld("BOOT_METADATA_A", l)}
+
+{_region_ld("BOOT_METADATA_B", l)}
+
+{_region_ld("UPDATE_METADATA", l)}
+
+{_slot_ld("A", l)}
+
+{_slot_ld("B", l)}
+
+{_region_ld("RECOVERY", l)}
 
 STM32F429_SIGNED_IMAGE_BASE = {_hex(l["signed_image_base"])};
 STM32F429_SIGNED_MANIFEST_SIZE = {_hex(l["signed_manifest_size"])};
@@ -104,9 +264,45 @@ STM32F429_MAIN_SRAM_SUPPORTED_END = {_hex(l["main_sram_supported_end"])};
 def render_make() -> str:
     l = LAYOUT
     return f"""# Generated from config/stm32f429_memory_layout.json.
+STM32F429_FLASH_BASE_HEX := {l["flash_base"]:08x}
+STM32F429_FLASH_END_HEX := {l["flash_end"]:08x}
+STM32F429_FLASH_TOTAL_SIZE_BYTES := {l["flash_total_size"]}
+STM32F429_BOOTLOADER_BASE_HEX := {l["bootloader_base"]:08x}
 STM32F429_BOOTLOADER_SIZE_BYTES := {l["bootloader_size"]}
+STM32F429_BOOT_METADATA_A_BASE_HEX := {l["boot_metadata_a_base"]:08x}
+STM32F429_BOOT_METADATA_A_SIZE_BYTES := {l["boot_metadata_a_size"]}
+STM32F429_BOOT_METADATA_A_FIRST_SECTOR := {l["boot_metadata_a_first_sector"]}
+STM32F429_BOOT_METADATA_A_LAST_SECTOR := {l["boot_metadata_a_last_sector"]}
+STM32F429_BOOT_METADATA_B_BASE_HEX := {l["boot_metadata_b_base"]:08x}
+STM32F429_BOOT_METADATA_B_SIZE_BYTES := {l["boot_metadata_b_size"]}
+STM32F429_BOOT_METADATA_B_FIRST_SECTOR := {l["boot_metadata_b_first_sector"]}
+STM32F429_BOOT_METADATA_B_LAST_SECTOR := {l["boot_metadata_b_last_sector"]}
+STM32F429_UPDATE_METADATA_BASE_HEX := {l["update_metadata_base"]:08x}
+STM32F429_UPDATE_METADATA_SIZE_BYTES := {l["update_metadata_size"]}
+STM32F429_UPDATE_METADATA_FIRST_SECTOR := {l["update_metadata_first_sector"]}
+STM32F429_UPDATE_METADATA_LAST_SECTOR := {l["update_metadata_last_sector"]}
 STM32F429_APPLICATION_BASE_HEX := {l["application_base"]:08x}
 STM32F429_APPLICATION_PAYLOAD_MAX_SIZE_BYTES := {l["application_payload_max_size"]}
+STM32F429_SLOT_A_SIGNED_IMAGE_BASE_HEX := {l["slot_a_signed_image_base"]:08x}
+STM32F429_SLOT_A_APPLICATION_BASE_HEX := {l["slot_a_payload_base"]:08x}
+STM32F429_SLOT_A_END_HEX := {l["slot_a_end"]:08x}
+STM32F429_SLOT_A_PAYLOAD_MAX_SIZE_BYTES := {l["slot_a_payload_max_size"]}
+STM32F429_SLOT_A_FIRST_SECTOR := {l["slot_a_first_sector"]}
+STM32F429_SLOT_A_LAST_SECTOR := {l["slot_a_last_sector"]}
+STM32F429_SLOT_B_SIGNED_IMAGE_BASE_HEX := {l["slot_b_signed_image_base"]:08x}
+STM32F429_SLOT_B_APPLICATION_BASE_HEX := {l["slot_b_payload_base"]:08x}
+STM32F429_SLOT_B_END_HEX := {l["slot_b_end"]:08x}
+STM32F429_SLOT_B_PAYLOAD_MAX_SIZE_BYTES := {l["slot_b_payload_max_size"]}
+STM32F429_SLOT_B_FIRST_SECTOR := {l["slot_b_first_sector"]}
+STM32F429_SLOT_B_LAST_SECTOR := {l["slot_b_last_sector"]}
+STM32F429_RECOVERY_BASE_HEX := {l["recovery_base"]:08x}
+STM32F429_RECOVERY_SIZE_BYTES := {l["recovery_size"]}
+STM32F429_RECOVERY_FIRST_SECTOR := {l["recovery_first_sector"]}
+STM32F429_RECOVERY_LAST_SECTOR := {l["recovery_last_sector"]}
+STM32F429_SIGNED_MANIFEST_SIZE_BYTES := {l["signed_manifest_size"]}
+STM32F429_SIGNED_SIGNATURE_SIZE_BYTES := {l["signed_signature_size"]}
+STM32F429_SIGNED_IMAGE_HEADER_SIZE_BYTES := {l["signed_image_header_size"]}
+STM32F429_BOOT_METADATA_RECORD_SIZE_BYTES := {l["boot_metadata_record_size"]}
 """
 
 
