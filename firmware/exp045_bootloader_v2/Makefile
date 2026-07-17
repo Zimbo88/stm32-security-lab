@@ -51,3 +51,18 @@ flash: all
 
 clean:
 	rm -rf $(BUILD)
+
+# EXP053: Keep the bootloader inside the reserved 32 KiB flash region.
+BOOTLOADER_MAX_SIZE_BYTES := 32768
+BOOTLOADER_BINARY := $(BUILD)/$(PROJECT).bin
+
+.PHONY: check-size
+check-size: $(BOOTLOADER_BINARY)
+	@actual_size=$$(wc -c < "$(BOOTLOADER_BINARY)"); \
+	echo "Bootloader size check: $$actual_size / $(BOOTLOADER_MAX_SIZE_BYTES) bytes"; \
+	if [ "$$actual_size" -gt "$(BOOTLOADER_MAX_SIZE_BYTES)" ]; then \
+		echo "ERROR: bootloader exceeds the reserved 32 KiB region"; \
+		exit 1; \
+	fi
+
+all: check-size
