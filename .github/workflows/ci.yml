@@ -88,6 +88,11 @@ jobs:
           make -C tests/host_verifier clean test
           make -C tests/host_verifier clean test SANITIZE=1
 
+      - name: Run update-storage foundation tests
+        run: |
+          make -C tests/update_storage clean test
+          make -C tests/update_storage clean test SANITIZE=1
+
       - name: Check deterministic builds and binary comparison
         run: python tools/check_deterministic_build.py
 
