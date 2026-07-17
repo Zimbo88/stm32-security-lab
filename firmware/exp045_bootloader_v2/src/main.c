@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "delay.h"
+#include "boot_policy.h"
 #include "signed_image.h"
 #include "uart.h"
 
@@ -34,7 +35,7 @@ int main(void)
 
     uart_puts("Computing SHA-512 and verifying Ed25519...\n");
 
-    const verify_status_t status = signed_image_verify();
+    const verify_status_t status = boot_policy_verify();
 
     uart_puts("Verification     = ");
     uart_puts(signed_image_status_text(status));
