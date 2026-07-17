@@ -1,0 +1,57 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+RUN_01
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+Info : clock speed 1000 kHz
+Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748
+Info : Target voltage: 3.201578
+Info : [stm32f4x.cpu] Cortex-M4 r0p1 processor detected
+Info : [stm32f4x.cpu] target has 6 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32f4x.cpu on 3333
+Info : Listening on port 3333 for gdb connections
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+[stm32f4x.cpu] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+=== EXP038 ACCESS CONSISTENCY ===
+RUN|RUN_01
+FORMAT: NAME|ADDRESS|STATUS|VALUE
+SCB_CPUID|0xE000ED00|OK|0x410fc241
+SCB_VTOR|0xE000ED08|OK|0x0
+COREDEBUG_DHCSR|0xE000EDF0|OK|0x30003
+DBGMCU_IDCODE|0xE0042000|OK|0x20036419
+FLASH_SR|0x40023C0C|OK|0x0
+FLASH_CR|0x40023C10|OK|0x80000000
+FLASH_OPTCR|0x40023C14|OK|0xffe00ed
+FLASH_OPTCR1|0x40023C18|OK|0xfff0000
+RCC_CR|0x40023800|OK|0x5f83
+RCC_CFGR|0x40023808|OK|0x0
+RCC_CSR|0x40023874|OK|0x1e000000
+PWR_CR|0x40007000|OK|0xc000
+SYSCFG_MEMRMP|0x40013800|OK|0x0
+GPIOA_MODER|0x40020000|OK|0xa8000000
+SRAM_START|0x20000000|OK|0x569df8ae
+SRAM_MIDDLE|0x20010000|OK|0xa5fadca8
+SRAM_END|0x2002FFFC|OK|0x16d21c1
+CCM_START|0x10000000|OK|0x52d24dc0
+CCM_END|0x1000FFFC|OK|0x9150468e
+Error: read_memory: read at 0x08000000 with width=32 and count=1 failed
+FLASH_START|0x08000000|FAIL
+Error: read_memory: read at 0x08000004 with width=32 and count=1 failed
+FLASH_VECTOR_1|0x08000004|FAIL
+Error: read_memory: read at 0x00000000 with width=32 and count=1 failed
+FLASH_ALIAS|0x00000000|FAIL
+Error: read_memory: read at 0x1fff0000 with width=32 and count=1 failed
+SYSTEM_ROM|0x1FFF0000|FAIL
+Error: read_memory: read at 0x1fff7a10 with width=32 and count=1 failed
+UID0|0x1FFF7A10|FAIL
+Error: read_memory: read at 0x1fff7a14 with width=32 and count=1 failed
+UID1|0x1FFF7A14|FAIL
+Error: read_memory: read at 0x1fff7a18 with width=32 and count=1 failed
+UID2|0x1FFF7A18|FAIL
+Error: read_memory: read at 0x1fff7a22 with width=32 and count=1 failed
+FLASH_SIZE|0x1FFF7A22|FAIL
+EXP038_ACCESS_COMPLETE|RUN_01
+shutdown command invoked
