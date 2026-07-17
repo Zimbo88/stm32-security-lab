@@ -5,6 +5,7 @@
 #include "monocypher.h"
 #include "monocypher-ed25519.h"
 #include "signed_image.h"
+#include "board.h"
 
 #define REG32(a) (*(volatile uint32_t *)(a))
 
@@ -58,7 +59,7 @@ verify_status_t signed_image_verify(void)
     const uint32_t reset =
         *(volatile const uint32_t *)(m->vector_address + 4U);
 
-    if ((msp < 0x20000000UL) || (msp > 0x20020000UL)) {
+    if ((msp < BOARD_SRAM_BASE) || (msp > (BOARD_SRAM_BASE + BOARD_SRAM_SIZE))) {
         return VERIFY_BAD_STACK;
     }
 
