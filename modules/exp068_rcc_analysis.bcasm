@@ -1,0 +1,54 @@
+; EXP068 first bytecode analysis module.
+;
+; Outputs:
+;   channel 1: raw RCC_CR
+;   channel 2: RCC_CR.HSIRDY as 0/1
+;   channel 3: RCC_CR.PLLON as 0/1
+;   channel 4: RCC_CFGR.SWS field
+;   channel 5: raw RCC_CSR reset flags
+
+.stack 8
+.cap RCC_READ
+.cap OUTPUT
+
+; raw RCC_CR
+PUSH 0
+SYSCALL RCC_READ 1
+PUSH 1
+SYSCALL EMIT 2
+
+; RCC_CR.HSIRDY
+PUSH 0
+SYSCALL RCC_READ 1
+PUSH 2
+AND
+NEZ
+PUSH 2
+SYSCALL EMIT 2
+
+; RCC_CR.PLLON
+PUSH 0
+SYSCALL RCC_READ 1
+PUSH 1
+SHL 24
+AND
+NEZ
+PUSH 3
+SYSCALL EMIT 2
+
+; RCC_CFGR.SWS
+PUSH 1
+SYSCALL RCC_READ 1
+SHR 2
+PUSH 3
+AND
+PUSH 4
+SYSCALL EMIT 2
+
+; raw RCC_CSR
+PUSH 2
+SYSCALL RCC_READ 1
+PUSH 5
+SYSCALL EMIT 2
+
+HALT

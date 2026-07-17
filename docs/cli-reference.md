@@ -23,3 +23,9 @@ EXP067 host tools:
   supplied as raw bytes or hex.
 - `tools/module_inspect.py` prints deterministic package metadata and can
   verify the signature when a public key is supplied.
+
+EXP068 host tools:
+
+- `tools/bytecode_asm.py` assembles bytecode source.
+- `tools/bytecode_vm.py` runs raw bytecode with explicit capabilities or a
+  signed bytecode package. Native packages and ELF files are rejected.

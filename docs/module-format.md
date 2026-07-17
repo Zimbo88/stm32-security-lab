@@ -20,3 +20,7 @@ Parsers reject malformed ranges, overlap, gaps between the capability table and
 payload, trailing bytes after the payload, duplicate capabilities, unsupported
 types, nonzero flags, bad versions, rollback versions, CRCs, hashes,
 signatures, and reserved bytes.
+
+EXP068 defines the first executable payload class for `TYPE_BYTECODE` packages.
+The payload itself uses the `BCV1` bytecode header documented in
+`docs/exp068-bytecode-vm.md`. `TYPE_NATIVE` remains rejected by the EXP068 VM.
