@@ -1,6 +1,7 @@
 #ifndef SIGNED_IMAGE_H
 #define SIGNED_IMAGE_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "flash_layout.h"
@@ -35,6 +36,13 @@ typedef enum {
     VERIFY_BAD_PAYLOAD_RANGE
 } verify_status_t;
 
+verify_status_t signed_image_verify_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t signature_bytes[STM32F429_SIGNED_SIGNATURE_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const uint8_t public_key[32]
+);
 verify_status_t signed_image_verify(void);
 const char *signed_image_status_text(verify_status_t status);
 void signed_image_jump(void);

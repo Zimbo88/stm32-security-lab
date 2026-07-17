@@ -1,11 +1,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "firmware_public_key.h"
 #include "monocypher.h"
 #include "monocypher-ed25519.h"
 #include "performance.h"
 #include "signed_image.h"
+
+#ifndef SIGNED_IMAGE_HOST_TEST
+#include "firmware_public_key.h"
+#endif
 
 _Static_assert(
     sizeof(signed_manifest_t) == SIGNED_MANIFEST_SIZE,
@@ -27,14 +30,43 @@ _Static_assert(
 
 typedef void (*entry_fn_t)(void);
 
+#ifndef SIGNED_IMAGE_HOST_TEST
+static const uint8_t *signature(void)
+{
+    return (const uint8_t *)SIGNATURE_ADDRESS;
+}
+
 static const signed_manifest_t *manifest(void)
 {
     return (const signed_manifest_t *)SIGNED_IMAGE_BASE;
 }
+#endif
 
-static const uint8_t *signature(void)
+static uint32_t load_le32(const uint8_t bytes[4])
 {
-    return (const uint8_t *)SIGNATURE_ADDRESS;
+    return ((uint32_t)bytes[0]) |
+           (((uint32_t)bytes[1]) << 8) |
+           (((uint32_t)bytes[2]) << 16) |
+           (((uint32_t)bytes[3]) << 24);
+}
+
+static void decode_manifest(
+    const uint8_t bytes[SIGNED_MANIFEST_SIZE],
+    signed_manifest_t *m
+)
+{
+    m->magic = load_le32(&bytes[0]);
+    m->header_version = load_le32(&bytes[4]);
+    m->image_version = load_le32(&bytes[8]);
+    m->vector_address = load_le32(&bytes[12]);
+    m->image_size = load_le32(&bytes[16]);
+    m->flags = load_le32(&bytes[20]);
+    m->reserved0 = load_le32(&bytes[24]);
+    m->reserved1 = load_le32(&bytes[28]);
+
+    for (size_t i = 0U; i < sizeof(m->payload_sha512); ++i) {
+        m->payload_sha512[i] = bytes[32U + i];
+    }
 }
 
 static uint8_t checked_u32_add(uint32_t left, uint32_t right, uint32_t *out)
@@ -88,13 +120,16 @@ static verify_status_t validate_payload_range(
         return VERIFY_BAD_VECTOR_ADDRESS;
     }
 
-    if ((m->image_size < APPLICATION_MIN_SIZE) ||
-        (m->image_size > MAX_PAYLOAD_SIZE)) {
+    if (m->image_size < APPLICATION_MIN_SIZE) {
         return VERIFY_BAD_SIZE;
     }
 
     if (checked_u32_add(m->vector_address, m->image_size, payload_end) == 0U) {
         return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    if (m->image_size > MAX_PAYLOAD_SIZE) {
+        return VERIFY_BAD_SIZE;
     }
 
     if (*payload_end > APPLICATION_FLASH_END) {
@@ -106,13 +141,12 @@ static verify_status_t validate_payload_range(
 
 static verify_status_t validate_vector_table(
     const signed_manifest_t *m,
+    const uint8_t *payload,
     uint32_t payload_end
 )
 {
-    const uint32_t msp =
-        *(volatile const uint32_t *)(m->vector_address + 0U);
-    const uint32_t reset =
-        *(volatile const uint32_t *)(m->vector_address + 4U);
+    const uint32_t msp = load_le32(&payload[0]);
+    const uint32_t reset = load_le32(&payload[4]);
     const uint32_t reset_address = reset & ~1UL;
 
     if ((msp <= APPLICATION_MSP_BASE) ||
@@ -131,9 +165,18 @@ static verify_status_t validate_vector_table(
     return VERIFY_OK;
 }
 
-verify_status_t signed_image_verify(void)
+verify_status_t signed_image_verify_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t signature_bytes[STM32F429_SIGNED_SIGNATURE_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const uint8_t public_key[32]
+)
 {
-    const signed_manifest_t *m = manifest();
+    signed_manifest_t decoded_manifest;
+    decode_manifest(manifest_bytes, &decoded_manifest);
+
+    const signed_manifest_t *m = &decoded_manifest;
     uint32_t payload_end = 0U;
     verify_status_t status = validate_manifest_header(m);
 
@@ -146,7 +189,11 @@ verify_status_t signed_image_verify(void)
         return status;
     }
 
-    status = validate_vector_table(m, payload_end);
+    if ((size_t)m->image_size > payload_capacity) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    status = validate_vector_table(m, payload, payload_end);
     if (status != VERIFY_OK) {
         return status;
     }
@@ -156,7 +203,7 @@ verify_status_t signed_image_verify(void)
 
     crypto_sha512(
         computed_hash,
-        (const uint8_t *)m->vector_address,
+        payload,
         (size_t)m->image_size
     );
 
@@ -173,9 +220,9 @@ verify_status_t signed_image_verify(void)
     const uint32_t ed25519_start = performance_cycles();
 
     const int ed25519_result = crypto_ed25519_check(
-        signature(),
-        firmware_public_key,
-        (const uint8_t *)SIGNED_IMAGE_BASE,
+        signature_bytes,
+        public_key,
+        manifest_bytes,
         (size_t)SIGNED_MANIFEST_SIZE
     );
 
@@ -209,8 +256,22 @@ const char *signed_image_status_text(verify_status_t status)
     }
 }
 
+#ifndef SIGNED_IMAGE_HOST_TEST
+verify_status_t signed_image_verify(void)
+{
+    return signed_image_verify_buffer(
+        (const uint8_t *)SIGNED_IMAGE_BASE,
+        signature(),
+        (const uint8_t *)APPLICATION_BASE_ADDRESS,
+        (size_t)MAX_PAYLOAD_SIZE,
+        firmware_public_key
+    );
+}
+#endif
+
 void signed_image_jump(void)
 {
+#ifndef SIGNED_IMAGE_HOST_TEST
     const signed_manifest_t *m = manifest();
     const uint32_t new_msp =
         *(volatile const uint32_t *)(m->vector_address + 0U);
@@ -243,4 +304,8 @@ void signed_image_jump(void)
 
     for (;;) {
     }
+#else
+    for (;;) {
+    }
+#endif
 }
