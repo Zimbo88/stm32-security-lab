@@ -23,9 +23,41 @@
 #define USART_CR1_TE  (1UL << 3)
 #define USART_CR1_RE  (1UL << 2)
 
+
+static uint32_t uart_brr_from_clock(uint32_t pclk_hz)
+{
+    return (pclk_hz + 57600U) / 115200U;
+}
+
+void uart_init_115200(uint32_t pclk_hz)
+{
+    RCC_AHB1ENR |= (1UL << 0);
+    RCC_APB2ENR |= (1UL << 4);
+    (void)RCC_AHB1ENR;
+    (void)RCC_APB2ENR;
+
+    GPIOA_MODER &= ~((3UL << 18) | (3UL << 20));
+    GPIOA_MODER |=  ((2UL << 18) | (2UL << 20));
+
+    GPIOA_OTYPER &= ~((1UL << 9) | (1UL << 10));
+    GPIOA_OSPEEDR |= ((2UL << 18) | (2UL << 20));
+
+    GPIOA_PUPDR &= ~((3UL << 18) | (3UL << 20));
+    GPIOA_PUPDR |=  (1UL << 20);
+
+    GPIOA_AFRH &= ~((0xFUL << 4) | (0xFUL << 8));
+    GPIOA_AFRH |=  ((7UL << 4) | (7UL << 8));
+
+    USART1_CR1 = 0U;
+    USART1_CR2 = 0U;
+    USART1_CR3 = 0U;
+    USART1_BRR = uart_brr_from_clock(pclk_hz);
+    USART1_CR1 = USART_CR1_UE | USART_CR1_TE | USART_CR1_RE;
+}
+
 void uart_init(void)
 {
-    uart_init_115200_hsi16();
+    uart_init_115200(16000000UL);
 }
 
 void uart_init_115200_hsi16(void)
