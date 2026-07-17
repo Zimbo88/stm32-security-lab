@@ -43,6 +43,7 @@ The adversary may:
 | Malformed payload range | Size, flash-region, and overflow validation |
 | Invalid stack pointer | Initial MSP range and alignment validation |
 | Invalid execution target | Reset-vector validation |
+| Handoff context drift | Redundant pre-jump validation and flash vector re-read |
 | Partial validation failure | Fail-safe halt before execution |
 
 ## Assumptions
@@ -97,5 +98,7 @@ The following negative tests were performed successfully:
 - Address overflow
 - Invalid initial MSP
 - Invalid reset vector
+- Payload and vector boundary values
+- Final jump-context validation
 
 Detailed results are recorded in `docs/secure_boot_validation.md`.

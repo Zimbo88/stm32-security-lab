@@ -34,8 +34,10 @@ private signing seed is used only by the host-side signing process.
 13. Reset-vector validation
 14. SHA-512 payload verification
 15. Ed25519 signature verification
-16. Vector-table relocation
-17. Transfer of control to the application
+16. Redundant manifest, flash-range, and vector validation for handoff
+17. Final jump-context validation and flash vector re-read
+18. Vector-table relocation with data/instruction barriers
+19. Transfer of control to the application
 
 If any validation step fails, the application is not started and the
 bootloader halts safely.
@@ -73,6 +75,11 @@ Before execution, the bootloader validates:
 
 These checks reduce the risk of transferring control to invalid memory.
 
+Stage 0 performs these vector checks during image verification and again during
+jump preparation. The target jump routine validates the prepared context before
+disabling interrupts, then re-reads the vector table from flash and compares it
+with the prepared context before updating `VTOR` and loading `MSP`.
+
 ## Recovery Policy
 
 The current implementation contains a recovery-policy abstraction.
@@ -86,3 +93,7 @@ The bootloader uses a deny-by-default policy.
 
 Any malformed, unsupported, outdated, corrupted, incorrectly signed, or
 structurally invalid image is rejected before execution.
+
+Final handoff validation failures are routed back through the same failure
+reporting and halt path. This is defensive validation only; it is not a claim
+of fault-injection or glitch resistance.

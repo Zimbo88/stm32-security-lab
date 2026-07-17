@@ -39,6 +39,12 @@ The initial MSP must be in the supported main SRAM range and 8-byte aligned.
 The reset vector must have the Thumb bit set and resolve inside the accepted
 payload.
 
+After `signed_image_verify()` accepts an image, Stage 0 performs a second
+manifest/payload/vector validation pass in `signed_image_prepare_jump()`.
+The target jump path then validates the prepared context and re-reads the flash
+vector table before updating `VTOR`, loading `MSP`, and branching to the
+application.
+
 ## Automated Host Tests
 
 Run:
@@ -53,17 +59,33 @@ The host C verifier tests compile the production `signed_image.c` verifier
 with Monocypher and strict host warnings. They cover:
 
 - valid image
+- null verifier inputs
+- minimum payload length
+- maximum payload length
+- payload capacity one byte short
+- payload one byte too large
+- final jump-context revalidation in host mode
 - bad magic
 - unsupported header version
 - invalid payload length
+- bad manifest vector address
 - address overflow
 - bad MSP
+- lowest accepted MSP
+- highest accepted MSP
+- MSP above supported SRAM
+- unaligned MSP
 - bad reset vector
+- reset vector before payload
 - reset vector outside payload
+- reset vector at flash end
+- reset vector at the last accepted payload address
 - modified payload
 - modified signature
 - unsupported flags
+- unsupported high flag bit
 - noncanonical reserved fields
+- noncanonical second reserved field
 - rollback rejection
 - stable verifier status-code values
 
@@ -75,7 +97,8 @@ deterministic output, and atomic-output failure behavior.
 
 The host tests provide repeatable evidence for manifest parsing, little-endian
 field decoding, policy checks, SHA-512 digest comparison, Ed25519 signature
-verification, signing-tool input validation, and failure-code stability.
+verification, signing-tool input validation, boundary-value rejection, redundant
+jump-context validation in host mode, and failure-code stability.
 
 ## What Host Tests Do Not Prove
 
@@ -100,6 +123,10 @@ review before any production claim.
 On a verification failure, the bootloader prints the failure status and halts
 instead of starting the application. Recovery remains unavailable in this
 baseline, so the halt is safe but not operationally complete.
+
+The jump path also treats final handoff validation failures as security
+failures: it returns an explicit verifier status to the boot sequence, which
+prints the status and enters the centralized halt path.
 
 ## Remaining Critical Gaps
 

@@ -6,9 +6,13 @@ offline builds only. No board was flashed, erased, reset, or reconfigured.
 Post-audit hardening note: subsequent commits corrected the EXP066 vector
 table, introduced the generated STM32F429 memory layout, tightened canonical
 manifest validation, hardened the signer, added host C verifier tests, and
-added CI/reproducibility checks. Historical observations below are preserved as
-audit evidence; use `docs/memory_layout.md`, `docs/secure_boot_validation.md`,
-and the current source for the implemented baseline.
+added CI/reproducibility checks. A later Stage-0 hardening pass added
+redundant pre-jump validation, compile-time layout assertions, final flash
+vector re-read before handoff, and expanded malformed-image boundary tests.
+Historical observations below are preserved as audit evidence; use
+`firmware/exp045_bootloader_v2/README.md`, `docs/memory_layout.md`,
+`docs/secure_boot_validation.md`, and the current source for the implemented
+baseline.
 
 ## Repository overview
 

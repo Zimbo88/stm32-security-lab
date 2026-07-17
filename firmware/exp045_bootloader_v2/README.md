@@ -23,7 +23,16 @@ This is a laboratory baseline, not a production-ready secure boot chain.
 - Ed25519 signature over the manifest
 
 The verifier fails closed. Any failed check halts the bootloader instead of
-starting the application.
+starting the application. After cryptographic verification succeeds, Stage 0
+re-decodes the manifest, rechecks the payload bounds, re-reads the application
+vector table, and validates the prepared jump context before changing `VTOR`
+or `MSP`.
+
+The final jump path disables interrupts, stops SysTick, clears NVIC enable and
+pending state, updates `VTOR`, executes data/instruction barriers around the
+handoff, loads the validated MSP, and transfers control to the Thumb reset
+vector. If the final jump context fails validation or application entry
+unexpectedly returns, the bootloader reports the failure and halts.
 
 ## Memory Layout
 
@@ -66,8 +75,9 @@ make -C tests/host_verifier clean test
 make -C tests/host_verifier clean test SANITIZE=1
 ```
 
-The host tests verify parser and cryptographic verifier behavior. They do not
-prove hardware reset behavior, VTOR relocation, option-byte policy, flash
+The host tests verify parser, cryptographic verifier, malformed-image, boundary
+value, and host-mode jump-context validation behavior. They do not prove
+hardware reset behavior, VTOR relocation on silicon, option-byte policy, flash
 protection, power-loss behavior, glitch resistance, or physical recovery.
 
 ## Remaining Security Boundaries
