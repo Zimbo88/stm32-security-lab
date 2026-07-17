@@ -2,14 +2,10 @@
 
 ## Objective
 
-Decode the flash-controller and option-control register values captured during
+Decode the flash-controller and option-byte register values captured during
 EXP032.
 
 ## Input
-
-The experiment uses the read-only OpenOCD register inventory from EXP032.
-
-## Registers
 
 - FLASH_ACR
 - FLASH_SR
@@ -17,24 +13,21 @@ The experiment uses the read-only OpenOCD register inventory from EXP032.
 - FLASH_OPTCR
 - FLASH_OPTCR1
 
-## Questions
-
-- What RDP level is currently active?
-- Which flash sectors are write-protected?
-- Is a flash erase or programming operation active?
-- Is the flash controller locked?
-- Which option fields require additional mode-specific analysis?
-
 ## Method
 
-This is an offline software analysis.
+Offline analysis of previously captured register values.
 
-No target connection is opened.
+## Result summary
+
+- RDP byte: 0x00
+- Interpreted RDP state: Level 1
+- Bank 1 write-protected sectors: sector 0
+- Bank 2 write-protected sectors: none
+- Flash controller locked
+- No flash operation active
 
 ## Safety
 
-- No flash write
-- No flash erase
-- No option-byte write
-- No RDP transition
-- No RDP Level 2 operation
+No connection to the target was opened during EXP033.
+
+No flash memory, register or option byte was modified.
