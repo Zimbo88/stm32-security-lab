@@ -24,3 +24,7 @@ signatures, and reserved bytes.
 EXP068 defines the first executable payload class for `TYPE_BYTECODE` packages.
 The payload itself uses the `BCV1` bytecode header documented in
 `docs/exp068-bytecode-vm.md`. `TYPE_NATIVE` remains rejected by the EXP068 VM.
+
+EXP069 defines the constrained `TYPE_NATIVE` payload class. Native payloads use
+the `NMV1` header documented in `docs/exp069-native-modules.md`; they are not
+ELF files and have no dynamic linker or symbol resolver.

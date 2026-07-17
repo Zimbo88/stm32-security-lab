@@ -29,3 +29,10 @@ EXP068 host tools:
 - `tools/bytecode_asm.py` assembles bytecode source.
 - `tools/bytecode_vm.py` runs raw bytecode with explicit capabilities or a
   signed bytecode package. Native packages and ELF files are rejected.
+
+EXP069 host tool:
+
+- `tools/native_loader.py` validates and simulates a signed `TYPE_NATIVE`
+  package. It rejects bytecode packages, malformed native payloads, unknown
+  capabilities, wrong signer identity, incompatible ABI/platform versions, and
+  rollback versions.

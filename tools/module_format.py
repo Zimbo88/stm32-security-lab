@@ -297,6 +297,12 @@ def build_package(
     min_platform: int = 1,
     abi_version: int = 1,
     supported_capabilities: Container[int] | None = None,
+    code_size: int | None = None,
+    rodata_size: int = 0,
+    data_size: int = 0,
+    bss_size: int = 0,
+    stack_size: int = 0,
+    entry_offset: int = 0,
 ) -> bytes:
     payload = bytes(payload)
     seed = bytes(seed)
@@ -309,6 +315,17 @@ def build_package(
     _validate_u32("abi_version", abi_version, nonzero=True)
     if module_type not in SUPPORTED_TYPES:
         raise ValueError("unsupported type")
+    effective_code_size = len(payload) if code_size is None else code_size
+    _validate_u32("code_size", effective_code_size)
+    _validate_u32("rodata_size", rodata_size)
+    _validate_u32("data_size", data_size)
+    _validate_u32("bss_size", bss_size)
+    _validate_u32("stack_size", stack_size)
+    _validate_u32("entry_offset", entry_offset)
+    if effective_code_size > len(payload):
+        raise ValueError("code size exceeds payload")
+    if entry_offset > effective_code_size:
+        raise ValueError("entry offset exceeds code")
 
     _, capability_blob = _encode_capabilities(capabilities, supported_capabilities)
     payload_offset = HEADER_SIZE + len(capability_blob)
@@ -329,12 +346,12 @@ def build_package(
         abi_version,
         module_type,
         0,
-        len(payload),
-        0,
-        0,
-        0,
-        0,
-        0,
+        effective_code_size,
+        rodata_size,
+        data_size,
+        bss_size,
+        stack_size,
+        entry_offset,
         HEADER_SIZE,
         len(capability_blob),
         payload_offset,
