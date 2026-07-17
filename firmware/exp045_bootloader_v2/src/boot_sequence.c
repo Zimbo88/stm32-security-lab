@@ -6,12 +6,16 @@
 #include "boot_result.h"
 #include "delay.h"
 #include "recovery_policy.h"
+#include "reset_cause.h"
 #include "signed_image.h"
 #include "uart.h"
 
 _Noreturn void boot_sequence_execute(void)
 {
+    const reset_cause_t reset_cause = reset_cause_capture();
     boot_info_print_banner();
+    reset_cause_print(&reset_cause);
+    reset_cause_clear();
 
     const boot_mode_t mode = boot_mode_detect();
     const recovery_policy_status_t recovery_status =
