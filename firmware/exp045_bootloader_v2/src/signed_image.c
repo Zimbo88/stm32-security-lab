@@ -4,6 +4,7 @@
 #include "firmware_public_key.h"
 #include "monocypher.h"
 #include "monocypher-ed25519.h"
+#include "performance.h"
 #include "signed_image.h"
 #include "board.h"
 
@@ -70,11 +71,16 @@ verify_status_t signed_image_verify(void)
     }
 
     uint8_t computed_hash[64];
+    const uint32_t sha512_start = performance_cycles();
+
     crypto_sha512(
         computed_hash,
         (const uint8_t *)m->vector_address,
         (size_t)m->image_size
     );
+
+    const uint32_t sha512_end = performance_cycles();
+    performance_record_sha512_cycles(sha512_end - sha512_start);
 
     if (crypto_verify64(computed_hash, m->payload_sha512) != 0) {
         crypto_wipe(computed_hash, sizeof(computed_hash));
@@ -83,11 +89,19 @@ verify_status_t signed_image_verify(void)
 
     crypto_wipe(computed_hash, sizeof(computed_hash));
 
-    if (crypto_ed25519_check(
-            signature(),
-            firmware_public_key,
-            (const uint8_t *)SIGNED_IMAGE_BASE,
-            (size_t)SIGNED_MANIFEST_SIZE) != 0) {
+    const uint32_t ed25519_start = performance_cycles();
+
+    const int ed25519_result = crypto_ed25519_check(
+        signature(),
+        firmware_public_key,
+        (const uint8_t *)SIGNED_IMAGE_BASE,
+        (size_t)SIGNED_MANIFEST_SIZE
+    );
+
+    const uint32_t ed25519_end = performance_cycles();
+    performance_record_ed25519_cycles(ed25519_end - ed25519_start);
+
+    if (ed25519_result != 0) {
         return VERIFY_BAD_SIGNATURE;
     }
 
