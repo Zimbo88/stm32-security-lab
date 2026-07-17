@@ -1,0 +1,92 @@
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+Info : clock speed 1000 kHz
+Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748
+Info : Target voltage: 3.189474
+Info : [stm32f4x.cpu] Cortex-M4 r0p1 processor detected
+Info : [stm32f4x.cpu] target has 6 breakpoints, 4 watchpoints
+Info : starting gdb server for stm32f4x.cpu on 3333
+Info : Listening on port 3333 for gdb connections
+[stm32f4x.cpu] halted due to breakpoint, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+Info : Unable to match requested speed 2000 kHz, using 1800 kHz
+[stm32f4x.cpu] halted due to debug-request, current mode: Thread 
+xPSR: 0x01000000 pc: 0xfffffffe msp: 0xfffffffc
+=== EXP035 EXTENDED READ-ONLY ACCESS SURVEY ===
+FORMAT: NAME|ADDRESS|WIDTH|STATUS|VALUE
+SECTION|CONTROL
+SCB_CPUID|0xE000ED00|32|OK|0x410fc241
+SCB_VTOR|0xE000ED08|32|OK|0x0
+DBGMCU_IDCODE|0xE0042000|32|OK|0x20036419
+FLASH_OPTCR|0x40023C14|32|OK|0xffe00ed
+SECTION|MEMORY_ALIAS
+Error: read_memory: read at 0x00000000 with width=32 and count=1 failed
+ALIAS_START_32|0x00000000|32|FAIL
+Error: read_memory: read at 0x00000000 with width=16 and count=1 failed
+ALIAS_START_16|0x00000000|16|FAIL
+Error: read_memory: read at 0x00000000 with width=8 and count=1 failed
+ALIAS_START_8|0x00000000|8|FAIL
+SECTION|INTERNAL_FLASH
+Error: read_memory: read at 0x08000000 with width=32 and count=1 failed
+FLASH_000000_32|0x08000000|32|FAIL
+Error: read_memory: read at 0x08000000 with width=16 and count=1 failed
+FLASH_000000_16|0x08000000|16|FAIL
+Error: read_memory: read at 0x08000000 with width=8 and count=1 failed
+FLASH_000000_8|0x08000000|8|FAIL
+Error: read_memory: read at 0x08004000 with width=32 and count=1 failed
+FLASH_004000|0x08004000|32|FAIL
+Error: read_memory: read at 0x08010000 with width=32 and count=1 failed
+FLASH_010000|0x08010000|32|FAIL
+Error: read_memory: read at 0x08020000 with width=32 and count=1 failed
+FLASH_020000|0x08020000|32|FAIL
+Error: read_memory: read at 0x08040000 with width=32 and count=1 failed
+FLASH_040000|0x08040000|32|FAIL
+Error: read_memory: read at 0x08080000 with width=32 and count=1 failed
+FLASH_080000|0x08080000|32|FAIL
+Error: read_memory: read at 0x08100000 with width=32 and count=1 failed
+FLASH_100000|0x08100000|32|FAIL
+SECTION|SRAM
+SRAM_20000000|0x20000000|32|OK|0x769df8ae
+SRAM_20001000|0x20001000|32|OK|0xbbb453df
+SRAM_20010000|0x20010000|32|OK|0xa5fadda8
+SRAM_2001BFFC|0x2001BFFC|32|OK|0x403080c6
+SRAM_2001C000|0x2001C000|32|OK|0x883f5c7a
+SRAM_2001FFFC|0x2001FFFC|32|OK|0x8008269
+SRAM_20020000|0x20020000|32|OK|0x862f1c9e
+SRAM_2002FFFC|0x2002FFFC|32|OK|0x12d01d1
+SECTION|CCM
+CCM_START|0x10000000|32|OK|0x52d24144
+CCM_MIDDLE|0x10008000|32|OK|0xd62dcdda
+CCM_END|0x1000FFFC|32|OK|0xb150468e
+SECTION|SYSTEM_MEMORY
+Error: read_memory: read at 0x1fff0000 with width=32 and count=1 failed
+SYSTEM_START|0x1FFF0000|32|FAIL
+Error: read_memory: read at 0x1fff4000 with width=32 and count=1 failed
+SYSTEM_MIDDLE|0x1FFF4000|32|FAIL
+Error: read_memory: read at 0x1fff7a10 with width=32 and count=1 failed
+UID0_32|0x1FFF7A10|32|FAIL
+Error: read_memory: read at 0x1fff7a10 with width=16 and count=1 failed
+UID0_16|0x1FFF7A10|16|FAIL
+Error: read_memory: read at 0x1fff7a10 with width=8 and count=1 failed
+UID0_8|0x1FFF7A10|8|FAIL
+Error: read_memory: read at 0x1fff7a14 with width=32 and count=1 failed
+UID1|0x1FFF7A14|32|FAIL
+Error: read_memory: read at 0x1fff7a18 with width=32 and count=1 failed
+UID2|0x1FFF7A18|32|FAIL
+Error: read_memory: read at 0x1fff7a22 with width=16 and count=1 failed
+FLASH_SIZE_16|0x1FFF7A22|16|FAIL
+Error: read_memory: read at 0x1fff7a22 with width=8 and count=1 failed
+FLASH_SIZE_8|0x1FFF7A22|8|FAIL
+SECTION|PERIPHERALS
+RCC_CR|0x40023800|32|OK|0x5f83
+RCC_CSR|0x40023874|32|OK|0x1e000000
+PWR_CR|0x40007000|32|OK|0xc000
+SYSCFG_MEMRMP|0x40013800|32|OK|0x0
+GPIOA_MODER|0x40020000|32|OK|0xa8000000
+GPIOB_MODER|0x40020400|32|OK|0x280
+EXP035_EXTENDED_COMPLETE
+shutdown command invoked
