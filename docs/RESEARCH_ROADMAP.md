@@ -17,6 +17,11 @@ debug, flash-protection, reset, clock and communication configurations.
 RDP Level 2 must not be enabled on the primary STM32F429IGT6 development
 board.
 
+RDP Level 2 also must not be enabled for EXP071. Recovery is not yet proven,
+target-side update installation is not implemented, host-side module
+installation remains simulated, and hardware power-loss behavior has not been
+validated.
+
 Experiments involving irreversible configuration require:
 
 - a separately designated expendable target
@@ -43,6 +48,27 @@ Completed work includes:
 - boot timing measurement
 - reset interruption campaign
 - end-to-end secure boot validation
+
+### EXP066-EXP071 – Pre-hardware research platform integration
+
+Completed repository-side work includes:
+
+- signed EXP066 Stage-1 research-platform build;
+- static allowlisted UART CLI;
+- curated read-only diagnostics;
+- RAM logging and retained fault record display;
+- EXP067 signed package tooling;
+- EXP068 host-side bytecode VM;
+- EXP069 host-side constrained native-module validator/simulator;
+- EXP070 host-side atomic module-installation simulator;
+- EXP071 non-blocking platform LED health indication;
+- EXP071 health/LED/Easter-egg CLI commands;
+- EXP071 platform feature matrix and release-readiness documentation.
+
+This is a pre-hardware integration milestone. Module execution, native-module
+isolation, atomic module installation, update power-loss behavior, watchdog
+recovery, and LED polarity/timing still require hardware validation before any
+irreversible provisioning.
 
 ## Phase 2 – Architecture and security characterization
 

@@ -12,12 +12,31 @@ ALLOWED_TEST_COMMANDS = {
 }
 
 UNAVAILABLE_REGISTER_GROUPS = {
-    "registers nvic",
-    "registers systick",
-    "registers mpu",
-    "registers flash",
     "registers pwr",
     "registers syscfg",
+}
+
+ALLOWED_LED_COMMANDS = {
+    "led status",
+    "led test healthy",
+    "led test degraded",
+    "led test update",
+    "led test recovery",
+    "led test fault",
+    "led test security",
+    "led test stop",
+}
+
+ALLOWED_EASTEREGG_COMMANDS = {
+    "easteregg knightrider",
+    "easteregg retro",
+    "easteregg stop",
+}
+
+ALLOWED_HEALTH_COMMANDS = {
+    "boot status",
+    "health status",
+    "health acknowledge",
 }
 
 
@@ -47,6 +66,19 @@ class Exp066Tests(unittest.TestCase):
             self.assertTrue(is_allowed_test_command(command))
         for command in ("test", "test run", "test run flash", "test anything"):
             self.assertFalse(is_allowed_test_command(command))
+
+    def test_led_and_easteregg_commands_are_explicit_allowlist(self):
+        source = PLATFORM_C.read_text()
+        for command in ALLOWED_LED_COMMANDS | ALLOWED_EASTEREGG_COMMANDS | ALLOWED_HEALTH_COMMANDS:
+            self.assertIn(f'eq(command, "{command}")', source)
+        for rejected in (
+            "led set",
+            "led write",
+            "gpio write",
+            "gpio set",
+            "easteregg fault",
+        ):
+            self.assertNotIn(f'eq(command, "{rejected}")', source)
     def test_crc(self):
         self.assertEqual(crc32(b"123456789"), 0xcbf43926)
     def test_ring_wrap_model(self):
@@ -63,5 +95,17 @@ class Exp066Tests(unittest.TestCase):
         source = PLATFORM_C.read_text()
         for command in UNAVAILABLE_REGISTER_GROUPS:
             self.assertIn(f'eq(command, "{command}")', source)
+    def test_no_arbitrary_gpio_or_memory_command_exposure(self):
+        source = PLATFORM_C.read_text().lower()
+        for forbidden in (
+            "gpio write",
+            "gpio set",
+            "led write",
+            "memory peek",
+            "memory poke",
+            "call-address",
+            'eq(command, "rdp',
+        ):
+            self.assertNotIn(forbidden, source)
 
 if __name__ == "__main__": unittest.main()

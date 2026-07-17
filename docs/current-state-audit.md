@@ -60,6 +60,20 @@ bounded capability tables, and does not execute package bytes. The redundant
 catalog helper validates fixed-size CRC-protected records and can select the
 newest valid record after corrupted records.
 
+EXP068 through EXP070 added host-side bytecode execution, constrained native
+module validation/simulation, and atomic A/B module-installation simulation.
+These are not target-firmware module execution or target Flash installation
+paths.
+
+EXP071 completed the pre-hardware integration pass for EXP066. The target
+platform now has a non-blocking LED health service, active-low board LED GPIO
+adapter for PE3/PH10/PH11/PH12, reset/fault-to-health policy, boot status,
+health status/acknowledge commands, bounded LED tests, and a bounded
+`easteregg knightrider` command. Optional audio remains unavailable because no
+speaker/buzzer pin is documented. The feature matrix in
+`docs/platform-feature-matrix.md` is authoritative for target, host,
+simulation, design-only, and not-implemented boundaries.
+
 ## Verified memory layout
 
 | Region | Address range | Reference implementation |
@@ -113,6 +127,10 @@ interrupts, and calls the application reset handler.
 - The MSP upper bound is accepted inclusively and models only the first 128 KiB.
 - Rollback policy is a compiled constant, not monotonic persistent state.
 - Recovery and authenticated update are placeholders only.
+- Target-side module execution and target-side atomic module installation are
+  not implemented; EXP068-EXP070 remain host tools/simulations.
+- EXP071 LED health indication is built into EXP066 but still needs hardware
+  validation for polarity, timing, and UART responsiveness.
 
 ## Build and repository caveats
 

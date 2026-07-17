@@ -4,17 +4,49 @@ The prompt is `rp> `. Input is bounded to 79 characters; CR, LF, and CRLF are
 accepted. Commands are a static allowlist. There is no address argument or
 generic memory/register access.
 
-Commands: `help`, `version`, `device info`, `device uid`, `device flash-size`,
-`device option-bytes`, `reset cause`, `clock show`, all required `registers`
-groups, `memory regions`, `log show`, `log clear`, `fault show`, `fault clear`,
+Commands: `help`, `version`, `boot status`, `device info`, `device uid`,
+`device flash-size`, `device option-bytes`, `reset cause`, `clock show`, all
+required `registers` groups, `memory regions`, `log show`, `log clear`,
+`fault show`, `fault clear`, `health status`, `health acknowledge`,
+`led status`, `led test healthy|degraded|update|recovery|fault|security`,
+`led test stop`, `easteregg knightrider`, `easteregg retro`, `easteregg stop`,
 `test list`, `test run gpio|button|clock|ram`, `security status`, and
 `module list`.
 
 Only the exact `test run gpio`, `test run button`, `test run clock`, and
 `test run ram` commands return PASS. Other `test ...` strings are rejected.
-The `registers nvic`, `registers systick`, `registers mpu`, `registers flash`,
-`registers pwr`, and `registers syscfg` commands return an explicit
-unavailable message in EXP066 instead of reading broader register windows.
+The `registers nvic`, `registers systick`, `registers mpu`, and
+`registers flash` commands now print curated read-only snapshots. The
+`registers pwr` and `registers syscfg` commands return an explicit unavailable
+message in EXP066 instead of changing peripheral clocks.
+
+EXP071 health and Easter egg commands:
+
+- `health status` prints the active health state, automatic state, temporary
+  override state, LED mask, boot reset cause, retained fault-record status, and
+  mandatory self-test status.
+- `health acknowledge` clears a degraded historical reset/fault indication for
+  the current boot. It does not erase Flash or change option bytes.
+- `led test healthy`, `led test degraded`, `led test update`,
+  `led test recovery`, `led test fault`, and `led test security` start bounded
+  non-blocking LED tests and then restore automatic health indication.
+- `led test stop` stops the temporary LED test.
+- `easteregg knightrider` starts the bounded fast Knight-Rider LED pattern.
+- `easteregg retro` reports audio unavailable unless external audio hardware is
+  explicitly added in a future revision.
+- `easteregg stop` stops temporary LED/audio activity.
+
+How to trigger the Easter egg at the `rp> ` prompt:
+
+```text
+easteregg knightrider
+```
+
+Stop it with:
+
+```text
+easteregg stop
+```
 
 EXP067 host tools:
 

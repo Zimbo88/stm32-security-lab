@@ -20,6 +20,7 @@ uint32_t platform_millis(void);
 void platform_tick(void);
 void platform_idle(void);
 void platform_cli_poll(void);
+int fault_valid(void);
 void fault_show(void);
 void fault_clear(void);
 #endif
