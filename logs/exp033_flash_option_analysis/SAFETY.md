@@ -1,17 +1,20 @@
-# EXP033 – Safety Record
+# EXP033 Safety Record
 
-EXP033 performs offline analysis only.
+EXP033 performs only offline decoding of register values previously captured
+during EXP032.
 
-No OpenOCD command is executed.
+The experiment does not contain OpenOCD commands.
+
+The experiment does not connect to the STM32 target.
 
 The experiment does not modify:
 
-- flash memory
 - FLASH_CR
 - FLASH_OPTCR
 - FLASH_OPTCR1
 - RDP
 - WRP
 - PCROP
+- flash memory
 
-No erase or programming operation was performed.
+RDP Level 2 must not be enabled on the primary research board.
