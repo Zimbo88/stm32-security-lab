@@ -10,21 +10,29 @@ SIZE    := arm-none-eabi-size
 NM      := arm-none-eabi-nm
 
 CPUFLAGS := -mcpu=cortex-m4 -mthumb
+REPRO_FLAGS := -ffile-prefix-map=$(CURDIR)=. \
+               -fdebug-prefix-map=$(CURDIR)=. \
+               -fmacro-prefix-map=$(CURDIR)=.
 CFLAGS   := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding \
             -fdata-sections -ffunction-sections -fno-builtin \
-            -Wall -Wextra -Werror -fstack-usage -I$(SRC) -Iinclude -I$(COMMON)
-ASFLAGS  := $(CPUFLAGS) -x assembler-with-cpp -g3
+            -Wall -Wextra -Werror -fstack-usage $(REPRO_FLAGS) \
+            -I$(SRC) -Iinclude -I$(COMMON)
+ASFLAGS  := $(CPUFLAGS) -x assembler-with-cpp -g3 $(REPRO_FLAGS)
 LDFLAGS  := $(CPUFLAGS) -T linker.ld -nostdlib \
-            -Wl,--gc-sections -Wl,-Map=$(BUILD)/$(PROJECT).map
+            -Wl,--gc-sections -Wl,--build-id=none \
+            -Wl,-Map=$(BUILD)/$(PROJECT).map
 
-SOURCES_C := $(wildcard $(SRC)/*.c)
+SOURCES_C := $(sort $(wildcard $(SRC)/*.c))
 OBJECTS_C := $(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SOURCES_C))
 OBJECTS   := $(BUILD)/startup.o $(OBJECTS_C)
+ELF       := $(BUILD)/$(PROJECT).elf
+BIN       := $(BUILD)/$(PROJECT).bin
+HEX       := $(BUILD)/$(PROJECT).hex
 
 .PHONY: all clean flash sizecheck
 
-all: $(BUILD)/$(PROJECT).elf $(BUILD)/$(PROJECT).bin sizecheck
-	$(SIZE) $(BUILD)/$(PROJECT).elf
+all: $(ELF) $(BIN) $(HEX) sizecheck
+	$(SIZE) $(ELF)
 
 $(BUILD):
 	mkdir -p $(BUILD)
@@ -35,13 +43,16 @@ $(BUILD)/startup.o: $(SRC)/startup.s | $(BUILD)
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD)/$(PROJECT).elf: $(OBJECTS) linker.ld $(COMMON)/stm32f429_memory_layout.ld
+$(ELF): $(OBJECTS) linker.ld $(COMMON)/stm32f429_memory_layout.ld
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 
-$(BUILD)/$(PROJECT).bin: $(BUILD)/$(PROJECT).elf
+$(BIN): $(ELF)
 	$(OBJCOPY) -O binary $< $@
 
-sizecheck: $(BUILD)/$(PROJECT).bin
+$(HEX): $(ELF)
+	$(OBJCOPY) -O ihex $< $@
+
+sizecheck: $(BIN)
 	@size=$$(stat -c %s $<); \
 	echo "Bootloader binary size: $$size bytes"; \
 	if [ $$size -gt $(STM32F429_BOOTLOADER_SIZE_BYTES) ]; then \
@@ -57,7 +68,7 @@ clean:
 
 # EXP053: Keep the bootloader inside the reserved 32 KiB flash region.
 BOOTLOADER_MAX_SIZE_BYTES := $(STM32F429_BOOTLOADER_SIZE_BYTES)
-BOOTLOADER_BINARY := $(BUILD)/$(PROJECT).bin
+BOOTLOADER_BINARY := $(BIN)
 
 .PHONY: check-size
 check-size: $(BOOTLOADER_BINARY)
@@ -82,8 +93,8 @@ report: all
 	echo "Reserved size    : $(BOOTLOADER_MAX_SIZE_BYTES) bytes"; \
 	echo "Remaining space  : $$remaining bytes"
 	@echo
-	@$(SIZE) -A $(BUILD)/$(PROJECT).elf
+	@$(SIZE) -A $(ELF)
 	@echo
 	@echo "Flash symbols:"
-	@$(NM) -n $(BUILD)/$(PROJECT).elf | \
+	@$(NM) -n $(ELF) | \
 	grep -E '_flash_region_start|_flash_image_end|_flash_region_end'
