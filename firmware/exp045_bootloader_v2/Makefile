@@ -10,7 +10,7 @@ NM      := arm-none-eabi-nm
 CPUFLAGS := -mcpu=cortex-m4 -mthumb
 CFLAGS   := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding \
             -fdata-sections -ffunction-sections -fno-builtin \
-            -Wall -Wextra -Werror -fstack-usage -I$(SRC)
+            -Wall -Wextra -Werror -fstack-usage -I$(SRC) -Iinclude
 ASFLAGS  := $(CPUFLAGS) -x assembler-with-cpp -g3
 LDFLAGS  := $(CPUFLAGS) -T linker.ld -nostdlib \
             -Wl,--gc-sections -Wl,-Map=$(BUILD)/$(PROJECT).map
