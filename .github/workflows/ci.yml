@@ -47,12 +47,48 @@ jobs:
           make -C firmware/exp065_signed_app clean all
           make -C firmware/exp066_research_platform_core clean all
 
+      - name: Verify signed release artifacts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from nacl.signing import SigningKey
+
+          seed = bytes(range(32))
+          Path("/tmp/ci_signing_seed.bin").write_bytes(seed)
+          Path("/tmp/ci_public_key_hex.txt").write_text(
+              bytes(SigningKey(seed).verify_key).hex(),
+              encoding="ascii",
+          )
+          PY
+          PUBLIC_KEY_HEX="$(cat /tmp/ci_public_key_hex.txt)"
+          make -C firmware/exp065_signed_app verify-signed \
+            SIGNING_SEED=/tmp/ci_signing_seed.bin \
+            PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
+          make -C firmware/exp066_research_platform_core verify-signed \
+            SIGNING_SEED=/tmp/ci_signing_seed.bin \
+            PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
+          python tools/release_artifacts.py verify-release \
+            --bootloader-elf firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf \
+            --bootloader-bin firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin \
+            --bootloader-hex firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex \
+            --application-elf firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf \
+            --application-bin firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
+            --application-hex firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex \
+            --signed-image firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
+            --public-key-hex "${PUBLIC_KEY_HEX}" \
+            --manifest-output firmware/exp066_research_platform_core/build/ci_release_manifest.json \
+            --report-output firmware/exp066_research_platform_core/build/ci_release_verification.json \
+            --application-name exp066_research_platform_core \
+            --bootloader-version exp045 \
+            --release-version ci \
+            --git-commit "${GITHUB_SHA}"
+
       - name: Run host C verifier tests
         run: |
           make -C tests/host_verifier clean test
           make -C tests/host_verifier clean test SANITIZE=1
 
-      - name: Check deterministic builds
+      - name: Check deterministic builds and binary comparison
         run: python tools/check_deterministic_build.py
 
       - name: Scan tracked files for private key material
