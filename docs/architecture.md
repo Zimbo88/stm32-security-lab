@@ -27,14 +27,15 @@ private signing seed is used only by the host-side signing process.
 6. Manifest parsing
 7. Manifest magic validation
 8. Manifest header-version validation
-9. Image-version policy validation
-10. Application range and size validation
-11. SHA-512 payload verification
-12. Ed25519 signature verification
-13. Initial MSP validation
-14. Reset-vector validation
-15. Vector-table relocation
-16. Transfer of control to the application
+9. Manifest flags and reserved-field validation
+10. Image-version policy validation
+11. Application range, size, and overflow validation
+12. Initial MSP validation
+13. Reset-vector validation
+14. SHA-512 payload verification
+15. Ed25519 signature verification
+16. Vector-table relocation
+17. Transfer of control to the application
 
 If any validation step fails, the application is not started and the
 bootloader halts safely.
@@ -47,6 +48,9 @@ The signed manifest is authenticated using Ed25519.
 
 The bootloader accepts an image only when the payload hash matches and the
 manifest signature is valid under the embedded public key.
+
+The signature covers the serialized manifest. The payload hash inside that
+manifest binds the application bytes to the signed metadata.
 
 ## Version Policy
 
@@ -62,8 +66,9 @@ otherwise authentic firmware image.
 
 Before execution, the bootloader validates:
 
-- The initial MSP is inside the configured SRAM range.
-- The reset vector points into the permitted application region.
+- The initial MSP is inside the supported application SRAM range.
+- The initial MSP is 8-byte aligned.
+- The reset vector points into the accepted payload.
 - The reset vector contains the required Thumb-state bit.
 
 These checks reduce the risk of transferring control to invalid memory.

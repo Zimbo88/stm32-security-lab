@@ -3,6 +3,13 @@
 Audit date: 2026-07-17. This audit is based on repository inspection and
 offline builds only. No board was flashed, erased, reset, or reconfigured.
 
+Post-audit hardening note: subsequent commits corrected the EXP066 vector
+table, introduced the generated STM32F429 memory layout, tightened canonical
+manifest validation, hardened the signer, added host C verifier tests, and
+added CI/reproducibility checks. Historical observations below are preserved as
+audit evidence; use `docs/memory_layout.md`, `docs/secure_boot_validation.md`,
+and the current source for the implemented baseline.
+
 ## Repository overview
 
 The repository contains a sequence of bare-metal STM32F429 experiments,

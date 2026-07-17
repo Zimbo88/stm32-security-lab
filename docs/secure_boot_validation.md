@@ -1,11 +1,11 @@
-# Secure Boot Validation Report
+# Secure Boot Validation
 
-## Overview
+This document describes the current validation coverage for EXP045,
+EXP065, and EXP066. It combines earlier manual board observations with the
+current automated host checks. No new hardware flashing or option-byte
+operation is implied by the automated tests.
 
-This document summarizes the manual validation of the EXP045 Bootloader V2
-using the EXP066 Research Platform on the STM32F429.
-
-## Test Configuration
+## Configuration
 
 - Bootloader address: `0x08000000`
 - Signed image address: `0x08008000`
@@ -16,114 +16,94 @@ using the EXP066 Research Platform on the STM32F429.
 - Minimum image version: `2`
 - Payload hash: SHA-512
 - Signature algorithm: Ed25519
+- Manifest flags allowed mask: `0x00000000`
+- Reserved manifest fields: must be zero
 
-## Validation Summary
+## Canonical Manifest Requirements
 
-| Test | Result |
-|------|--------|
-| Valid signed image | PASS |
-| Modified payload | PASS |
-| Modified signature | PASS |
-| Wrong signing key | PASS |
-| Rollback protection | PASS |
-| Header version validation | PASS |
-| Initial MSP validation | PASS |
-| Reset vector validation | PASS |
-| Valid image restored | PASS |
+The bootloader accepts only a canonical manifest:
 
-## Valid Signed Image
+- magic equals `0x31474953`
+- header version equals `1`
+- image version is at least `2`
+- vector address equals `0x08008200`
+- image size is at least 8 bytes and no larger than `0x000f7e00`
+- payload address arithmetic does not overflow
+- complete payload remains inside the supported application flash region
+- flags contain no unsupported bits
+- reserved fields are zero
+- payload hash matches the application bytes
+- Ed25519 signature validates over the serialized manifest bytes
 
-```text
-Verification     = OK
-Signature and payload hash accepted.
-Jumping to application...
+The initial MSP must be in the supported main SRAM range and 8-byte aligned.
+The reset vector must have the Thumb bit set and resolve inside the accepted
+payload.
+
+## Automated Host Tests
+
+Run:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
+make -C tests/host_verifier clean test
+make -C tests/host_verifier clean test SANITIZE=1
 ```
 
-## Payload Integrity Validation
+The host C verifier tests compile the production `signed_image.c` verifier
+with Monocypher and strict host warnings. They cover:
 
-```text
-Verification     = PAYLOAD SHA512 MISMATCH
-Application will NOT be started.
-Bootloader halted safely.
-```
+- valid image
+- bad magic
+- unsupported header version
+- invalid payload length
+- address overflow
+- bad MSP
+- bad reset vector
+- reset vector outside payload
+- modified payload
+- modified signature
+- unsupported flags
+- noncanonical reserved fields
+- rollback rejection
+- stable verifier status-code values
 
-## Signature Validation
+The Python signer tests cover payload size limits, malformed vector tables,
+unsupported flags/reserved fields through the signer API, truncated payloads,
+deterministic output, and atomic-output failure behavior.
 
-```text
-Verification     = ED25519 SIGNATURE INVALID
-Application will NOT be started.
-Bootloader halted safely.
-```
+## What Host Tests Prove
 
-## Unauthorized Signing Key
+The host tests provide repeatable evidence for manifest parsing, little-endian
+field decoding, policy checks, SHA-512 digest comparison, Ed25519 signature
+verification, signing-tool input validation, and failure-code stability.
 
-```text
-Verification     = ED25519 SIGNATURE INVALID
-Application will NOT be started.
-Bootloader halted safely.
-```
+## What Host Tests Do Not Prove
 
-## Rollback Protection
+The host tests do not validate:
 
-```text
-Image version    = 1
-Minimum version  = 2
-Verification     = ROLLBACK VERSION REJECTED
-Application will NOT be started.
-Bootloader halted safely.
-```
+- flash programming or erase behavior
+- hardware reset sequencing
+- VTOR relocation on silicon
+- interrupt behavior after the jump
+- option bytes, WRP, RDP, or debug locking
+- power-loss recovery
+- physical recovery entry
+- fault-injection or glitch resistance
+- side-channel resistance
+- production key custody or provisioning
 
-## Manifest Header Validation
+Those properties require dedicated hardware validation and external security
+review before any production claim.
 
-```text
-Header version   = 2
-Verification     = BAD HEADER VERSION
-Application will NOT be started.
-Bootloader halted safely.
-```
+## Secure Failure Behavior
 
-## Initial MSP Validation
+On a verification failure, the bootloader prints the failure status and halts
+instead of starting the application. Recovery remains unavailable in this
+baseline, so the halt is safe but not operationally complete.
 
-The initial MSP was changed from `0x20020000` to `0x10000000`.
+## Remaining Critical Gaps
 
-```text
-Verification     = BAD INITIAL MSP
-Application will NOT be started.
-Bootloader halted safely.
-```
-
-## Reset Vector Validation
-
-The reset vector was changed from `0x08008241` to `0x08000001`.
-
-```text
-Verification     = BAD RESET VECTOR
-Application will NOT be started.
-Bootloader halted safely.
-```
-
-## Signing Tool Protection
-
-```text
-Initial MSP is outside SRAM: 0x10000000
-```
-
-## Recovery Status
-
-```text
-RECOVERY_POLICY_UNAVAILABLE
-```
-
-## Conclusion
-
-The secure boot implementation successfully rejects:
-
-- Modified firmware payloads
-- Invalid Ed25519 signatures
-- Unauthorized signing keys
-- Rollback images
-- Unsupported manifest versions
-- Invalid initial stack pointers
-- Invalid reset vectors
-
-After each negative test, the original signed firmware was restored and booted successfully.
+The current implementation still lacks authenticated update transport,
+hardware-backed rollback state, physical recovery, bootloader write protection,
+debug/option-byte provisioning policy, and fault-injection countermeasures. It
+must not be described as production ready.

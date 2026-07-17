@@ -19,11 +19,14 @@ master's thesis on secure boot mechanisms for embedded systems.
 - Embedded trusted public key
 - Minimum image-version enforcement
 - Manifest header-version validation
+- Canonical manifest flags and reserved-field validation
 - Application range and size validation
 - Initial MSP validation
 - Reset-vector validation
 - Deny-by-default boot policy
-- Reproducible negative security tests
+- Host C verifier tests and signer negative tests
+- Deterministic build comparison
+- CI foundation without hardware requirements
 - Separate bootloader and application projects
 
 ## Repository Structure
@@ -77,8 +80,9 @@ Responsibilities:
 - Calculate the SHA-512 application digest
 - Sign the manifest using Ed25519
 - Support configurable image versions
-- Support configurable manifest header versions
+- Emit only the supported manifest header version
 - Reject structurally invalid application binaries before signing
+- Write signed images atomically
 
 ### EXP066 Research Platform Core
 
@@ -139,7 +143,7 @@ The build environment requires:
 - GNU Make
 - Python 3
 - ARM GNU Toolchain
-- Python package providing Ed25519 support for the signing script
+- Python dependencies from `requirements.txt`
 - STM32 flashing tool compatible with the target board
 
 The following compiler tools must be available in `PATH`:
@@ -177,7 +181,8 @@ firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin
 
 ## Build a Signed Image
 
-The signing tool supports explicit manifest and image versions.
+The signing tool requires an explicit seed path. The manifest header version is
+fixed at `1`; unsupported header versions are rejected before signing.
 
 Example:
 
@@ -185,13 +190,20 @@ Example:
 python3 firmware/exp065_signed_app/tools/build_signed_image.py \
   --application firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
   --seed firmware/exp065_signed_app/keys/firmware_signing_seed.bin \
-  --output firmware/exp065_signed_app/build/exp066_signed.bin \
+  --output firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
   --header-version 1 \
   --image-version 2
 ```
 
 The signing seed path is deployment-specific. Private signing material should
 not be committed to the repository.
+
+The Makefile signing targets also require an explicit seed path:
+
+```bash
+make -C firmware/exp066_research_platform_core signed \
+  SIGNING_SEED=/path/to/development_or_release_seed.bin
+```
 
 ## Flashing
 
@@ -220,7 +232,7 @@ openocd \
 openocd \
   -f interface/stlink.cfg \
   -f target/stm32f4x.cfg \
-  -c "program firmware/exp065_signed_app/build/exp066_signed.bin 0x08008000 verify reset exit"
+  -c "program firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin 0x08008000 verify reset exit"
 ```
 
 The exact interface and target configuration may differ depending on the
@@ -238,14 +250,15 @@ The boot process follows this order:
 6. Manifest parsing
 7. Manifest magic validation
 8. Header-version validation
-9. Image-version validation
-10. Application range validation
-11. SHA-512 payload verification
-12. Ed25519 signature verification
-13. Initial MSP validation
-14. Reset-vector validation
-15. Vector-table relocation
-16. Transfer of control to the application
+9. Manifest flags and reserved-field validation
+10. Image-version validation
+11. Application range and overflow validation
+12. Initial MSP validation
+13. Reset-vector validation
+14. SHA-512 payload verification
+15. Ed25519 signature verification
+16. Vector-table relocation
+17. Transfer of control to the application
 
 The application is never started after a failed validation step.
 
@@ -261,8 +274,11 @@ The following tests were performed successfully:
 | Unauthorized signing key | PASS |
 | Rollback image | PASS |
 | Unsupported header version | PASS |
+| Unsupported manifest flags | PASS |
+| Nonzero reserved manifest fields | PASS |
 | Invalid initial MSP | PASS |
 | Invalid reset vector | PASS |
+| Address overflow | PASS |
 | Valid image restoration | PASS |
 
 Detailed logs and observations are documented in:
@@ -281,6 +297,7 @@ The current design mitigates:
 - Firmware replacement with an unauthorized key
 - Rollback to an older signed image
 - Unsupported manifest formats
+- Noncanonical signed-image metadata
 - Invalid stack-pointer values
 - Invalid reset-vector targets
 
@@ -312,10 +329,11 @@ The bootloader therefore reports recovery as unavailable and aborts safely.
 
 | Component | Size |
 |---|---:|
-| Bootloader binary | 13,804 bytes |
+| Bootloader binary | 14,580 bytes |
 | Bootloader reserved flash | 32,768 bytes |
-| Application text | 6,852 bytes |
+| EXP066 application text | 6,880 bytes |
 | Application BSS | 1,128 bytes |
+| EXP066 signed image | 7,392 bytes |
 
 These values represent the validated build state and may change with future
 implementation changes.
@@ -339,6 +357,22 @@ make -C firmware/exp066_research_platform_core clean
 make -C firmware/exp066_research_platform_core
 ```
 
+Run host tests and deterministic build checks:
+
+```bash
+python3 -m pip install -r requirements.txt
+PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
+make -C tests/host_verifier clean test
+make -C tests/host_verifier clean test SANITIZE=1
+python3 tools/check_deterministic_build.py
+python3 tools/check_no_private_keys.py
+```
+
+The CI workflow uses Python 3.12 on `ubuntu-24.04`, installs
+`gcc-arm-none-eabi` from Ubuntu packages, and prints the exact
+`arm-none-eabi-gcc --version` in the workflow log. The local baseline used for
+this hardening pass was `arm-none-eabi-gcc 13.2.1 20231009`.
+
 ## Documentation
 
 - [Secure Boot Architecture](docs/architecture.md)
@@ -348,7 +382,8 @@ make -C firmware/exp066_research_platform_core
 
 ## Research Status
 
-The secure boot validation phase is complete.
+The repository now has a hardened laboratory baseline with automated host
+validation and deterministic build checks. It is not production ready.
 
 Future research and engineering work may include:
 
@@ -361,6 +396,21 @@ Future research and engineering work may include:
 - Key rotation
 - Fault-injection evaluation
 - Timing and performance measurements
+
+## Security Boundaries
+
+The following remain outside the implemented security boundary:
+
+- authenticated firmware update and transport
+- A/B firmware slots
+- physical recovery selection and recovery image policy
+- hardware-backed rollback counters
+- bootloader write protection, RDP changes, debug locking, and option-byte
+  provisioning
+- fault-injection, clock/voltage glitch, and side-channel resistance
+- production key ceremony, storage, rotation, and revocation
+
+No hardware validation was performed by the host tests or CI workflow.
 
 ## License
 

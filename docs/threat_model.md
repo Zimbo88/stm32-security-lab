@@ -25,6 +25,8 @@ The adversary may:
 - Sign firmware with an unauthorized key
 - Provide an older correctly signed firmware image
 - Provide an unsupported manifest format
+- Provide noncanonical manifest flags or reserved fields
+- Provide malformed payload ranges or address-overflow cases
 - Manipulate the initial MSP
 - Manipulate the reset vector
 
@@ -37,7 +39,9 @@ The adversary may:
 | Unauthorized firmware | Embedded trusted public key |
 | Rollback attack | Minimum image-version policy |
 | Unsupported manifest | Header-version validation |
-| Invalid stack pointer | Initial MSP range validation |
+| Noncanonical manifest metadata | Flags and reserved-field validation |
+| Malformed payload range | Size, flash-region, and overflow validation |
+| Invalid stack pointer | Initial MSP range and alignment validation |
 | Invalid execution target | Reset-vector validation |
 | Partial validation failure | Fail-safe halt before execution |
 
@@ -88,6 +92,9 @@ The following negative tests were performed successfully:
 - Unauthorized signing key
 - Rollback image
 - Unsupported header version
+- Unsupported flags
+- Nonzero reserved fields
+- Address overflow
 - Invalid initial MSP
 - Invalid reset vector
 
