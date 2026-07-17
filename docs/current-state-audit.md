@@ -8,8 +8,8 @@ offline builds only. No board was flashed, erased, reset, or reconfigured.
 The repository contains a sequence of bare-metal STM32F429 experiments,
 captured measurements and recovery images, host scripts, and a vendored copy of
 Monocypher 4.0.3. The current secure-boot reference is
-`firmware/exp045_bootloader_v2`; the current signed application is the untracked
-working tree project `firmware/exp065_signed_app`.
+`firmware/exp045_bootloader_v2`; the current signed application is
+`firmware/exp065_signed_app`.
 
 The working tree was not clean when this audit began. In particular,
 `board_clock.c` and `firmware_public_key.h` in EXP045 were modified, and EXP065,
@@ -35,7 +35,7 @@ make -C firmware/exp065_signed_app report
 ```
 
 The clean builds succeeded with `-Wall -Wextra -Werror`. EXP045 also enables
-stack-usage output. Baseline artifacts from the clean build were:
+stack-usage output. Baseline artifacts from the initial clean build were:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -43,7 +43,8 @@ stack-usage output. Baseline artifacts from the clean build were:
 | EXP065 application payload | 456 | `6d40897f54674f3b2aef96e8f56dc69513ca0157ecebb5f74c666eee59e58511` |
 | EXP065 signed image | 968 | `9bb74b5ae3d35b84b1f59f45be1de50ccfc8fd1b4aab5d00c344662225b908aa` |
 
-These hashes describe the dirty working-tree baseline, not a clean Git commit.
+These hashes describe the initial dirty working-tree baseline from the audit
+start, not the post-EXP067 hardening commit.
 
 EXP066 was completed as a separately linked Stage-1 research platform during
 this audit. Its clean build succeeds with the same toolchain and produces an
@@ -117,7 +118,8 @@ interrupts, and calls the application reset handler.
 
 The initial Git status contains unrelated user work (modified EXP045 clock and
 public-key files, an untracked EXP065 project, board assets, and an earlier
-EXP066 scaffold). No files were reverted or hardware operations performed.
+EXP066 scaffold). Milestone-relevant source was later committed; no files were
+reverted and no hardware operations were performed.
 Generated `build/` outputs are local verification artifacts and are not being
 flashed or committed as part of this audit.
 - The reference vector tables contain only the 16 core entries; peripheral IRQs
@@ -125,7 +127,8 @@ flashed or committed as part of this audit.
 - Stage 0 fault handling is a spin-only default handler.
 - UART assumes the reset-default 16 MHz clock.
 - No host unit tests exercise the embedded verifier.
-- EXP065 is currently untracked, so a fresh checkout cannot reproduce it.
+- EXP065 source is tracked, but the private signing seed remains intentionally
+  ignored and must be supplied out-of-band for signed-image reproduction.
 
 ## Known hardware assumptions
 
