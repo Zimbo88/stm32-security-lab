@@ -1,1 +1,10 @@
-STM32_Programmer_CLI: Befehl nicht gefunden.
+STM32CubeProgrammer CLI was not available in PATH during the initial EXP032
+attempt.
+
+The connected ST-LINK/V2 was detected by lsusb as USB ID 0483:3748.
+
+The read-only target connection and register inventory are therefore performed
+with OpenOCD 0.12.0. See:
+
+- openocd_inventory_raw.txt
+- openocd_inventory_summary.txt

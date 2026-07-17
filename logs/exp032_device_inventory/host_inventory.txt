@@ -2,7 +2,7 @@ EXP032 HOST AND TOOL INVENTORY
 ==============================
 
 Date:
-2026-07-17T09:55:26+02:00
+2026-07-17T09:59:59+02:00
 
 Kernel:
 Linux mathias-zimmermann-MS-7D32 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
@@ -14,14 +14,14 @@ ARM GCC:
 arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
 
 ARM GDB:
-arm-none-eabi-gdb: Befehl nicht gefunden.
+GNU gdb (Ubuntu 15.1-1ubuntu1~24.04.1) 15.1
 
 OpenOCD:
 Open On-Chip Debugger 0.12.0
 Licensed under GNU GPL v2
 
-STM32CubeProgrammer:
-STM32_Programmer_CLI: Befehl nicht gefunden.
+STM32CubeProgrammer CLI:
+not installed or not present in PATH
 
 USB devices:
 Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
@@ -37,19 +37,15 @@ Bus 001 Device 010: ID 0bda:5411 Realtek Semiconductor Corp. RTS5411 Hub
 Bus 001 Device 011: ID 054c:0d5e Sony Corp. Wireless Headset
 Bus 001 Device 012: ID 046d:c548 Logitech, Inc. Logi Bolt Receiver
 Bus 001 Device 046: ID 0403:6001 Future Technology Devices International, Ltd FT232 Serial (UART) IC
-Bus 001 Device 047: ID 0483:3748 STMicroelectronics ST-LINK/V2
 Bus 001 Device 049: ID 0925:3881 Lakeview Research Saleae Logic
+Bus 001 Device 051: ID 0483:3748 STMicroelectronics ST-LINK/V2
 Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
 
 Serial devices:
 crw-rw----+ 1 root plugdev 188, 0 Jul 17 09:21 /dev/ttyUSB0
 
-Git state:
-?? docs/
-?? logs/exp032_device_inventory/
-
-Current revision:
-c1b92976396e1913b80b28d201741cf48d892dd8
+Current Git revision:
+d0e17b0bdbb8055da4a9d9fdf76ddc28d099a388
 
 Tags:
 v1.0.0

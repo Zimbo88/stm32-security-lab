@@ -3,22 +3,26 @@
 ## Project objective
 
 This repository documents a controlled and reproducible investigation of the
-STM32F429 architecture and security mechanisms.
+STM32F429 architecture, peripherals, boot mechanisms and security functions.
 
 The STM32F429IGT6 development board is the primary laboratory target. It is
 owned, programmable and recoverable by the researcher.
 
-The long-term objective is to understand the externally observable behavior
-of STM32F429 devices under different boot, debug and protection
-configurations.
+The long-term objective is to understand the internally configured and
+externally observable behavior of STM32F429 devices under different boot,
+debug, flash-protection, reset, clock and communication configurations.
 
 ## Safety rule
 
 RDP Level 2 must not be enabled on the primary STM32F429IGT6 development
 board.
 
-Experiments involving irreversible configuration require a separately
-designated expendable target and an explicit preparation procedure.
+Experiments involving irreversible configuration require:
+
+- a separately designated expendable target
+- a written risk assessment
+- verified recovery limitations
+- explicit confirmation immediately before execution
 
 ## Completed milestone
 
@@ -76,20 +80,20 @@ Planned experiments:
 Every experiment should record:
 
 - hardware configuration
-- physical pin number
-- STM32 signal name
+- physical package pin number
+- STM32 GPIO or dedicated pin name
 - alternate function
 - signal direction
-- voltage level
+- expected voltage
 - wiring table
 - firmware revision
-- tool versions
+- host-tool versions
 - raw measurements
 - interpreted results
-- limitations
+- known limitations
 - SHA-256 hashes of important evidence
 
 ## Repository policy
 
-Raw measurements, firmware, analysis scripts and reports should remain
-versioned so results can be independently reproduced.
+Raw measurements, firmware, scripts, reports and relevant hardware notes
+remain versioned so that results can be independently reviewed and reproduced.
