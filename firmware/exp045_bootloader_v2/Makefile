@@ -5,6 +5,7 @@ SRC     := src
 CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
 SIZE    := arm-none-eabi-size
+NM      := arm-none-eabi-nm
 
 CPUFLAGS := -mcpu=cortex-m4 -mthumb
 CFLAGS   := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding \
@@ -66,3 +67,21 @@ check-size: $(BOOTLOADER_BINARY)
 	fi
 
 all: check-size
+
+.PHONY: report
+report: all
+	@echo
+	@echo "=== Bootloader build report ==="
+	@echo "Project          : $(PROJECT)"
+	@echo "Binary           : $(BOOTLOADER_BINARY)"
+	@actual_size=$$(wc -c < "$(BOOTLOADER_BINARY)"); \
+	remaining=$$(( $(BOOTLOADER_MAX_SIZE_BYTES) - actual_size )); \
+	echo "Binary size      : $$actual_size bytes"; \
+	echo "Reserved size    : $(BOOTLOADER_MAX_SIZE_BYTES) bytes"; \
+	echo "Remaining space  : $$remaining bytes"
+	@echo
+	@$(SIZE) -A $(BUILD)/$(PROJECT).elf
+	@echo
+	@echo "Flash symbols:"
+	@$(NM) -n $(BUILD)/$(PROJECT).elf | \
+	grep -E '_flash_region_start|_flash_image_end|_flash_region_end'
