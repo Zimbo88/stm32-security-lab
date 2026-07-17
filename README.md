@@ -26,6 +26,8 @@ master's thesis on secure boot mechanisms for embedded systems.
 - Deny-by-default boot policy
 - Host C verifier tests and signer negative tests
 - Deterministic build comparison
+- Offline release artifact verification
+- Structured release manifest generation
 - CI foundation without hardware requirements
 - Separate bootloader and application projects
 
@@ -175,8 +177,10 @@ Expected output files:
 ```text
 firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf
 firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin
+firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex
 firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf
 firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin
+firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex
 ```
 
 ## Build a Signed Image
@@ -204,6 +208,35 @@ The Makefile signing targets also require an explicit seed path:
 make -C firmware/exp066_research_platform_core signed \
   SIGNING_SEED=/path/to/development_or_release_seed.bin
 ```
+
+Verify the signed image with an explicit public key source:
+
+```bash
+make -C firmware/exp066_research_platform_core verify-signed \
+  SIGNING_SEED=/path/to/development_or_release_seed.bin \
+  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
+```
+
+Generate a complete release manifest and verification report:
+
+```bash
+python3 tools/release_artifacts.py verify-release \
+  --bootloader-elf firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf \
+  --bootloader-bin firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin \
+  --bootloader-hex firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex \
+  --application-elf firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf \
+  --application-bin firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
+  --application-hex firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex \
+  --signed-image firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
+  --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
+  --manifest-output firmware/exp066_research_platform_core/build/release_manifest.json \
+  --report-output firmware/exp066_research_platform_core/build/release_verification.json \
+  --application-name exp066_research_platform_core \
+  --bootloader-version exp045
+```
+
+The complete host-only release workflow is documented in
+`docs/release_process.md`.
 
 ## Flashing
 
@@ -368,10 +401,14 @@ python3 tools/check_deterministic_build.py
 python3 tools/check_no_private_keys.py
 ```
 
+The deterministic check compares ELF, BIN, HEX, signed-image, release-manifest,
+and verification-report outputs from two independent archived source trees.
+
 The CI workflow uses Python 3.12 on `ubuntu-24.04`, installs
-`gcc-arm-none-eabi` from Ubuntu packages, and prints the exact
-`arm-none-eabi-gcc --version` in the workflow log. The local baseline used for
-this hardening pass was `arm-none-eabi-gcc 13.2.1 20231009`.
+`gcc-arm-none-eabi` from Ubuntu packages, verifies deterministic test-signed
+artifacts offline, and prints the exact `arm-none-eabi-gcc --version` in the
+workflow log. The local baseline used for this hardening pass was
+`arm-none-eabi-gcc 13.2.1 20231009`.
 
 ## Documentation
 
@@ -379,6 +416,7 @@ this hardening pass was `arm-none-eabi-gcc 13.2.1 20231009`.
 - [Memory Layout](docs/memory_layout.md)
 - [Threat Model](docs/threat_model.md)
 - [Secure Boot Validation](docs/secure_boot_validation.md)
+- [Release Process](docs/release_process.md)
 
 ## Research Status
 

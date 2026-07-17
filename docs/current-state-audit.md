@@ -9,10 +9,13 @@ manifest validation, hardened the signer, added host C verifier tests, and
 added CI/reproducibility checks. A later Stage-0 hardening pass added
 redundant pre-jump validation, compile-time layout assertions, final flash
 vector re-read before handoff, and expanded malformed-image boundary tests.
-Historical observations below are preserved as audit evidence; use
+The release workflow now generates HEX artifacts, verifies signed images and
+complete release artifact sets offline, emits structured release manifests, and
+compares ELF/BIN/HEX/signed-image/release-JSON outputs across archived source
+trees. Historical observations below are preserved as audit evidence; use
 `firmware/exp045_bootloader_v2/README.md`, `docs/memory_layout.md`,
-`docs/secure_boot_validation.md`, and the current source for the implemented
-baseline.
+`docs/secure_boot_validation.md`, `docs/release_process.md`, and the current
+source for the implemented baseline.
 
 ## Repository overview
 

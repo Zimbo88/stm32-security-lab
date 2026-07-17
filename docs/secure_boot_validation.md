@@ -53,6 +53,7 @@ Run:
 PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
 make -C tests/host_verifier clean test
 make -C tests/host_verifier clean test SANITIZE=1
+python3 tools/check_deterministic_build.py
 ```
 
 The host C verifier tests compile the production `signed_image.c` verifier
@@ -93,12 +94,29 @@ The Python signer tests cover payload size limits, malformed vector tables,
 unsupported flags/reserved fields through the signer API, truncated payloads,
 deterministic output, and atomic-output failure behavior.
 
+The release artifact tests cover:
+
+- offline signed-image verification
+- release-manifest generation
+- modified payload artifacts
+- invalid signatures
+- unsupported manifest versions
+- invalid payload hashes
+- missing release artifacts
+- inconsistent expected application versions
+- deterministic-output mismatch reporting
+
+The deterministic build check compares ELF, BIN, HEX, signed image, release
+manifest, and release verification JSON outputs from two independent archived
+source trees.
+
 ## What Host Tests Prove
 
 The host tests provide repeatable evidence for manifest parsing, little-endian
 field decoding, policy checks, SHA-512 digest comparison, Ed25519 signature
 verification, signing-tool input validation, boundary-value rejection, redundant
-jump-context validation in host mode, and failure-code stability.
+jump-context validation in host mode, release artifact integrity, reproducible
+release metadata, and failure-code stability.
 
 ## What Host Tests Do Not Prove
 
@@ -109,6 +127,7 @@ The host tests do not validate:
 - VTOR relocation on silicon
 - interrupt behavior after the jump
 - option bytes, WRP, RDP, or debug locking
+- GitHub release settings or tag protection rules
 - power-loss recovery
 - physical recovery entry
 - fault-injection or glitch resistance
