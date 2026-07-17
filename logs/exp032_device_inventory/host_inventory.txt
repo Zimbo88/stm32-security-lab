@@ -1,0 +1,55 @@
+EXP032 HOST AND TOOL INVENTORY
+==============================
+
+Date:
+2026-07-17T09:55:26+02:00
+
+Kernel:
+Linux mathias-zimmermann-MS-7D32 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+Git:
+git version 2.43.0
+
+ARM GCC:
+arm-none-eabi-gcc (15:13.2.rel1-2) 13.2.1 20231009
+
+ARM GDB:
+arm-none-eabi-gdb: Befehl nicht gefunden.
+
+OpenOCD:
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+
+STM32CubeProgrammer:
+STM32_Programmer_CLI: Befehl nicht gefunden.
+
+USB devices:
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 001 Device 002: ID 1462:7d32 Micro Star International MYSTIC LIGHT 
+Bus 001 Device 003: ID 0db0:b202 Micro Star International USB Audio
+Bus 001 Device 004: ID 046d:c52b Logitech, Inc. Unifying Receiver
+Bus 001 Device 005: ID 03f0:1b01 HP, Inc HP Color LaserJet Pro MFP 3302
+Bus 001 Device 006: ID 05e3:0608 Genesys Logic, Inc. Hub
+Bus 001 Device 007: ID 05e3:0608 Genesys Logic, Inc. Hub
+Bus 001 Device 008: ID 256f:c633 3Dconnexion SpaceMouse Enterprise
+Bus 001 Device 009: ID 8087:0032 Intel Corp. AX210 Bluetooth
+Bus 001 Device 010: ID 0bda:5411 Realtek Semiconductor Corp. RTS5411 Hub
+Bus 001 Device 011: ID 054c:0d5e Sony Corp. Wireless Headset
+Bus 001 Device 012: ID 046d:c548 Logitech, Inc. Logi Bolt Receiver
+Bus 001 Device 046: ID 0403:6001 Future Technology Devices International, Ltd FT232 Serial (UART) IC
+Bus 001 Device 047: ID 0483:3748 STMicroelectronics ST-LINK/V2
+Bus 001 Device 049: ID 0925:3881 Lakeview Research Saleae Logic
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+
+Serial devices:
+crw-rw----+ 1 root plugdev 188, 0 Jul 17 09:21 /dev/ttyUSB0
+
+Git state:
+?? docs/
+?? logs/exp032_device_inventory/
+
+Current revision:
+c1b92976396e1913b80b28d201741cf48d892dd8
+
+Tags:
+v1.0.0
