@@ -17,6 +17,7 @@ endif
 SOURCES := \
 	test_signed_image_verifier.c \
 	performance_stub.c \
+	$(BOOTLOADER)/src/boot_slot.c \
 	$(BOOTLOADER)/src/signed_image.c \
 	$(BOOTLOADER)/src/monocypher.c \
 	$(BOOTLOADER)/src/monocypher-ed25519.c
@@ -35,6 +36,9 @@ $(BUILD)/test_signed_image_verifier.o: test_signed_image_verifier.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/performance_stub.o: performance_stub.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/boot_slot.o: $(BOOTLOADER)/src/boot_slot.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/signed_image.o: $(BOOTLOADER)/src/signed_image.c | $(BUILD)

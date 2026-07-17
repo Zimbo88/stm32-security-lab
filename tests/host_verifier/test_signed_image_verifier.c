@@ -3,8 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "boot_slot.h"
 #include "monocypher-ed25519.h"
 #include "signed_image.h"
+#include "stm32f429_memory_layout.h"
 
 #define TEST_PAYLOAD_SIZE 256U
 
@@ -27,6 +29,19 @@ static void expect_int(const char *name, int expected, int actual)
 {
     if (actual != expected) {
         printf("%s: expected %d, got %d\n", name, expected, actual);
+        failures += 1;
+    }
+}
+
+static void expect_u32(const char *name, uint32_t expected, uint32_t actual)
+{
+    if (actual != expected) {
+        printf(
+            "%s: expected 0x%08lx, got 0x%08lx\n",
+            name,
+            (unsigned long)expected,
+            (unsigned long)actual
+        );
         failures += 1;
     }
 }
@@ -219,6 +234,125 @@ static void test_enum_values_are_stable(void)
     expect_int("VERIFY_BAD_FLAGS", 10, (int)VERIFY_BAD_FLAGS);
     expect_int("VERIFY_BAD_RESERVED", 11, (int)VERIFY_BAD_RESERVED);
     expect_int("VERIFY_BAD_PAYLOAD_RANGE", 12, (int)VERIFY_BAD_PAYLOAD_RANGE);
+}
+
+static void test_boot_slot_descriptors(void)
+{
+    const boot_slot_descriptor_t *slot = NULL;
+
+    expect_int(
+        "slot A lookup",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(BOOT_SLOT_A, &slot)
+    );
+    if (slot != NULL) {
+        expect_int("slot A id", BOOT_SLOT_A, (int)slot->id);
+        expect_u32(
+            "slot A signed image",
+            STM32F429_SLOT_A_SIGNED_IMAGE_BASE,
+            slot->signed_image_base
+        );
+        expect_u32(
+            "slot A manifest",
+            STM32F429_SLOT_A_MANIFEST_BASE,
+            slot->manifest_address
+        );
+        expect_u32(
+            "slot A signature",
+            STM32F429_SLOT_A_SIGNATURE_BASE,
+            slot->signature_address
+        );
+        expect_u32(
+            "slot A payload",
+            STM32F429_SLOT_A_PAYLOAD_BASE,
+            slot->payload_base
+        );
+        expect_u32("slot A end", STM32F429_SLOT_A_END, slot->slot_end);
+        expect_u32(
+            "slot A payload max",
+            STM32F429_SLOT_A_PAYLOAD_MAX_SIZE,
+            slot->maximum_payload_size
+        );
+        expect_u32(
+            "slot A first sector",
+            STM32F429_SLOT_A_FIRST_SECTOR,
+            slot->first_sector
+        );
+        expect_u32(
+            "slot A last sector",
+            STM32F429_SLOT_A_LAST_SECTOR,
+            slot->last_sector
+        );
+    }
+
+    expect_int(
+        "slot B lookup",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(BOOT_SLOT_B, &slot)
+    );
+    if (slot != NULL) {
+        expect_int("slot B id", BOOT_SLOT_B, (int)slot->id);
+        expect_u32(
+            "slot B signed image",
+            STM32F429_SLOT_B_SIGNED_IMAGE_BASE,
+            slot->signed_image_base
+        );
+        expect_u32(
+            "slot B manifest",
+            STM32F429_SLOT_B_MANIFEST_BASE,
+            slot->manifest_address
+        );
+        expect_u32(
+            "slot B signature",
+            STM32F429_SLOT_B_SIGNATURE_BASE,
+            slot->signature_address
+        );
+        expect_u32(
+            "slot B payload",
+            STM32F429_SLOT_B_PAYLOAD_BASE,
+            slot->payload_base
+        );
+        expect_u32("slot B end", STM32F429_SLOT_B_END, slot->slot_end);
+        expect_u32(
+            "slot B payload max",
+            STM32F429_SLOT_B_PAYLOAD_MAX_SIZE,
+            slot->maximum_payload_size
+        );
+        expect_u32(
+            "slot B first sector",
+            STM32F429_SLOT_B_FIRST_SECTOR,
+            slot->first_sector
+        );
+        expect_u32(
+            "slot B last sector",
+            STM32F429_SLOT_B_LAST_SECTOR,
+            slot->last_sector
+        );
+    }
+
+    expect_int(
+        "invalid slot lookup",
+        BOOT_SLOT_LOOKUP_INVALID,
+        boot_slot_lookup(2U, &slot)
+    );
+    if (slot != NULL) {
+        printf("invalid slot lookup returned a descriptor\n");
+        failures += 1;
+    }
+
+    expect_int(
+        "null slot lookup",
+        BOOT_SLOT_LOOKUP_INVALID,
+        boot_slot_lookup(BOOT_SLOT_A, NULL)
+    );
+
+    slot = boot_slot_default();
+    if (slot == NULL) {
+        printf("default slot is null\n");
+        failures += 1;
+    } else {
+        expect_int("default slot is A", BOOT_SLOT_A, (int)slot->id);
+    }
 }
 
 static void test_valid_image(void)
@@ -742,6 +876,7 @@ int main(void)
     init_keys();
 
     test_enum_values_are_stable();
+    test_boot_slot_descriptors();
     test_valid_image();
     test_null_inputs_are_rejected();
     test_minimum_payload_length();
