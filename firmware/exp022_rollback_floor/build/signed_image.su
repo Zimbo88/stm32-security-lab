@@ -1,3 +1,0 @@
-src/signed_image.c:28:17:signed_image_verify	72	static
-src/signed_image.c:96:13:signed_image_status_text	0	static
-src/signed_image.c:113:6:signed_image_jump	8	static

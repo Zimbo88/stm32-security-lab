@@ -1,4 +1,0 @@
-src/minilib.c:4:7:memset	0	static
-src/minilib.c:17:7:memcpy	8	static
-src/minilib.c:30:7:memmove	8	static
-src/minilib.c:57:5:memcmp	8	static
