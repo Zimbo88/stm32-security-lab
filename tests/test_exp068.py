@@ -12,7 +12,6 @@ from bytecode_asm import assemble_text
 from bytecode_vm import (
     CAP_OUTPUT,
     CAP_RCC_READ,
-    SYS_RCC_READ,
     BytecodeVM,
     Instruction,
     SyscallHost,
@@ -22,7 +21,6 @@ from bytecode_vm import (
 )
 from module_format import TYPE_BYTECODE, TYPE_NATIVE, build_package
 from nacl.signing import SigningKey
-
 
 ROOT = Path(__file__).parents[1]
 RCC_MODULE = ROOT / "modules" / "exp068_rcc_analysis.bcasm"

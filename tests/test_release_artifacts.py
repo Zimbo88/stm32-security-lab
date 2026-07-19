@@ -7,7 +7,6 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
-
 ROOT = Path(__file__).resolve().parents[1]
 RELEASE_TOOL = ROOT / "tools" / "release_artifacts.py"
 SIGNER_PATH = (

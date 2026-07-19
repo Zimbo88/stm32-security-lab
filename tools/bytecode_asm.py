@@ -12,7 +12,6 @@ from typing import Sequence
 from bytecode_vm import (
     CAP_OUTPUT,
     CAP_RCC_READ,
-    INSTRUCTION_SIZE,
     OP_ADD,
     OP_AND,
     OP_DROP,

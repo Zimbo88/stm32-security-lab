@@ -1,456 +1,403 @@
-# STM32 Secure Boot Research Platform
+# STM32 Security Lab
+
+**A reproducible STM32F429 secure-boot and embedded-security research platform with authenticated firmware, rollback-aware slot selection, controlled recovery, and automated hardware-in-the-loop validation.**
+
+<p align="center">
+  <img src="docs/assets/stm32f429-development-board.png"
+       alt="STM32F429 development board used by the project"
+       width="760">
+</p>
+
+> **Research status:** hardware validated<br>
+> **Target platform:** STM32F429 family<br>
+> **License:** BSD 3-Clause
+> **Primary focus:** defensive embedded-security research
 
 ## Overview
 
-This repository contains a secure boot research platform for the STM32F429.
+STM32 Security Lab is a research-oriented firmware and tooling repository for
+studying secure boot, authenticated firmware installation, boot metadata,
+rollback policy, recovery behavior, debug access, memory protection, and
+hardware fault response on STM32 microcontrollers.
 
-The project separates a trusted bootloader from a signed research application.
-Before transferring control, the bootloader validates the firmware image,
-enforces a minimum image version, checks the application vector table, and
-rejects invalid images using a fail-safe policy.
+The repository combines:
 
-The implementation is intended as a practical research artifact accompanying a
-master's thesis on secure boot mechanisms for embedded systems.
+- a stage-0 secure bootloader;
+- signed application images;
+- SHA-512 integrity verification;
+- Ed25519 authentication;
+- redundant boot metadata;
+- A/B application slots;
+- update and recovery tooling;
+- deterministic host-side verification;
+- automated hardware-in-the-loop testing;
+- documented security experiments and observations.
 
-## Main Features
+The project is designed as a reproducible laboratory environment rather than
+as a vendor product or certified production boot chain.
 
-- SHA-512 payload integrity verification
-- Ed25519 firmware authentication
-- Embedded trusted public key
-- Minimum image-version enforcement
-- Manifest header-version validation
-- Canonical manifest flags and reserved-field validation
-- Application range and size validation
-- Initial MSP validation
-- Reset-vector validation
-- Deny-by-default boot policy
-- Host C verifier tests and signer negative tests
-- Deterministic build comparison
-- Offline release artifact verification
-- Structured release manifest generation
-- CI foundation without hardware requirements
-- Separate bootloader and application projects
+## Why this project exists
 
-## Repository Structure
+The project originated from defensive embedded-security research into how
+firmware trust, protection state, debug access, memory contents, and fault
+behavior interact on real microcontrollers.
+
+A secure boot chain was implemented first to establish a known and measurable
+security baseline. This baseline makes later experiments more meaningful:
+changes in boot behavior, memory state, authentication decisions, update
+handling, and protection settings can be compared against a controlled
+reference implementation.
+
+The STM32F429 family was selected as an accessible and capable research
+platform for understanding the architecture, flash organization, boot process,
+debug infrastructure, and protection mechanisms of the family. The resulting
+methods and tooling are intended to support future work on closely related
+STM32F429 variants, including the STM32F429VET6 target that motivated the
+broader investigation.
+
+The long-term research direction includes controlled analysis of:
+
+- fault injection and glitch response;
+- unauthorized or malformed firmware loading attempts;
+- protection-state transitions;
+- read-out protection behavior;
+- boot-chain corruption and recovery;
+- changes to memory and device state caused by security configuration;
+- observable behavior at and around the microcontroller during invasive tests.
+
+Only hardware owned by or explicitly entrusted to the researcher should be
+used for these experiments.
+
+## Security goals
+
+The implemented platform is designed to demonstrate and test the following
+properties:
+
+1. **Authenticity** — only images signed by an authorized key are accepted.
+2. **Integrity** — image contents are verified before execution.
+3. **Manifest validation** — malformed sizes, addresses, versions, and ranges
+   are rejected before use.
+4. **Safe failure** — invalid images do not receive control.
+5. **Redundant metadata** — boot decisions tolerate an invalid metadata copy.
+6. **Rollback control** — version policy can prevent booting older images.
+7. **Recovery** — failed tests restore the device to a verified baseline.
+8. **Reproducibility** — host tests and HIL tests document observable results.
+
+## Hardware platform
+
+The current implementation targets an STM32F429 development board built around
+an STM32F429IGT6-class device and is tested through an ST-LINK-compatible SWD
+debug interface.
+
+### Required equipment
+
+- STM32F429 development board;
+- ST-LINK-compatible programmer/debugger;
+- USB-to-UART interface when the board does not expose one directly;
+- Linux development host;
+- ARM GNU toolchain;
+- OpenOCD and/or `st-flash`;
+- Python 3 for host tooling and HIL orchestration.
+
+Board-specific wiring, interfaces, and component notes are documented in
+[`docs/hardware-platform.md`](docs/hardware-platform.md).
+
+## Architecture
+
+```mermaid
+flowchart TD
+    RESET[Reset or power-on] --> STAGE0[Stage-0 bootloader]
+    STAGE0 --> META[Read redundant boot metadata]
+    META --> SELECT[Select candidate slot]
+    SELECT --> MANIFEST[Validate image manifest]
+    MANIFEST --> RANGE[Validate address and payload range]
+    RANGE --> HASH[Compute SHA-512]
+    HASH --> SIG[Verify Ed25519 signature]
+    SIG --> POLICY[Apply version and boot policy]
+    POLICY -->|Accepted| VECTOR[Validate vector table]
+    VECTOR --> JUMP[Transfer control to application]
+    MANIFEST -->|Rejected| FALLBACK[Try fallback or halt safely]
+    RANGE -->|Rejected| FALLBACK
+    HASH -->|Mismatch| FALLBACK
+    SIG -->|Invalid| FALLBACK
+    POLICY -->|Rejected| FALLBACK
+```
+
+A detailed description is available in
+[`docs/architecture.md`](docs/architecture.md).
+
+## Flash organization
+
+The repository uses a generated and centrally defined flash layout. The exact
+addresses remain source-controlled in:
+
+- `config/stm32f429_memory_layout.json`
+- `firmware/common/stm32f429_memory_layout.h`
+- `firmware/common/stm32f429_memory_layout.ld`
+- `firmware/common/stm32f429_memory_layout.mk`
+
+```mermaid
+block-beta
+  columns 1
+  BL["Stage-0 bootloader"]
+  MA["Boot metadata copy A"]
+  MB["Boot metadata copy B"]
+  SA["Signed application slot A"]
+  SB["Signed application slot B"]
+  ST["Update or staging storage"]
+```
+
+Do not infer production addresses from this diagram. Use the generated layout
+files for the active target configuration.
+
+## Repository structure
 
 ```text
-stm32-security-lab/
-├── docs/
-│   ├── architecture.md
-│   ├── memory_layout.md
-│   ├── secure_boot_validation.md
-│   └── threat_model.md
-├── firmware/
-│   ├── exp045_bootloader_v2/
-│   ├── exp065_signed_app/
-│   └── exp066_research_platform_core/
+.
+├── config/                 Generated-source memory layout configuration
+├── docs/                   Architecture, threat model, validation, and research notes
+├── firmware/               Bootloader, application, and experiment firmware
+├── hardware/               Hardware baselines and provisioning records
+├── logic/                  Logic-analyzer captures and timing observations
+├── logs/                   Curated experiment evidence
+├── modules/                Research platform modules and examples
+├── scripts/                Reproducible experiment scripts
+├── tests/                  Host-side tests
+├── third_party/            Vendored dependencies and license notices
+├── tools/                  Image, update, verification, and HIL tooling
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── SECURITY.md
 └── README.md
 ```
 
-## Components
+The numbered `expNNN_*` directories preserve the research history and make
+individual experiments traceable.
 
-### EXP045 Bootloader V2
+## Secure-boot validation
 
-Location:
+The hardware-in-the-loop framework performs positive and negative tests
+against the real target.
 
-```text
-firmware/exp045_bootloader_v2
+Validated classes include:
+
+- accepted authentic image;
+- modified payload;
+- invalid hash;
+- invalid signature;
+- malformed manifest fields;
+- invalid payload ranges;
+- authentication failures;
+- metadata and slot-selection behavior;
+- backup and restoration of protected flash regions.
+
+The completed validation campaign produced:
+
+| Result | Count |
+|---|---:|
+| PASS | 15 |
+| FAIL | 0 |
+| ERROR | 0 |
+| SKIP | 0 |
+| Restore verified | Yes |
+
+The HIL runner verified restoration of the bootloader, metadata copies, slot A,
+and slot B after the campaign.
+
+Detailed test strategy and report semantics are documented under
+`tools/secure_boot_hil/docs/`.
+
+## Quick start
+
+### 1. Clone and enter the repository
+
+```bash
+Clone the repository using its GitHub page or an existing Git remote, then enter the working tree:
+
+```bash
+cd stm32-security-lab
 ```
 
-Responsibilities:
+### 2. Install host dependencies
 
-- Parse the signed image manifest
-- Validate manifest metadata
-- Verify the SHA-512 payload digest
-- Verify the Ed25519 signature
-- Enforce the image-version policy
-- Validate the initial MSP
-- Validate the reset vector
-- Transfer control only after all checks succeed
-
-### EXP065 Signed Image Tooling
-
-Location:
-
-```text
-firmware/exp065_signed_app
-```
-
-Responsibilities:
-
-- Build the signed image container
-- Calculate the SHA-512 application digest
-- Sign the manifest using Ed25519
-- Support configurable image versions
-- Emit only the supported manifest header version
-- Reject structurally invalid application binaries before signing
-- Write signed images atomically
-
-### EXP066 Research Platform Core
-
-Location:
-
-```text
-firmware/exp066_research_platform_core
-```
-
-Responsibilities:
-
-- Provide the application firmware executed after secure boot
-- Provide UART-based platform output
-- Provide platform health and fault handling
-- Serve as the signed application payload for validation
-
-## Security Architecture
-
-The bootloader is part of the trusted computing base.
-
-The application is treated as untrusted until all configured validation steps
-succeed.
-
-The trusted Ed25519 public key is compiled into the bootloader. The
-corresponding private signing seed is required only by the host-side signing
-process and must not be stored on the target device.
-
-The bootloader uses a deny-by-default policy. Any malformed, corrupted,
-outdated, unsupported, incorrectly signed, or structurally invalid image is
-rejected before execution.
-
-Detailed architecture documentation is available in:
-
-```text
-docs/architecture.md
-```
-
-## Flash Memory Layout
-
-| Region | Start Address | Purpose |
-|---|---:|---|
-| Bootloader | `0x08000000` | Trusted boot code |
-| Signed image | `0x08008000` | Manifest, signature, and application |
-| Manifest | `0x08008000` | Signed image metadata |
-| Signature | `0x08008060` | Ed25519 signature |
-| Application | `0x08008200` | Vector table and firmware payload |
-
-Detailed information is available in:
-
-```text
-docs/memory_layout.md
-```
-
-## Prerequisites
-
-The build environment requires:
-
-- GNU Make
-- Python 3
-- ARM GNU Toolchain
-- Python dependencies from `requirements.txt`
-- STM32 flashing tool compatible with the target board
-
-The following compiler tools must be available in `PATH`:
+Use the package manager appropriate for the development host. Typical tools
+include:
 
 ```text
 arm-none-eabi-gcc
-arm-none-eabi-objcopy
-arm-none-eabi-size
+arm-none-eabi-binutils
+make
+python3
+python3-venv
+openocd
+stlink-tools
 ```
 
-## Build
-
-Build the bootloader:
+### 3. Create the Python environment
 
 ```bash
-make -C firmware/exp045_bootloader_v2 clean
-make -C firmware/exp045_bootloader_v2
+python3 -m venv .venv-hil
+. .venv-hil/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python -m pip install -e tools/secure_boot_hil
 ```
 
-Build the research application:
+### 4. Run host-side tests
 
 ```bash
-make -C firmware/exp066_research_platform_core clean
-make -C firmware/exp066_research_platform_core
+python -m pytest
+python -m ruff check .
 ```
 
-Expected output files:
-
-```text
-firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf
-firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin
-firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex
-firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf
-firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin
-firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex
-```
-
-## Build a Signed Image
-
-The signing tool requires an explicit seed path. The manifest header version is
-fixed at `1`; unsupported header versions are rejected before signing.
-
-Example:
+### 5. Build the bootloader and application
 
 ```bash
-python3 firmware/exp065_signed_app/tools/build_signed_image.py \
-  --application firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
-  --seed firmware/exp065_signed_app/keys/firmware_signing_seed.bin \
-  --output firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
-  --header-version 1 \
-  --image-version 2
+make -C firmware/exp045_bootloader_v2 clean all
+make -C firmware/exp066_research_platform_core clean all
 ```
 
-The signing seed path is deployment-specific. Private signing material should
-not be committed to the repository.
+### 6. Run hardware-in-the-loop validation
 
-The Makefile signing targets also require an explicit seed path:
+Review the configured serial device, debugger, image paths, and target flash
+layout before running any hardware operation.
 
 ```bash
-make -C firmware/exp066_research_platform_core signed \
-  SIGNING_SEED=/path/to/development_or_release_seed.bin
+./run_hil_regression.sh
 ```
 
-Verify the signed image with an explicit public key source:
+The HIL runner can erase and rewrite flash. It should only be used with a
+recoverable target and verified backups.
 
-```bash
-make -C firmware/exp066_research_platform_core verify-signed \
-  SIGNING_SEED=/path/to/development_or_release_seed.bin \
-  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
-```
+## Safety and authorization
 
-Generate a complete release manifest and verification report:
+This repository includes operations that can:
 
-```bash
-python3 tools/release_artifacts.py verify-release \
-  --bootloader-elf firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf \
-  --bootloader-bin firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin \
-  --bootloader-hex firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex \
-  --application-elf firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf \
-  --application-bin firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
-  --application-hex firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex \
-  --signed-image firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
-  --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
-  --manifest-output firmware/exp066_research_platform_core/build/release_manifest.json \
-  --report-output firmware/exp066_research_platform_core/build/release_verification.json \
-  --application-name exp066_research_platform_core \
-  --bootloader-version exp045
-```
+- erase or overwrite internal flash;
+- modify boot metadata;
+- change option bytes;
+- alter read-out or write protection;
+- disable normal debug access;
+- leave a target temporarily unbootable;
+- permanently restrict access when irreversible protection is enabled.
 
-The complete host-only release workflow is documented in
-`docs/release_process.md`.
+Do not perform these actions on devices that you do not own or have explicit
+authorization to test.
 
-## Flashing
+RDP Level 2 may be irreversible. Consult the authoritative device
+documentation before changing protection settings.
 
-The bootloader must be flashed at:
+## Threat model
 
-```text
-0x08000000
-```
+The project evaluates a software-controlled boot chain under a defined
+research threat model. It does not claim resistance against every physical
+attacker.
 
-The signed image must be flashed at:
+Included concerns:
 
-```text
-0x08008000
-```
+- unsigned or incorrectly signed firmware;
+- modified payloads;
+- malformed manifests;
+- invalid addresses and lengths;
+- stale firmware versions;
+- corrupted metadata;
+- interrupted update installation;
+- unexpected reset and recovery paths.
 
-Example commands depend on the selected flashing tool.
+Out of scope for the current validated baseline:
 
-For OpenOCD-compatible setups, the general workflow is:
+- certified resistance to voltage, clock, electromagnetic, or laser fault injection;
+- side-channel resistance certification;
+- secure key storage backed by a dedicated hardware root of trust;
+- production provisioning at manufacturing scale;
+- formal verification of the complete boot chain;
+- resistance to decapsulation or invasive silicon analysis.
 
-```bash
-openocd \
-  -f interface/stlink.cfg \
-  -f target/stm32f4x.cfg \
-  -c "program firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf verify reset exit"
+See [`docs/threat_model.md`](docs/threat_model.md) and
+[`docs/limitations.md`](docs/limitations.md).
 
-openocd \
-  -f interface/stlink.cfg \
-  -f target/stm32f4x.cfg \
-  -c "program firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin 0x08008000 verify reset exit"
-```
+## Research workflow
 
-The exact interface and target configuration may differ depending on the
-debugger and board.
+The repository follows a baseline-driven process:
 
-## Secure Boot Sequence
+1. capture the initial device state;
+2. implement one controlled security mechanism;
+3. verify expected positive behavior;
+4. inject negative and malformed cases;
+5. record UART, debugger, memory, and timing observations;
+6. restore the target;
+7. verify the restored state;
+8. document residual uncertainty.
 
-The boot process follows this order:
-
-1. MCU reset
-2. Bootloader initialization
-3. Reset-cause evaluation
-4. Boot-mode evaluation
-5. Recovery-policy evaluation
-6. Manifest parsing
-7. Manifest magic validation
-8. Header-version validation
-9. Manifest flags and reserved-field validation
-10. Image-version validation
-11. Application range and overflow validation
-12. Initial MSP validation
-13. Reset-vector validation
-14. SHA-512 payload verification
-15. Ed25519 signature verification
-16. Vector-table relocation
-17. Transfer of control to the application
-
-The application is never started after a failed validation step.
-
-## Validation Results
-
-The following tests were performed successfully:
-
-| Test | Result |
-|---|---|
-| Valid signed image | PASS |
-| Modified payload | PASS |
-| Modified signature | PASS |
-| Unauthorized signing key | PASS |
-| Rollback image | PASS |
-| Unsupported header version | PASS |
-| Unsupported manifest flags | PASS |
-| Nonzero reserved manifest fields | PASS |
-| Invalid initial MSP | PASS |
-| Invalid reset vector | PASS |
-| Address overflow | PASS |
-| Valid image restoration | PASS |
-
-Detailed logs and observations are documented in:
-
-```text
-docs/secure_boot_validation.md
-```
-
-## Threat Model
-
-The current design mitigates:
-
-- Unauthorized firmware execution
-- Payload modification
-- Signature modification
-- Firmware replacement with an unauthorized key
-- Rollback to an older signed image
-- Unsupported manifest formats
-- Noncanonical signed-image metadata
-- Invalid stack-pointer values
-- Invalid reset-vector targets
-
-The following topics are currently outside the implementation scope:
-
-- Physical invasive attacks
-- Side-channel attacks
-- Fault injection
-- Secure firmware transport
-- Firmware confidentiality
-- Hardware-backed monotonic counters
-- Production key provisioning and rotation
-- Protection against replacement of an unprotected bootloader
-
-The complete threat model is available in:
-
-```text
-docs/threat_model.md
-```
-
-## Recovery Status
-
-A recovery-policy interface exists, but no physical recovery input or firmware
-update transport is currently implemented.
-
-The bootloader therefore reports recovery as unavailable and aborts safely.
-
-## Current Build Sizes
-
-| Component | Size |
-|---|---:|
-| Bootloader binary | 14,580 bytes |
-| Bootloader reserved flash | 32,768 bytes |
-| EXP066 application text | 6,880 bytes |
-| Application BSS | 1,128 bytes |
-| EXP066 signed image | 7,392 bytes |
-
-These values represent the validated build state and may change with future
-implementation changes.
+This approach is intended to separate observed hardware behavior from
+assumptions and to make later fault-injection work measurable.
 
 ## Reproducibility
 
-A clean build should complete without compiler warnings because both firmware
-projects use:
+Reproducibility is supported through:
 
-```text
--Wall -Wextra -Werror
-```
+- centrally generated memory-layout definitions;
+- deterministic build checks;
+- host-side image verification;
+- explicit negative tests;
+- flash-region backup and comparison;
+- machine-readable HIL reports;
+- preserved experiment scripts;
+- documented tool versions and test conditions.
 
-To reproduce the validated build:
+Transient ST-LINK or USB failures may occur during repeated flashing. Such
+transport failures are reported separately from secure-boot test failures and
+should be evaluated using the captured command output.
 
-```bash
-make -C firmware/exp045_bootloader_v2 clean
-make -C firmware/exp045_bootloader_v2
+## Limitations
 
-make -C firmware/exp066_research_platform_core clean
-make -C firmware/exp066_research_platform_core
-```
+This is a research platform, not a drop-in production bootloader.
 
-Run host tests and deterministic build checks:
+Before production use, an independent engineering and security review would
+still be required, including:
 
-```bash
-python3 -m pip install -r requirements.txt
-PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
-make -C tests/host_verifier clean test
-make -C tests/host_verifier clean test SANITIZE=1
-python3 tools/check_deterministic_build.py
-python3 tools/check_no_private_keys.py
-```
-
-The deterministic check compares ELF, BIN, HEX, signed-image, release-manifest,
-and verification-report outputs from two independent archived source trees.
-
-The CI workflow uses Python 3.12 on `ubuntu-24.04`, installs
-`gcc-arm-none-eabi` from Ubuntu packages, verifies deterministic test-signed
-artifacts offline, and prints the exact `arm-none-eabi-gcc --version` in the
-workflow log. The local baseline used for this hardening pass was
-`arm-none-eabi-gcc 13.2.1 20231009`.
+- key-management design;
+- manufacturing provisioning;
+- lifecycle and revocation policy;
+- hardware-specific fault analysis;
+- recovery authorization;
+- secure update transport;
+- production logging policy;
+- formalized compatibility and migration guarantees.
 
 ## Documentation
 
-- [Secure Boot Architecture](docs/architecture.md)
-- [Memory Layout](docs/memory_layout.md)
-- [Threat Model](docs/threat_model.md)
-- [Secure Boot Validation](docs/secure_boot_validation.md)
-- [Release Process](docs/release_process.md)
+Start with:
 
-## Research Status
+- [`docs/project-motivation.md`](docs/project-motivation.md)
+- [`docs/hardware-platform.md`](docs/hardware-platform.md)
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/threat_model.md`](docs/threat_model.md)
+- [`docs/secure_boot_validation.md`](docs/secure_boot_validation.md)
+- [`docs/validation-summary.md`](docs/validation-summary.md)
+- [`tools/secure_boot_hil/README.md`](tools/secure_boot_hil/README.md)
 
-The repository now has a hardened laboratory baseline with automated host
-validation and deterministic build checks. It is not production ready.
+## Responsible use
 
-Future research and engineering work may include:
+The repository is published to support defensive research, education,
+reproducibility, and peer review. Users are responsible for complying with
+applicable law, device ownership requirements, contractual restrictions, and
+laboratory safety procedures.
 
-- Physical recovery input
-- Authenticated firmware update transport
-- Bootloader write protection
-- MCU readout protection evaluation
-- Persistent rollback counters
-- Production key provisioning
-- Key rotation
-- Fault-injection evaluation
-- Timing and performance measurements
+## Contributing
 
-## Security Boundaries
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
-The following remain outside the implemented security boundary:
-
-- authenticated firmware update and transport
-- A/B firmware slots
-- physical recovery selection and recovery image policy
-- hardware-backed rollback counters
-- bootloader write protection, RDP changes, debug locking, and option-byte
-  provisioning
-- fault-injection, clock/voltage glitch, and side-channel resistance
-- production key ceremony, storage, rotation, and revocation
-
-No hardware validation was performed by the host tests or CI workflow.
+Security reports should follow [`SECURITY.md`](SECURITY.md).
 
 ## License
 
-No license has been assigned yet. All rights remain with the repository owner
-until a license file is added.
+Project-authored content is distributed under the
+[BSD 3-Clause License](LICENSE).
+
+Third-party components remain under their respective licenses.
+
+## Citation
+
+Citation metadata is provided in [`CITATION.cff`](CITATION.cff).

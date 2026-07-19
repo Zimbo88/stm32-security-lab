@@ -81,7 +81,27 @@ _Noreturn void boot_sequence_execute(void)
     uart_puts(boot_slot_selection_decision_text(selection.decision));
     uart_puts("\n");
 
-    boot_result_print(selection.selected_verify_status);
+    if (selection_status == BOOT_SLOT_SELECTION_OK) {
+        boot_result_print(selection.selected_verify_status);
+    } else {
+        uart_puts("Selected verify  = ");
+        uart_puts(signed_image_status_text(selection.selected_verify_status));
+        uart_puts("\n");
+
+        uart_puts("Confirmed verify = ");
+        uart_puts(signed_image_status_text(selection.confirmed_verify_status));
+        uart_puts("\n");
+
+        uart_puts("Candidate verify = ");
+        uart_puts(signed_image_status_text(selection.candidate_verify_status));
+        uart_puts("\n");
+
+        uart_puts("Fallback cause   = ");
+        uart_puts(boot_slot_selection_status_text(selection.fallback_cause));
+        uart_puts("\n");
+
+        boot_result_print(selection.selected_verify_status);
+    }
     boot_performance_print();
 
     if (selection_status != BOOT_SLOT_SELECTION_OK) {

@@ -1,0 +1,8 @@
+flowchart TD
+    BASELINE[Capture device baseline] --> IMPLEMENT[Implement one controlled change]
+    IMPLEMENT --> POSITIVE[Run positive tests]
+    POSITIVE --> NEGATIVE[Run malformed and negative tests]
+    NEGATIVE --> OBSERVE[Capture UART, memory, debug, and timing evidence]
+    OBSERVE --> RESTORE[Restore target]
+    RESTORE --> COMPARE[Verify restored state]
+    COMPARE --> DOCUMENT[Document result and residual uncertainty]

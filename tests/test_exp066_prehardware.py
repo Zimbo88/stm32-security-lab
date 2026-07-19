@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
 from nacl.signing import SigningKey
 
-
 ROOT = Path(__file__).resolve().parents[1]
+UPDATE_PACKAGE_MAGIC = 0x31474953
+UPDATE_PACKAGE_FORMAT_VERSION = 2
+UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1 = 0xF429AB01
+UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION = 1
 
 sys.path.insert(0, str(ROOT / "tools"))
 import memory_integrity  # noqa: E402
@@ -56,6 +59,33 @@ LAYOUT_PROFILES_LEGACY_END = 0x08200000
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def decode_signed_manifest(path: Path) -> dict[str, object]:
+    data = path.read_bytes()
+    (
+        magic,
+        header_version,
+        image_version,
+        vector_address,
+        image_size,
+        flags,
+        reserved0,
+        reserved1,
+        payload_sha512,
+    ) = struct.unpack_from("<8I64s", data, 0)
+    return {
+        "magic": magic,
+        "header_version": header_version,
+        "image_version": image_version,
+        "vector_address": vector_address,
+        "image_size": image_size,
+        "flags": flags,
+        "reserved0": reserved0,
+        "reserved1": reserved1,
+        "payload_sha512": payload_sha512,
+        "total_size": len(data),
+    }
 
 
 def test_runtime_telemetry_layout_matches_host_decoder() -> None:
@@ -163,7 +193,22 @@ def test_exp066_slot_a_and_slot_b_release_targets(tmp_path: Path) -> None:
         assert report["target_layout"]["flash_size"] == 0x00100000
         assert report["target_layout"]["sector_count"] == 12
         assert report["package"]["slot"] == slot
+        assert report["package"]["format_version"] == UPDATE_PACKAGE_FORMAT_VERSION
+        assert (
+            report["package"]["target_compatibility"]
+            == UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1
+        )
+        assert (
+            report["package"]["image_type"]
+            == UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION
+        )
         assert report["package"]["vector_address"] == LAYOUT[f"slot_{slot}_payload_base"]
+        assert report["manifest"]["header_version"] == UPDATE_PACKAGE_FORMAT_VERSION
+        assert (
+            report["manifest"]["reserved0"]
+            == UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1
+        )
+        assert report["manifest"]["reserved1"] == UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION
         assert report["verification"]["signature_valid"] is True
 
         elf = (
@@ -183,3 +228,77 @@ def test_exp066_slot_a_and_slot_b_release_targets(tmp_path: Path) -> None:
         assert LAYOUT[f"slot_{slot}_payload_base"] <= reset_address < LAYOUT[f"slot_{slot}_end"]
         assert sha256(elf)
         assert sha256(binary)
+
+
+def test_exp066_signed_target_builds_bootloader_v2_slot_a_package(
+    tmp_path: Path,
+) -> None:
+    seed = bytes(32)
+    seed_path = tmp_path / "test_seed.bin"
+    seed_path.write_bytes(seed)
+    public_key_hex = bytes(SigningKey(seed).verify_key).hex()
+
+    result = subprocess.run(
+        [
+            "make",
+            "-C",
+            "firmware/exp066_research_platform_core",
+            "clean",
+            "verify-signed",
+            "LAYOUT_PROFILE=stm32f429_1m",
+            f"SIGNING_SEED={seed_path}",
+            f"PUBLIC_KEY_HEX={public_key_hex}",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    artifact = (
+        ROOT
+        / "firmware"
+        / "exp066_research_platform_core"
+        / "build"
+        / "exp066_research_platform_core_slot_a_update_v2.bin"
+    )
+    legacy_artifact = (
+        ROOT
+        / "firmware"
+        / "exp066_research_platform_core"
+        / "build"
+        / "exp066_research_platform_core_signed.bin"
+    )
+    report_path = (
+        ROOT
+        / "firmware"
+        / "exp066_research_platform_core"
+        / "build"
+        / "exp066_research_platform_core_slot_a_package_verify.json"
+    )
+
+    assert artifact.exists()
+    assert not legacy_artifact.exists()
+
+    manifest = decode_signed_manifest(artifact)
+    assert manifest["magic"] == UPDATE_PACKAGE_MAGIC
+    assert manifest["header_version"] == UPDATE_PACKAGE_FORMAT_VERSION
+    assert manifest["image_version"] >= 2
+    assert manifest["vector_address"] == LAYOUT["slot_a_payload_base"]
+    assert manifest["flags"] == 0
+    assert manifest["reserved0"] == UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1
+    assert manifest["reserved1"] == UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION
+    assert (
+        manifest["total_size"]
+        == LAYOUT["signed_image_header_size"] + manifest["image_size"]
+    )
+
+    data = artifact.read_bytes()
+    payload = data[LAYOUT["signed_image_header_size"]:]
+    assert hashlib.sha512(payload).digest() == manifest["payload_sha512"]
+
+    report = json.loads(report_path.read_text(encoding="ascii"))
+    assert report["result"] == "ok"
+    assert report["verification"]["signature_valid"] is True

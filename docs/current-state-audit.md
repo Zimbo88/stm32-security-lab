@@ -60,13 +60,13 @@ stack-usage output. Baseline artifacts from the initial clean build were:
 These hashes describe the initial dirty working-tree baseline from the audit
 start, not the post-EXP067 hardening commit.
 
-EXP066 was completed as a separately linked Stage-1 research platform during
-this audit. Its clean build succeeds with the same toolchain and produces an
-EXP065-compatible signed image. It uses the existing `0x08008200` vector
-address and does not alter the Stage-0 linker layout. The current platform
-provides startup, UART command dispatch, device identity, fixed diagnostic
-snapshots, a bounded RAM log, retained fault record, non-destructive test
-placeholders, and a module-manager placeholder.
+During this audit, EXP066 was completed as a separately linked Stage-1 research
+platform using the then-current EXP065-compatible signed-image envelope. That
+historical observation used the `0x08008200` vector address and did not alter
+the then-current Stage-0 linker layout. Current EXP066 hardware-validation
+builds use the generated dual-slot layout and authenticated update-package v2
+path documented in `docs/release_process.md` and
+`docs/secure_boot_validation.md`.
 
 EXP067 was completed as a host-side module package milestone. The package
 parser is pure and fuzzable, verifies the CRC/hash/signature layout, enforces
@@ -88,7 +88,7 @@ speaker/buzzer pin is documented. The feature matrix in
 `docs/platform-feature-matrix.md` is authoritative for target, host,
 simulation, design-only, and not-implemented boundaries.
 
-## Verified memory layout
+## Historical verified memory layout
 
 | Region | Address range | Reference implementation |
 |---|---|---|

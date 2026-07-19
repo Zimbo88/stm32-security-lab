@@ -1,11 +1,11 @@
 # EXP042 – Bootloader Architecture Audit
 
-## Ergebnis
+## Result
 
 - EXP013: 16-KiB-Bootloader ab 0x08000000.
 - EXP014: 16-KiB-Bootloader mit CRC-geschütztem Image.
 - EXP019: 32-KiB-Bootloader mit signiertem Image.
-- EXP022: 32-KiB-Bootloader mit Signatur- und Rollback-Prüfung.
+- EXP022: 32 KiB bootloader with signature and rollback verification.
 
 ## Speicherlayout
 
@@ -22,11 +22,11 @@
 
 ## Verifikationskette
 
-- Prüfung von Magic und Header-Version.
-- Prüfung der Image-Version.
-- Prüfung von Vektoradresse und Imagegröße.
-- Prüfung von Stackpointer und Reset-Vektor.
-- SHA-512-Prüfung des Payloads.
+- Verification of magic and header version.
+- Verification of the image version.
+- Verification of vector address and image size.
+- Verification of stack pointer and reset vector.
+- SHA-512 verification of the payload.
 - Ed25519-Signaturprüfung.
 
 ## Rollback-Schutz
@@ -45,4 +45,4 @@
 
 ## Status
 
-EXP042 wurde vollständig offline durchgeführt.
+EXP042 was performed entirely offline.

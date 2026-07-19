@@ -1,8 +1,9 @@
 # EXP066 Implementation Plan
 
-EXP066 remains wire-compatible with the existing signed application envelope:
-its vector table is linked at `0x08008200`, and the existing EXP065 signer can
-wrap the resulting payload at `0x08008000` without changing Stage 0.
+EXP066 is now slot-aware for the EXP045 bootloader-v2 policy. Slot A links its
+vector table at `0x08020200`, Slot B links at `0x08080200`, and the build wraps
+the payload with the authenticated update-package v2 manifest required by
+Stage 0.
 
 The implementation is split into bounded components: startup and fault entry,
 direct-register board/UART/time support, retained fault records, a fixed RAM log,

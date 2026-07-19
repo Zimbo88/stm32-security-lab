@@ -10,7 +10,6 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SIGNER_PATH = (
     ROOT
@@ -24,7 +23,6 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import release_artifacts  # noqa: E402
 from stm32f429_layout import LAYOUT  # noqa: E402
-
 
 METADATA_TOOL = ROOT / "tools" / "build" / "boot_metadata_provision.bin"
 spec = importlib.util.spec_from_file_location("build_signed_image", SIGNER_PATH)

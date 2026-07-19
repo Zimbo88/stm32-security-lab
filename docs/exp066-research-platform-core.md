@@ -1,10 +1,10 @@
 # EXP066 Research Platform Core
 
 EXP066 is a bounded Stage-1 application that can be linked for Slot A
-(`0x08020200`) or Slot B (`0x08080200`) and signed either as a legacy signed
-image or as an authenticated update package. It uses direct STM32F429 register
-access, static buffers, and no heap. It is intended to be launched by verified
-Stage 0.
+(`0x08020200`) or Slot B (`0x08080200`) and packaged as an authenticated
+update-slot image for EXP045 Stage-0 bootloader v2. It uses direct STM32F429
+register access, static buffers, and no heap. It is intended to be launched by
+verified Stage 0.
 
 The hardware-validation build uses the generated `stm32f429_1m` profile for the
 STM32F429IGT6: 1 MiB internal flash, sectors 0-11 only, Slot A
@@ -15,8 +15,10 @@ Build:
 
 ```sh
 make -C firmware/exp066_research_platform_core clean all
-make -C firmware/exp066_research_platform_core signed \
-  SIGNING_SEED=/path/to/development_or_release_seed.bin
+make -C firmware/exp066_research_platform_core SLOT=a verify-update-package \
+  LAYOUT_PROFILE=stm32f429_1m \
+  SIGNING_SEED=/path/to/development_or_release_seed.bin \
+  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 make -C firmware/exp066_research_platform_core slot-releases \
   LAYOUT_PROFILE=stm32f429_1m \
   SIGNING_SEED=/path/to/development_or_release_seed.bin \

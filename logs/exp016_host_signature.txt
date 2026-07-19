@@ -24,7 +24,7 @@ Manipuliert: 0x80
 
 == Manipuliertes Image muss abgelehnt werden ==
 Signature Verification Failure
-PASS: Manipuliertes Image wurde von der Signaturprüfung abgelehnt.
+PASS: Modified image was rejected by signature verification.
 
 Ergebnisse: /path/to/stm32-security-lab/signing/exp016/results.txt
 WICHTIG: Privaten Schlüssel nicht zu Git hinzufügen.

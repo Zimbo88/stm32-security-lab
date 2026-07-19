@@ -12,7 +12,7 @@ TAMPERED="${OUT}/exp014_application_crc_image_tampered.bin"
 mkdir -p "${OUT}"
 
 if [[ ! -f "${IMAGE}" ]]; then
-    echo "FEHLER: Image nicht gefunden: ${IMAGE}" >&2
+    echo "ERROR: Image not found: ${IMAGE}" >&2
     exit 1
 fi
 
@@ -97,11 +97,11 @@ rc=$?
 set -e
 
 if [[ ${rc} -eq 0 ]]; then
-    echo "FEHLER: Manipuliertes Image wurde unerwartet akzeptiert." >&2
+    echo "ERROR: Modified image was unexpectedly accepted." >&2
     exit 1
 fi
 
-echo "PASS: Manipuliertes Image wurde von der Signaturprüfung abgelehnt."
+echo "PASS: Modified image was rejected by signature verification."
 
 cat > "${OUT}/results.txt" <<EOF
 EXP016 HOST-SIDE SIGNATURE BASELINE

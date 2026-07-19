@@ -43,15 +43,15 @@ set -e
 
 if [[ $openocd_status -ne 0 ]]; then
     echo
-    echo "FEHLER: OpenOCD-Status $openocd_status"
+    echo "ERROR: OpenOCD exited with status $openocd_status"
     echo "Temporäres Log bleibt erhalten: $temporary_log"
     exit "$openocd_status"
 fi
 
 if ! grep -q "^EXP037_SNAPSHOT_COMPLETE|${name}$" "$temporary_log"; then
     echo
-    echo "FEHLER: Abschlussmarkierung fehlt."
-    echo "Das bisherige gültige Log wurde nicht überschrieben."
+    echo "ERROR: Completion marker is missing."
+    echo "The previous valid log was not overwritten."
     exit 1
 fi
 
@@ -63,7 +63,7 @@ record_count="$(
 
 if [[ "$record_count" -ne 33 ]]; then
     echo
-    echo "FEHLER: Erwartet wurden 33 Datensätze, gefunden: $record_count"
+    echo "ERROR: Expected 33 records, found: $record_count"
     exit 1
 fi
 
@@ -71,4 +71,4 @@ mv "$temporary_log" "$final_log"
 
 echo
 echo "OK: Snapshot gespeichert: $final_log"
-echo "Datensätze: $record_count"
+echo "Records: $record_count"

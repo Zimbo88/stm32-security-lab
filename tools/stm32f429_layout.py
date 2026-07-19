@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "stm32f429_memory_layout.json"
 UINT32_MAX = 0xFFFFFFFF

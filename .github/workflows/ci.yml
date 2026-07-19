@@ -34,29 +34,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
+          python -m pip install -e tools/secure_boot_hil[dev]
+
+      - name: Run Ruff
+        run: ruff check .
 
       - name: Check generated memory layout
         run: python tools/emit_memory_layout.py --check
 
       - name: Run Python and host tests
-        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
+        run: PYTHONDONTWRITEBYTECODE=1 python -m pytest -q -p no:cacheprovider tests
 
-      - name: Run memory-integrity tooling tests
-        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_memory_integrity_tool.py
-
-      - name: Run pre-hardware EXP066 tests
-        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_exp066_prehardware.py
-
-      - name: Run authenticated update package tool tests
-        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_package_tool.py
+      - name: Run secure-boot HIL host checks
+        run: tools/secure_boot_hil/scripts/run_host_checks.sh
 
       - name: Build factory metadata provisioning tool
         run: |
           make -C tools clean test
           make -C tools clean test SANITIZE=1
-
-      - name: Run Stage-0 slot-selection simulation tests
-        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_storage.py
 
       - name: Build firmware projects
         run: |

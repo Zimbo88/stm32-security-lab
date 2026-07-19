@@ -12,12 +12,10 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 from stm32f429_layout import LAYOUT  # noqa: E402
-
 
 SIGNED_IMAGE_MAGIC = 0x31474953
 SIGNED_HEADER_VERSION = 1

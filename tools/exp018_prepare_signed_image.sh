@@ -17,7 +17,7 @@ mkdir -p "${OUT}"
 
 for file in "${PAYLOAD}" "${PRIVATE_KEY}" "${PUBLIC_KEY}"; do
     if [[ ! -f "${file}" ]]; then
-        echo "FEHLER: Datei fehlt: ${file}" >&2
+        echo "ERROR: File is missing: ${file}" >&2
         exit 1
     fi
 done
@@ -80,7 +80,7 @@ openssl pkeyutl \
     -out "${SIGNATURE}"
 
 if [[ "$(stat -c %s "${SIGNATURE}")" -ne 64 ]]; then
-    echo "FEHLER: Ed25519-Signatur ist nicht 64 Byte groß." >&2
+    echo "ERROR: Ed25519 signature is not 64 bytes." >&2
     exit 1
 fi
 
@@ -234,7 +234,7 @@ computed_hash = hashlib.sha512(payload).digest()
 print(f"Manipulationsprüfung – SHA512 stimmt: {stored_hash == computed_hash}")
 
 if stored_hash == computed_hash:
-    raise SystemExit("FEHLER: Manipulation wurde nicht erkannt")
+    raise SystemExit("ERROR: Modification was not detected")
 PY
 
 sha256sum \
@@ -269,6 +269,6 @@ No STM32 flash was modified by this experiment.
 EOF
 
 echo
-echo "PASS: EXP018-Imageformat wurde auf dem Host erfolgreich validiert."
+echo "PASS: EXP018 image format was validated successfully on the host."
 echo "Image: ${IMAGE}"
 echo "Noch nichts auf den STM32 flashen."

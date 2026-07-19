@@ -6,13 +6,11 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
-
 ROOT = Path(__file__).resolve().parents[1]
 TOOL = ROOT / "tools" / "update_package.py"
 
 sys.path.insert(0, str(ROOT / "tools"))
 from stm32f429_layout import LAYOUT  # noqa: E402
-
 
 SEED = bytes(range(32))
 PUBLIC_KEY_HEX = bytes(SigningKey(SEED).verify_key).hex()

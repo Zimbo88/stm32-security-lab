@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import argparse
-import serial
 import sys
 import time
+
+import serial
 
 ACK = 0x79
 NACK = 0x1F
@@ -11,7 +12,7 @@ def read_exact(ser: serial.Serial, count: int) -> bytes:
     data = ser.read(count)
     if len(data) != count:
         raise RuntimeError(
-            f"Timeout: erwartet {count} Byte, erhalten {len(data)}: {data.hex(' ')}"
+            f"Timeout: expected {count} bytes, received {len(data)}: {data.hex(' ')}"
         )
     return data
 
@@ -75,5 +76,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except (serial.SerialException, RuntimeError) as exc:
-        print(f"FEHLER: {exc}", file=sys.stderr)
+        print(f"ERROR: {exc}", file=sys.stderr)
         raise SystemExit(1)

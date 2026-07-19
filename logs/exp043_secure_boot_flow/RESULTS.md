@@ -3,11 +3,11 @@
 ## Bootablauf
 
 1. Reset startet den Bootloader bei 0x08000000.
-2. UART wird initialisiert.
-3. Das Manifest bei 0x08008000 wird gelesen.
+2. UART is initialized.
+3. The manifest at 0x08008000 is read.
 4. signed_image_verify() prüft das Image.
-5. Bei einem Fehler bleibt der Bootloader sicher stehen.
-6. Nur bei VERIFY_OK wird zur Anwendung gesprungen.
+5. On failure, the bootloader remains in a safe halt state.
+6. Control is transferred to the application only after VERIFY_OK.
 
 ## Verifikationsreihenfolge
 
@@ -25,13 +25,13 @@
 ## Übergabe an die Anwendung
 
 - Interrupts werden global deaktiviert.
-- SysTick wird deaktiviert.
+- SysTick is disabled.
 - NVIC-Interrupts werden deaktiviert.
 - Pending-Interrupts werden gelöscht.
-- VTOR wird auf 0x08008200 gesetzt.
-- MSP wird aus der Anwendung geladen.
+- VTOR is set to 0x08008200.
+- MSP is loaded from the application vector table.
 - Interrupts werden wieder aktiviert.
-- Der Reset-Handler der Anwendung wird aufgerufen.
+- The application reset handler is called.
 
 ## Bewertung
 
@@ -43,4 +43,4 @@
 
 ## Status
 
-EXP043 wurde vollständig offline durchgeführt.
+EXP043 was performed entirely offline.

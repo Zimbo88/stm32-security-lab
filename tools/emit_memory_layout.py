@@ -6,7 +6,6 @@ from pathlib import Path
 
 from stm32f429_layout import LAYOUT, LAYOUT_PROFILES, PROFILE_IDS, ROOT
 
-
 HEADER_PATH = ROOT / "firmware" / "common" / "stm32f429_memory_layout.h"
 LD_PATH = ROOT / "firmware" / "common" / "stm32f429_memory_layout.ld"
 MK_PATH = ROOT / "firmware" / "common" / "stm32f429_memory_layout.mk"

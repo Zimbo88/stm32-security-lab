@@ -36,6 +36,6 @@ c6849c2e6434e96750e37ff478500268f231ec8152ccb4259a7f4f0056aab102  /path/to/stm32
 fe1020bc864e045bece4c258908152aa103f30e9a6d8c06d7c825aaee57e649d  /path/to/stm32-security-lab/signing/exp018/signed_header.bin
 c4b3664fa3820f95c893b39d6f7a9af632d02b52d01d84a6cc1455b15e23dcc0  /path/to/stm32-security-lab/signing/exp018/exp018_signed_application_image.bin
 
-PASS: EXP018-Imageformat wurde auf dem Host erfolgreich validiert.
+PASS: EXP018 image format was validated successfully on the host.
 Image: /path/to/stm32-security-lab/signing/exp018/exp018_signed_application_image.bin
 Noch nichts auf den STM32 flashen.

@@ -1,0 +1,20 @@
+layout_profile = "stm32f429_1m"
+
+[paths]
+output_root = "hil-results"
+signing_seed = "firmware/exp065_signed_app/keys/firmware_signing_seed.bin"
+public_key_header = "firmware/exp045_bootloader_v2/src/firmware_public_key.h"
+
+[tools]
+make = "make"
+st_flash = "st-flash"
+
+[uart]
+device = "/dev/ttyUSB0"
+baud = 115200
+capture_seconds = 5.0
+
+[execution]
+reset_cycles = 10
+command_timeout_seconds = 120.0
+

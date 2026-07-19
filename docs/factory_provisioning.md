@@ -38,14 +38,17 @@ Build the bootloader and Slot A application with the hardware-validation layout:
 
 ```sh
 make -C firmware/exp045_bootloader_v2 clean all report LAYOUT_PROFILE=stm32f429_1m
-make -C firmware/exp066_research_platform_core SLOT=a clean all signed verify-signed \
+make -C firmware/exp066_research_platform_core SLOT=a clean all \
+  update-package inspect-update-package verify-update-package \
   LAYOUT_PROFILE=stm32f429_1m \
   SIGNING_SEED=/path/to/release_signing_seed.bin \
   PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
 
-The signed Slot A image must be written at the Slot A signed-image base:
-`0x08020000`. Its vector table is at `0x08020200`.
+The Slot A update-slot package must be written at the Slot A signed-image base:
+`0x08020000`. Its manifest format version is `2`, its target compatibility is
+`0xf429ab01`, its image type is application, and its vector table is at
+`0x08020200`.
 
 ## Create Initial CONFIRMED Metadata
 

@@ -10,7 +10,6 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
-
 ROOT = Path(__file__).resolve().parents[1]
 TEST_SEED = bytes(range(32))
 TEST_PUBLIC_KEY_HEX = bytes(SigningKey(TEST_SEED).verify_key).hex()
@@ -28,9 +27,10 @@ BUILD_OUTPUTS = (
     "firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf",
     "firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin",
     "firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex",
-    "firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin",
-    "firmware/exp066_research_platform_core/build/exp066_release_manifest.json",
-    "firmware/exp066_research_platform_core/build/exp066_release_verification.json",
+    "firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_update_v2.bin",
+    "firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_package_build.json",
+    "firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_release_manifest.json",
+    "firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_package_verify.json",
     "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.elf",
     "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.bin",
     "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.hex",
@@ -182,28 +182,12 @@ def build_checkout(checkout: Path) -> dict[str, str]:
             "make",
             "-C",
             "firmware/exp066_research_platform_core",
-            "signed",
+            "verify-signed",
             "LAYOUT_PROFILE=stm32f429_1m",
             f"SIGNING_SEED={seed}",
+            f"PUBLIC_KEY_HEX={TEST_PUBLIC_KEY_HEX}",
         ],
         checkout,
-    )
-    verify_release(
-        checkout,
-        git_commit=git_commit,
-        application="exp066_research_platform_core",
-        signed_image=(
-            "firmware/exp066_research_platform_core/build/"
-            "exp066_research_platform_core_signed.bin"
-        ),
-        manifest_output=(
-            "firmware/exp066_research_platform_core/build/"
-            "exp066_release_manifest.json"
-        ),
-        report_output=(
-            "firmware/exp066_research_platform_core/build/"
-            "exp066_release_verification.json"
-        ),
     )
     run(
         [

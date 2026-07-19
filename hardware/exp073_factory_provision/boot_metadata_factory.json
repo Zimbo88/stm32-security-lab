@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "result": "ok",
+  "operation": "create-confirmed",
+  "mcu": "STM32F429IGT6",
+  "layout_profile": "stm32f429_1m",
+  "flash_base": 134217728,
+  "flash_end": 135266304,
+  "metadata_state": "CONFIRMED",
+  "sequence": 1,
+  "active_slot": "a",
+  "active_slot_id": 0,
+  "image_version": 2,
+  "copy_a_address": 134250496,
+  "copy_b_address": 134266880,
+  "record_size": 128,
+  "output_size": 16384
+}

@@ -1,0 +1,40 @@
+name: Research observation
+description: Document a reproducible hardware or security observation
+title: "[Observation] "
+labels: ["research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use only owned or explicitly authorized hardware. Do not publish secrets,
+        private device data, or uncoordinated vulnerability details.
+  - type: textarea
+    id: hypothesis
+    attributes:
+      label: Hypothesis or question
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Experimental setup
+    validations:
+      required: true
+  - type: textarea
+    id: procedure
+    attributes:
+      label: Procedure
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+    validations:
+      required: true
+  - type: textarea
+    id: interpretation
+    attributes:
+      label: Interpretation and uncertainty
+    validations:
+      required: true

@@ -14,7 +14,6 @@ from module_catalog import decode, encode, select_newest, select_newest_from_blo
 from module_format import build_package, parse_package
 from nacl.signing import SigningKey
 
-
 ROOT = Path(__file__).parents[1]
 
 

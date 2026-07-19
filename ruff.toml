@@ -1,0 +1,32 @@
+target-version = "py312"
+line-length = 100
+
+exclude = [
+    ".git",
+    ".venv",
+    ".venv-*",
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "**/.ruff_cache",
+    "third_party",
+    "build",
+    "dist",
+]
+
+[lint]
+select = [
+    "E",
+    "F",
+    "I",
+]
+
+ignore = [
+    "E501",
+    "E741",
+]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

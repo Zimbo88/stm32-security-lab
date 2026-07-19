@@ -17,13 +17,13 @@ set -e
 
 if [[ $status -ne 0 ]]; then
     echo
-    echo "FEHLER: OpenOCD-Status $status"
-    echo "Temporäres Log: $temporary"
+    echo "ERROR: OpenOCD exited with status $status"
+    echo "Temporary log: $temporary"
     exit "$status"
 fi
 
 grep -q '^EXP039_COMPONENT_IDS_COMPLETE$' "$temporary" || {
-    echo "FEHLER: Abschlussmarkierung fehlt."
+    echo "ERROR: Completion marker is missing."
     exit 1
 }
 
@@ -34,7 +34,7 @@ count="$(
 )"
 
 if [[ "$count" -ne 100 ]]; then
-    echo "FEHLER: Erwartet 100 Datensätze, gefunden: $count"
+    echo "ERROR: Expected 100 records, found: $count"
     exit 1
 fi
 
@@ -42,4 +42,4 @@ mv "$temporary" "$final"
 
 echo
 echo "OK: $final"
-echo "Datensätze: $count"
+echo "Records: $count"

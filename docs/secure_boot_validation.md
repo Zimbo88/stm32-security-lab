@@ -8,30 +8,38 @@ operation is implied by the automated tests.
 ## Configuration
 
 - Bootloader address: `0x08000000`
-- Signed image address: `0x08008000`
-- Manifest address: `0x08008000`
-- Signature address: `0x08008060`
-- Application vector table: `0x08008200`
-- Header version: `1`
+- Slot A signed-image address: `0x08020000`
+- Slot A manifest address: `0x08020000`
+- Slot A signature address: `0x08020060`
+- Slot A application vector table: `0x08020200`
+- Slot B signed-image address: `0x08080000`
+- Slot B application vector table: `0x08080200`
+- Update-slot header version: `2`
+- Target compatibility: `0xf429ab01`
+- Image type: application (`1`)
 - Minimum image version: `2`
 - Payload hash: SHA-512
 - Signature algorithm: Ed25519
 - Manifest flags allowed mask: `0x00000000`
-- Reserved manifest fields: must be zero
+- Manifest reserved0/reserved1: authenticated target compatibility and image
+  type for update-slot packages
 
 ## Canonical Manifest Requirements
 
-The bootloader accepts only a canonical manifest:
+The metadata-driven Stage-0 slot policy accepts only a canonical update-slot
+manifest:
 
 - magic equals `0x31474953`
-- header version equals `1`
+- header version equals `2`
 - image version is at least `2`
-- vector address equals `0x08008200`
-- image size is at least 8 bytes and no larger than `0x000f7e00`
+- vector address equals the selected slot payload base
+- image size is at least 8 bytes and no larger than the selected slot payload
+  capacity
 - payload address arithmetic does not overflow
-- complete payload remains inside the supported application flash region
+- complete payload remains inside the selected slot
 - flags contain no unsupported bits
-- reserved fields are zero
+- target compatibility equals `0xf429ab01`
+- image type equals application (`1`)
 - payload hash matches the application bytes
 - Ed25519 signature validates over the serialized manifest bytes
 
@@ -106,9 +114,9 @@ The release artifact tests cover:
 - inconsistent expected application versions
 - deterministic-output mismatch reporting
 
-The deterministic build check compares ELF, BIN, HEX, signed image, release
-manifest, and release verification JSON outputs from two independent archived
-source trees.
+The deterministic build check compares ELF, BIN, HEX, update packages, package
+inspection JSON, and package verification JSON outputs from two independent
+archived source trees.
 
 ## What Host Tests Prove
 

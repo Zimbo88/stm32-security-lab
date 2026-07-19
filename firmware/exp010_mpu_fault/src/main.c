@@ -60,7 +60,7 @@ int main(void)
 
     /*
      * Dieser Lesezugriff muss durch Region 7 blockiert werden.
-     * Die Zuweisung wird normalerweise nicht mehr abgeschlossen.
+     * The assignment normally does not complete after the fault.
      */
     forbidden_value =
         *(volatile const uint32_t *)MPU_TEST_ADDRESS;

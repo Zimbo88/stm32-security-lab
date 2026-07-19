@@ -1,0 +1,16 @@
+flowchart TD
+    RESET[Reset or power-on] --> STAGE0[Stage-0 bootloader]
+    STAGE0 --> META[Read redundant metadata]
+    META --> SLOT[Select candidate slot]
+    SLOT --> MANIFEST[Validate manifest]
+    MANIFEST --> RANGE[Validate address and length]
+    RANGE --> HASH[Compute SHA-512]
+    HASH --> SIGNATURE[Verify Ed25519]
+    SIGNATURE --> POLICY[Apply rollback and boot policy]
+    POLICY --> VECTOR[Validate vector table]
+    VECTOR --> APP[Start application]
+    MANIFEST -->|Reject| SAFE[Fallback or safe halt]
+    RANGE -->|Reject| SAFE
+    HASH -->|Mismatch| SAFE
+    SIGNATURE -->|Invalid| SAFE
+    POLICY -->|Reject| SAFE

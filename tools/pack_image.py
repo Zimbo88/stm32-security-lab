@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-from pathlib import Path
 import argparse
 import binascii
 import struct
+from pathlib import Path
 
 MAGIC = 0x31474D49
 HEADER_VERSION = 1

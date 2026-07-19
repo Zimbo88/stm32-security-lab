@@ -12,13 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import release_artifacts  # noqa: E402
 from stm32f429_layout import LAYOUT  # noqa: E402
-
 
 SCHEMA_VERSION = 1
 TOOL_VERSION = "memory-integrity-v1"

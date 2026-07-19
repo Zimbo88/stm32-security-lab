@@ -1,1 +1,1 @@
-bash: user@host:~/stm32-security-lab$: Datei oder Verzeichnis nicht gefunden
+bash: user@host:~/stm32-security-lab$: No such file or directory

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 
 source = Path(
     "logs/exp032_device_inventory/"
@@ -13,7 +13,7 @@ values_file = output_dir / "decoded_values.txt"
 report_file = output_dir / "RESULTS.md"
 
 if not source.is_file():
-    print(f"FEHLER: Quelldatei fehlt: {source}", file=sys.stderr)
+    print(f"ERROR: Source file is missing: {source}", file=sys.stderr)
     sys.exit(1)
 
 text = source.read_text(encoding="utf-8", errors="replace")
@@ -42,7 +42,7 @@ missing = [name for name in required if name not in registers]
 
 if missing:
     print(
-        "FEHLER: Register fehlen: " + ", ".join(missing),
+        "ERROR: Registers are missing: " + ", ".join(missing),
         file=sys.stderr,
     )
     sys.exit(1)

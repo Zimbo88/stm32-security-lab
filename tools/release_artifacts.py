@@ -14,12 +14,10 @@ from typing import Any
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from stm32f429_layout import LAYOUT  # noqa: E402
-
 
 SIGNED_IMAGE_MAGIC = 0x31474953
 SIGNED_HEADER_VERSION = 1

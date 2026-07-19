@@ -11,7 +11,7 @@ OUT="${LAB}/signing/exp022"
 
 for f in "${SRC_BOOT}/Makefile" "${SRC_IMAGE}" "${PRIVATE_KEY}" "${PUBLIC_KEY}"; do
     if [[ ! -f "${f}" ]]; then
-        echo "FEHLER: Datei fehlt: ${f}" >&2
+        echo "ERROR: File is missing: ${f}" >&2
         exit 1
     fi
 done
@@ -55,13 +55,13 @@ replacement = needle + """    if (m->image_version < MIN_IMAGE_VERSION) {
 
 """
 if needle not in text:
-    raise SystemExit("Header-Version-Prüfung nicht gefunden")
+    raise SystemExit("Header-version check was not found")
 text = text.replace(needle, replacement)
 
 needle = '    case VERIFY_BAD_HEADER_VERSION: return "BAD HEADER VERSION";\n'
 replacement = needle + '    case VERIFY_ROLLBACK_VERSION:   return "ROLLBACK VERSION REJECTED";\n'
 if needle not in text:
-    raise SystemExit("Status-Text-Stelle nicht gefunden")
+    raise SystemExit("Status-text location was not found")
 text = text.replace(needle, replacement)
 c.write_text(text)
 
@@ -75,7 +75,7 @@ replacement = """    uart_puts("\\nImage version    = ");
     uart_put_u32(MIN_IMAGE_VERSION);
 """
 if needle not in text:
-    raise SystemExit("Image-Version-Ausgabe nicht gefunden")
+    raise SystemExit("Image-version output was not found")
 text = text.replace(needle, replacement)
 m.write_text(text)
 PY

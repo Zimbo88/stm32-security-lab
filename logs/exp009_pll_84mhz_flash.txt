@@ -4,4 +4,4 @@ arm-none-eabi-size build/exp009_pll_84mhz.elf
 st-flash --reset write build/exp009_pll_84mhz.bin 0x08000000
 st-flash 1.8.0
 2026-07-15T21:30:26 WARN usb.c: Couldn't find any ST-Link devices
-make: *** [Makefile:74: flash] Fehler 255
+make: *** [Makefile:74: flash] Error 255

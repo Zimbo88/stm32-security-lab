@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Secure Boot HIL Test Case",
+  "type": "object",
+  "required": [
+    "identifier",
+    "name",
+    "objective",
+    "preconditions",
+    "flash_actions",
+    "required_uart",
+    "forbidden_uart",
+    "expected_verdict",
+    "tags",
+    "timeout_seconds",
+    "cleanup"
+  ],
+  "properties": {
+    "identifier": {"type": "string", "pattern": "^SB-[A-Z]+-[0-9]{3}$"},
+    "name": {"type": "string"},
+    "objective": {"type": "string"},
+    "preconditions": {"type": "array", "items": {"type": "string"}},
+    "flash_actions": {"type": "array"},
+    "required_uart": {"type": "array"},
+    "forbidden_uart": {"type": "array"},
+    "expected_verdict": {
+      "type": "string",
+      "enum": ["PASS", "FAIL", "ERROR", "SKIP", "OBSERVE"]
+    },
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "cleanup": {"type": "string"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,11 @@
+flowchart LR
+    TEST[HIL test runner] --> BUILD[Build and image generation]
+    BUILD --> FLASH[ST-LINK flash adapter]
+    FLASH --> MCU[STM32F429 target]
+    MCU --> UART[UART observations]
+    UART --> TEST
+    TEST --> BACKUP[Flash backup]
+    TEST --> REPORT[Machine-readable report]
+    TEST --> RESTORE[Restore original regions]
+    RESTORE --> VERIFY[Read-back verification]
+    VERIFY --> REPORT

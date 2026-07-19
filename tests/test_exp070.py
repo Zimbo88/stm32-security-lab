@@ -12,11 +12,11 @@ from tempfile import TemporaryDirectory
 sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
 
 from bytecode_asm import assemble_text
-from bytecode_vm import CAP_OUTPUT, CAP_RCC_READ
+from bytecode_vm import CAP_OUTPUT
 from module_format import TYPE_BYTECODE, build_package
 from module_install import (
-    INSTALL_RECORD_KIND_STATE,
     INSTALL_RECORD_BODY_SIZE,
+    INSTALL_RECORD_KIND_STATE,
     INSTALL_RECORD_SIZE,
     SLOT_A,
     SLOT_B,
@@ -31,7 +31,6 @@ from module_install import (
     recover_catalog,
 )
 from nacl.signing import SigningKey
-
 
 ROOT = Path(__file__).parents[1]
 MODULE_ID = 0x7001

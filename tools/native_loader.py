@@ -11,7 +11,7 @@ import argparse
 import hashlib
 import hmac
 import struct
-from collections.abc import Container, Iterable, Sequence
+from collections.abc import Container, Sequence
 from dataclasses import dataclass, replace
 from enum import IntEnum
 from pathlib import Path

@@ -7,7 +7,6 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-
 ROOT = Path(__file__).parents[1]
 PROJECT = ROOT / "firmware" / "exp066_research_platform_core"
 COMMON = ROOT / "firmware" / "common"

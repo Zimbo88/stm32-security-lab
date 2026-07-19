@@ -83,7 +83,8 @@ class Exp066Tests(unittest.TestCase):
         self.assertEqual(crc32(b"123456789"), 0xcbf43926)
     def test_ring_wrap_model(self):
         slots = [None] * 4
-        for i in range(6): slots[i % 4] = i
+        for i in range(6):
+            slots[i % 4] = i
         self.assertEqual(slots, [4, 5, 2, 3])
     def test_firmware_source_uses_exact_test_allowlist(self):
         source = PLATFORM_C.read_text()
@@ -108,4 +109,5 @@ class Exp066Tests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
 
-if __name__ == "__main__": unittest.main()
+if __name__ == "__main__":
+    unittest.main()

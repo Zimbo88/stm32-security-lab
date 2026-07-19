@@ -15,11 +15,9 @@ from bytecode_vm import CAP_OUTPUT, CAP_RCC_READ, VMError, run_package
 from module_format import TYPE_BYTECODE, TYPE_NATIVE, build_package
 from nacl.signing import SigningKey
 from native_loader import (
-    APIEntry,
-    API_EMIT,
     API_READ_RCC,
+    APIEntry,
     LifecycleState,
-    NativeHeader,
     NativeHost,
     NativeLoaderError,
     NativeModuleManager,
@@ -30,7 +28,6 @@ from native_loader import (
     pack_native_header,
     unpack_native_header,
 )
-
 
 ROOT = Path(__file__).parents[1]
 

@@ -19,3 +19,57 @@ __pycache__/
 
 # Local reference material
 archive/
+
+# Hardware-in-the-loop run outputs
+hil-results/
+tools/secure_boot_hil/.mypy_cache/
+tools/secure_boot_hil/.pytest_cache/
+tools/secure_boot_hil/.ruff_cache/
+tools/secure_boot_hil/*.egg-info/
+
+# BEGIN publication-readiness local artifacts
+
+# Local Python environments
+.venv/
+.venv-*/
+venv/
+
+# Python and analysis caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Python packaging output
+*.egg-info/
+build/
+dist/
+
+# Local hardware-test output
+hil-results/
+test-results/
+secure_boot_flash_tests.log
+
+# Repository audit output containing local environment details
+audit/repository-audit.txt
+
+# Editor and temporary files
+*.bak
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Local environment configuration
+.env
+.env.*
+!.env.example
+
+# END publication-readiness local artifacts
+
+# Local publication installer backups
+.publication-backup-*/
+.publication-suite-backup-*/

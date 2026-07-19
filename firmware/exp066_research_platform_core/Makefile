@@ -53,13 +53,13 @@ OBJECTS := $(BUILD)/startup.o \
 ELF := $(BUILD)/$(PROJECT).elf
 BIN := $(BUILD)/$(PROJECT).bin
 HEX := $(BUILD)/$(PROJECT).hex
-SIGNED := $(BUILD)/$(PROJECT)_signed.bin
-VERIFY_REPORT := $(BUILD)/$(PROJECT)_verify.json
+LEGACY_SIGNED := $(BUILD)/$(PROJECT)_signed.bin
 UPDATE_PACKAGE := $(BUILD)/$(PROJECT)_slot_$(SLOT)_update_v2.bin
 UPDATE_PACKAGE_BUILD_REPORT := $(BUILD)/$(PROJECT)_slot_$(SLOT)_package_build.json
 UPDATE_PACKAGE_INSPECT_REPORT := $(BUILD)/$(PROJECT)_slot_$(SLOT)_release_manifest.json
 UPDATE_PACKAGE_VERIFY_REPORT := $(BUILD)/$(PROJECT)_slot_$(SLOT)_package_verify.json
-SIGNER ?= ../exp065_signed_app/tools/build_signed_image.py
+SIGNED := $(UPDATE_PACKAGE)
+VERIFY_REPORT := $(UPDATE_PACKAGE_VERIFY_REPORT)
 UPDATE_PACKAGE_TOOL ?= ../../tools/update_package.py
 SIGNING_SEED ?=
 PUBLIC_KEY_HEX ?=
@@ -107,21 +107,13 @@ require-public-key:
 		echo "ERROR: set PUBLIC_KEY_HEX or PUBLIC_KEY_HEADER for verification"; \
 		exit 1; \
 	fi
-signed: $(BIN) require-signing-seed
-	python3 $(SIGNER) --application $(BIN) --seed "$(SIGNING_SEED)" --output $(SIGNED)
-verify-signed: signed require-public-key
-	@key_arg=""; \
-	if [ -n "$(PUBLIC_KEY_HEX)" ]; then \
-		key_arg="--public-key-hex $(PUBLIC_KEY_HEX)"; \
-	else \
-		key_arg="--public-key-header $(PUBLIC_KEY_HEADER)"; \
-	fi; \
-	python3 ../../tools/release_artifacts.py verify-signed \
-	    --signed-image $(SIGNED) \
-	    --application $(BIN) \
-	    $$key_arg \
-	    --json-output $(VERIFY_REPORT)
+signed: update-package
+verify-signed: verify-update-package
 update-package: $(BIN) require-signing-seed
+	@if [ "$(LEGACY_SIGNED)" != "$(UPDATE_PACKAGE)" ] && [ -e "$(LEGACY_SIGNED)" ]; then \
+		echo "Removing legacy EXP066 signed-image artifact: $(LEGACY_SIGNED)"; \
+		rm -f "$(LEGACY_SIGNED)"; \
+	fi
 	python3 $(UPDATE_PACKAGE_TOOL) build \
 	    --application $(BIN) \
 	    --seed "$(SIGNING_SEED)" \

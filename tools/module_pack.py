@@ -4,9 +4,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from nacl.signing import SigningKey
-
 from module_format import TYPE_BYTECODE, TYPE_NATIVE, build_package, parse_package
+from nacl.signing import SigningKey
 
 
 def _u32(text: str) -> int:

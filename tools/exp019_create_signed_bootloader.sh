@@ -16,7 +16,7 @@ for file in \
     "${SIGNED_IMAGE}"
 do
     if [[ ! -f "${file}" ]]; then
-        echo "FEHLER: benötigte Datei fehlt: ${file}" >&2
+        echo "ERROR: Required file is missing: ${file}" >&2
         exit 1
     fi
 done
@@ -566,7 +566,7 @@ sizecheck: $(BUILD)/$(PROJECT).bin
 	@size=$$(stat -c %s $<); \
 	echo "Bootloader binary size: $$size bytes"; \
 	if [ $$size -gt 32768 ]; then \
-	    echo "FEHLER: Bootloader überschreitet 32 KiB."; \
+	    echo "ERROR: Bootloader exceeds 32 KiB."; \
 	    exit 1; \
 	fi
 

@@ -76,29 +76,44 @@ inspection JSON, and offline verification JSON under:
 
 ## Sign Firmware
 
-The signing seed must be supplied explicitly:
+The EXP065 legacy application target still produces the original version-1
+signed image:
 
 ```sh
-make -C firmware/exp066_research_platform_core signed \
+make -C firmware/exp065_signed_app signed \
   SIGNING_SEED=/path/to/release_signing_seed.bin
 ```
 
-The output signed image is:
+EXP066 is verified by EXP045 Stage-0 as a slot-aware update-slot package. Use
+the update-package target for factory Slot A and Slot B releases:
 
-```text
-firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin
+```sh
+make -C firmware/exp066_research_platform_core SLOT=a update-package \
+  LAYOUT_PROFILE=stm32f429_1m \
+  SIGNING_SEED=/path/to/release_signing_seed.bin
 ```
 
-The signer rejects unsupported manifest versions, unsupported flags, nonzero
-reserved fields, invalid vector tables, and payloads outside the supported
-application region before writing the signed image.
+The Slot A output package is:
+
+```text
+firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_update_v2.bin
+```
+
+The EXP066 compatibility targets `signed` and `verify-signed` are aliases for
+the slot-aware update-package build and verification path. They do not produce
+the obsolete `exp066_research_platform_core_signed.bin` version-1 artifact.
+The signer rejects unsupported manifest versions, unsupported flags, invalid
+target compatibility, invalid image type, invalid vector tables, and payloads
+outside the selected slot before writing the package.
 
 ## Verify Signed Image
 
-Verify the signed image offline against the public key compiled into Stage 0:
+Verify the EXP066 update-slot package offline against the public key compiled
+into Stage 0:
 
 ```sh
-make -C firmware/exp066_research_platform_core verify-signed \
+make -C firmware/exp066_research_platform_core SLOT=a verify-update-package \
+  LAYOUT_PROFILE=stm32f429_1m \
   SIGNING_SEED=/path/to/release_signing_seed.bin \
   PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
@@ -106,7 +121,7 @@ make -C firmware/exp066_research_platform_core verify-signed \
 This creates:
 
 ```text
-firmware/exp066_research_platform_core/build/exp066_research_platform_core_verify.json
+firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_package_verify.json
 ```
 
 The verification report is machine-readable JSON. The command exits with:
@@ -115,31 +130,20 @@ The verification report is machine-readable JSON. The command exits with:
 - `1` when artifact or signature verification fails
 - `2` for command-line usage errors from `argparse`
 
-## Generate Release Manifest
+## Inspect Update Package
 
-Run complete artifact verification and release-manifest generation:
+Run package inspection and offline verification for the Slot A factory image:
 
 ```sh
-python3 tools/release_artifacts.py verify-release \
-  --bootloader-elf firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf \
-  --bootloader-bin firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin \
-  --bootloader-hex firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex \
-  --application-elf firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf \
-  --application-bin firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
-  --application-hex firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex \
-  --signed-image firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
-  --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
-  --manifest-output firmware/exp066_research_platform_core/build/release_manifest.json \
-  --report-output firmware/exp066_research_platform_core/build/release_verification.json \
-  --application-name exp066_research_platform_core \
-  --bootloader-version exp045 \
-  --release-version <release-tag> \
-  --require-clean \
-  --require-exact-tag
+make -C firmware/exp066_research_platform_core SLOT=a \
+  inspect-update-package verify-update-package \
+  LAYOUT_PROFILE=stm32f429_1m \
+  SIGNING_SEED=/path/to/release_signing_seed.bin \
+  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
 
-For non-tagged CI or local dry runs, omit `--require-clean` and
-`--require-exact-tag`. Official releases should use both.
+This writes the package inspection JSON and offline verification JSON under
+`firmware/exp066_research_platform_core/build/`.
 
 The release manifest includes:
 
@@ -160,7 +164,7 @@ The release manifest includes:
 
 ## Offline Verification
 
-`tools/release_artifacts.py verify-signed` verifies only one signed image.
+`tools/release_artifacts.py verify-signed` verifies one legacy signed image.
 `tools/release_artifacts.py verify-release` verifies the complete release
 artifact set.
 `tools/update_package.py verify` verifies an authenticated update package for a
