@@ -5,8 +5,10 @@
 
 #include "boot_flash.h"
 #include "boot_flash_target.h"
+#include "boot_confirmation.h"
 #include "boot_metadata.h"
 #include "boot_slot.h"
+#include "boot_slot_selection.h"
 #include "monocypher-ed25519.h"
 #include "simulated_flash.h"
 #include "stm32f429_memory_layout.h"
@@ -157,6 +159,44 @@ static void expect_install_status(
             update_install_status_text(expected),
             (int)expected,
             update_install_status_text(actual),
+            (int)actual
+        );
+        failures += 1;
+    }
+}
+
+static void expect_selection_status(
+    const char *name,
+    boot_slot_selection_status_t expected,
+    boot_slot_selection_status_t actual
+)
+{
+    if (actual != expected) {
+        printf(
+            "%s: expected %s (%d), got %s (%d)\n",
+            name,
+            boot_slot_selection_status_text(expected),
+            (int)expected,
+            boot_slot_selection_status_text(actual),
+            (int)actual
+        );
+        failures += 1;
+    }
+}
+
+static void expect_confirm_status(
+    const char *name,
+    boot_confirm_status_t expected,
+    boot_confirm_status_t actual
+)
+{
+    if (actual != expected) {
+        printf(
+            "%s: expected %s (%d), got %s (%d)\n",
+            name,
+            boot_confirm_status_text(expected),
+            (int)expected,
+            boot_confirm_status_text(actual),
             (int)actual
         );
         failures += 1;
@@ -693,6 +733,59 @@ static boot_metadata_record_t metadata_writing(
     return next;
 }
 
+static boot_metadata_record_t metadata_candidate_ready(
+    const boot_metadata_record_t *current,
+    uint32_t active_slot,
+    uint32_t candidate_slot,
+    uint32_t version
+)
+{
+    boot_metadata_record_t next;
+    expect_metadata_status(
+        "prepare candidate ready",
+        BOOT_METADATA_OK,
+        boot_metadata_prepare_next(
+            current,
+            BOOT_METADATA_STATE_CANDIDATE_READY,
+            active_slot,
+            candidate_slot,
+            version,
+            0U,
+            0U,
+            0U,
+            &next
+        )
+    );
+    return next;
+}
+
+static boot_metadata_record_t metadata_pending(
+    const boot_metadata_record_t *current,
+    uint32_t active_slot,
+    uint32_t candidate_slot,
+    uint32_t version,
+    uint32_t attempts
+)
+{
+    boot_metadata_record_t next;
+    expect_metadata_status(
+        "prepare pending",
+        BOOT_METADATA_OK,
+        boot_metadata_prepare_next(
+            current,
+            BOOT_METADATA_STATE_PENDING_TRIAL,
+            active_slot,
+            candidate_slot,
+            version,
+            attempts,
+            0U,
+            0U,
+            &next
+        )
+    );
+    return next;
+}
+
 static void init_update_keys(void)
 {
     uint8_t seed[32];
@@ -804,6 +897,111 @@ static size_t build_update_package_for_slot(
     return package_size;
 }
 
+static void install_package_bytes_direct(
+    simulated_flash_t *sim,
+    const boot_slot_descriptor_t *slot,
+    const uint8_t *package,
+    size_t package_size
+)
+{
+    memcpy(
+        &sim->storage[flash_offset(slot->signed_image_base)],
+        package,
+        package_size
+    );
+}
+
+typedef struct {
+    const boot_flash_t *flash;
+    uint8_t *image_buffer;
+    size_t image_buffer_size;
+    const uint8_t *public_key;
+} selection_verify_context_t;
+
+static boot_slot_selection_status_t verify_slot_from_simulated_flash(
+    void *context,
+    const boot_slot_descriptor_t *slot,
+    signed_image_jump_context_t *jump_context,
+    verify_status_t *verify_status
+)
+{
+    selection_verify_context_t *config =
+        (selection_verify_context_t *)context;
+    signed_manifest_t manifest;
+    update_package_t package;
+    update_package_status_t package_status;
+    size_t package_size = 0U;
+
+    if ((config == NULL) ||
+        (config->flash == NULL) ||
+        (config->image_buffer == NULL) ||
+        (config->public_key == NULL) ||
+        (slot == NULL) ||
+        (jump_context == NULL) ||
+        (verify_status == NULL) ||
+        (config->image_buffer_size < (size_t)SIGNED_IMAGE_HEADER_SIZE)) {
+        return BOOT_SLOT_SELECTION_ERR_INVALID_ARGUMENT;
+    }
+
+    *verify_status = VERIFY_BAD_PAYLOAD_RANGE;
+
+    if (boot_flash_read(
+            config->flash,
+            slot->signed_image_base,
+            config->image_buffer,
+            (size_t)SIGNED_IMAGE_HEADER_SIZE
+        ) != BOOT_FLASH_OK) {
+        return BOOT_SLOT_SELECTION_ERR_VERIFY;
+    }
+
+    *verify_status = signed_image_decode_manifest(
+        config->image_buffer,
+        &manifest
+    );
+    if (*verify_status != VERIFY_OK) {
+        return BOOT_SLOT_SELECTION_ERR_VERIFY;
+    }
+
+    package_size = (size_t)SIGNED_IMAGE_HEADER_SIZE + (size_t)manifest.image_size;
+    if ((package_size < (size_t)SIGNED_IMAGE_HEADER_SIZE) ||
+        (package_size > config->image_buffer_size)) {
+        return BOOT_SLOT_SELECTION_ERR_VERIFY;
+    }
+
+    if (boot_flash_read(
+            config->flash,
+            slot->signed_image_base + SIGNED_IMAGE_HEADER_SIZE,
+            &config->image_buffer[SIGNED_IMAGE_HEADER_SIZE],
+            (size_t)manifest.image_size
+        ) != BOOT_FLASH_OK) {
+        return BOOT_SLOT_SELECTION_ERR_VERIFY;
+    }
+
+    package_status = update_package_verify_for_slot(
+        config->image_buffer,
+        package_size,
+        config->public_key,
+        slot,
+        &package,
+        verify_status
+    );
+    if (package_status != UPDATE_PACKAGE_OK) {
+        return BOOT_SLOT_SELECTION_ERR_VERIFY;
+    }
+
+    *verify_status = signed_image_prepare_update_slot_buffer(
+        package.manifest_bytes,
+        package.payload,
+        package.payload_size,
+        slot,
+        jump_context
+    );
+
+    return (*verify_status == VERIFY_OK)
+        ? BOOT_SLOT_SELECTION_OK
+        : BOOT_SLOT_SELECTION_ERR_VERIFY;
+}
+
 static void commit_confirmed_metadata(
     boot_flash_t *flash,
     uint32_t active_slot,
@@ -866,6 +1064,30 @@ static update_install_status_t install_fault_hook(
     return UPDATE_INSTALL_OK;
 }
 
+typedef struct {
+    boot_slot_selection_fault_point_t point;
+    uint32_t detail;
+    uint8_t match_detail;
+} selection_fault_config_t;
+
+static boot_slot_selection_status_t selection_fault_hook(
+    void *context,
+    boot_slot_selection_fault_point_t point,
+    uint32_t detail
+)
+{
+    const selection_fault_config_t *config =
+        (const selection_fault_config_t *)context;
+
+    if ((config != NULL) &&
+        (config->point == point) &&
+        ((config->match_detail == 0U) || (config->detail == detail))) {
+        return BOOT_SLOT_SELECTION_ERR_INJECTED;
+    }
+
+    return BOOT_SLOT_SELECTION_OK;
+}
+
 static size_t setup_standard_install(
     simulated_flash_t *sim,
     boot_flash_t *flash,
@@ -903,6 +1125,140 @@ static size_t setup_standard_install(
         package,
         package_capacity
     );
+}
+
+static boot_metadata_record_t commit_candidate_ready_metadata(
+    boot_flash_t *flash,
+    uint32_t active_slot,
+    uint32_t active_version,
+    uint32_t candidate_slot,
+    uint32_t candidate_version
+)
+{
+    boot_metadata_record_t empty = metadata_empty_record();
+    boot_metadata_record_t confirmed =
+        metadata_confirmed(&empty, active_slot, active_version);
+    boot_metadata_record_t writing =
+        metadata_writing(&confirmed, active_slot, candidate_slot, candidate_version);
+    boot_metadata_record_t ready =
+        metadata_candidate_ready(&writing, active_slot, candidate_slot, candidate_version);
+
+    expect_metadata_status(
+        "commit selection confirmed",
+        BOOT_METADATA_OK,
+        boot_metadata_commit(flash, &confirmed)
+    );
+    expect_metadata_status(
+        "commit selection writing",
+        BOOT_METADATA_OK,
+        boot_metadata_commit(flash, &writing)
+    );
+    expect_metadata_status(
+        "commit selection ready",
+        BOOT_METADATA_OK,
+        boot_metadata_commit(flash, &ready)
+    );
+    return ready;
+}
+
+static boot_metadata_record_t commit_pending_metadata(
+    boot_flash_t *flash,
+    uint32_t active_slot,
+    uint32_t active_version,
+    uint32_t candidate_slot,
+    uint32_t candidate_version,
+    uint32_t attempts
+)
+{
+    boot_metadata_record_t ready = commit_candidate_ready_metadata(
+        flash,
+        active_slot,
+        active_version,
+        candidate_slot,
+        candidate_version
+    );
+    boot_metadata_record_t pending = metadata_pending(
+        &ready,
+        active_slot,
+        candidate_slot,
+        candidate_version,
+        attempts
+    );
+
+    expect_metadata_status(
+        "commit selection pending",
+        BOOT_METADATA_OK,
+        boot_metadata_commit(flash, &pending)
+    );
+    return pending;
+}
+
+static void setup_selection_images(
+    simulated_flash_t *sim,
+    uint32_t active_slot_id,
+    uint32_t active_version,
+    uint32_t candidate_version,
+    const boot_slot_descriptor_t **active,
+    const boot_slot_descriptor_t **candidate
+)
+{
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    size_t package_size = 0U;
+    const uint32_t candidate_slot_id =
+        (active_slot_id == (uint32_t)BOOT_SLOT_A)
+            ? (uint32_t)BOOT_SLOT_B
+            : (uint32_t)BOOT_SLOT_A;
+
+    expect_u32(
+        "lookup selection active",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(active_slot_id, active)
+    );
+    expect_u32(
+        "lookup selection candidate",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(candidate_slot_id, candidate)
+    );
+
+    package_size = build_update_package_for_slot(
+        active_slot_id,
+        active_version,
+        package,
+        sizeof(package)
+    );
+    install_package_bytes_direct(sim, *active, package, package_size);
+
+    package_size = build_update_package_for_slot(
+        candidate_slot_id,
+        candidate_version,
+        package,
+        sizeof(package)
+    );
+    install_package_bytes_direct(sim, *candidate, package, package_size);
+}
+
+static boot_slot_selection_options_t make_selection_options(
+    const boot_flash_t *flash,
+    selection_verify_context_t *verify_context,
+    uint8_t *image_buffer,
+    boot_slot_selection_fault_hook_t fault_hook,
+    void *fault_context
+)
+{
+    verify_context->flash = flash;
+    verify_context->image_buffer = image_buffer;
+    verify_context->image_buffer_size = TEST_PACKAGE_BUFFER_SIZE;
+    verify_context->public_key = update_public_key;
+
+    boot_slot_selection_options_t options = {
+        .metadata_flash = flash,
+        .verify_slot = verify_slot_from_simulated_flash,
+        .verify_context = verify_context,
+        .fault_hook = fault_hook,
+        .fault_context = fault_context,
+    };
+
+    return options;
 }
 
 static void expect_no_forbidden_writes(
@@ -1302,15 +1658,30 @@ static void test_metadata_state_transitions(void)
         )
     );
     expect_metadata_status(
-        "pending requires attempts",
-        BOOT_METADATA_ERR_BAD_FORMAT,
+        "pending can record exhausted attempts",
+        BOOT_METADATA_OK,
         boot_metadata_prepare_next(
-            &ready,
+            &pending,
             BOOT_METADATA_STATE_PENDING_TRIAL,
             BOOT_SLOT_A,
             BOOT_SLOT_B,
             3U,
             0U,
+            0U,
+            0U,
+            &bad
+        )
+    );
+    expect_metadata_status(
+        "pending decrement cannot skip attempts",
+        BOOT_METADATA_ERR_BAD_TRANSITION,
+        boot_metadata_prepare_next(
+            &pending,
+            BOOT_METADATA_STATE_PENDING_TRIAL,
+            BOOT_SLOT_A,
+            BOOT_SLOT_B,
+            3U,
+            3U,
             0U,
             0U,
             &bad
@@ -2389,7 +2760,7 @@ static void test_update_installer_flash_failure_injection(void)
     }
 
     {
-        simulated_flash_t sim;
+        static simulated_flash_t sim;
         boot_flash_t flash;
         const boot_slot_descriptor_t *active = NULL;
         const boot_slot_descriptor_t *candidate = NULL;
@@ -2637,6 +3008,723 @@ static void test_update_installer_detects_verifier_failure_after_programming(voi
     expect_install_failure_invariants(&sim, &flash, active);
 }
 
+static void test_slot_selection_successful_upgrade_and_confirmation(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_confirm_result_t confirmation;
+    boot_metadata_record_t recovered;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_candidate_ready_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U
+    );
+
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "candidate ready selects trial",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("trial decision", BOOT_SLOT_SELECTION_DECISION_TRIAL, selection.decision);
+    expect_u32("trial selected candidate", candidate->id, selection.selected_slot);
+    expect_u32(
+        "trial attempts decremented",
+        BOOT_METADATA_MAX_BOOT_ATTEMPTS - 1UL,
+        selection.attempts_remaining_after
+    );
+    expect_verify_status("trial verify status", VERIFY_OK, selection.selected_verify_status);
+
+    expect_metadata_status(
+        "recover pending after trial select",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "pending trial metadata",
+        &recovered,
+        4U,
+        BOOT_METADATA_STATE_PENDING_TRIAL,
+        BOOT_SLOT_A,
+        BOOT_SLOT_B,
+        3U
+    );
+    expect_u32(
+        "pending attempts remaining",
+        BOOT_METADATA_MAX_BOOT_ATTEMPTS - 1UL,
+        recovered.boot_attempt_count
+    );
+
+    expect_confirm_status(
+        "confirm running candidate",
+        BOOT_CONFIRM_OK,
+        boot_confirm_current_slot(&flash, BOOT_SLOT_B, &confirmation)
+    );
+    expect_u32("confirmed slot B", BOOT_SLOT_B, confirmation.confirmed_slot);
+    expect_u32("confirmed version", 3U, confirmation.image_version);
+
+    expect_metadata_status(
+        "recover confirmed after app confirmation",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "confirmed candidate metadata",
+        &recovered,
+        5U,
+        BOOT_METADATA_STATE_CONFIRMED,
+        BOOT_SLOT_B,
+        BOOT_SLOT_NONE,
+        3U
+    );
+
+    expect_confirm_status(
+        "confirmation is idempotent",
+        BOOT_CONFIRM_OK,
+        boot_confirm_current_slot(&flash, BOOT_SLOT_B, &confirmation)
+    );
+    expect_u32("idempotent confirmation", 1U, confirmation.already_confirmed);
+
+    expect_selection_status(
+        "confirmed new slot boots",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("confirmed decision", BOOT_SLOT_SELECTION_DECISION_CONFIRMED, selection.decision);
+    expect_u32("confirmed selected slot B", BOOT_SLOT_B, selection.selected_slot);
+    (void)active;
+}
+
+static void test_slot_selection_missing_confirmation_exhausts_attempts(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_metadata_record_t recovered;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_candidate_ready_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U
+    );
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+
+    for (uint32_t expected_after = BOOT_METADATA_MAX_BOOT_ATTEMPTS - 1UL;
+         expected_after != UINT32_MAX;
+         --expected_after) {
+        expect_selection_status(
+            "repeated reset trial selection",
+            BOOT_SLOT_SELECTION_OK,
+            boot_slot_selection_select(&options, &selection)
+        );
+        expect_u32("trial selected slot", candidate->id, selection.selected_slot);
+        expect_u32("trial decision while attempts remain", BOOT_SLOT_SELECTION_DECISION_TRIAL, selection.decision);
+        expect_u32("attempt counter after reset", expected_after, selection.attempts_remaining_after);
+        if (expected_after == 0U) {
+            break;
+        }
+    }
+
+    expect_selection_status(
+        "attempt exhaustion falls back",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("fallback decision after exhaustion", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+    expect_u32("fallback selected active", active->id, selection.selected_slot);
+
+    expect_metadata_status(
+        "recover rejected after exhaustion",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "exhausted trial rejected",
+        &recovered,
+        7U,
+        BOOT_METADATA_STATE_REJECTED_INVALID,
+        BOOT_SLOT_A,
+        BOOT_SLOT_B,
+        3U
+    );
+    expect_u32(
+        "exhaustion result code",
+        BOOT_SLOT_SELECTION_RESULT_ATTEMPTS_EXHAUSTED,
+        recovered.result
+    );
+}
+
+static void test_slot_selection_invalid_candidate_falls_back(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_metadata_record_t recovered;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_candidate_ready_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U
+    );
+    sim.storage[
+        flash_offset(
+            candidate->signed_image_base +
+            SIGNED_IMAGE_HEADER_SIZE +
+            APPLICATION_VECTOR_MIN_SIZE
+        )
+    ] ^= 0x01U;
+
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "bad candidate falls back",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("fallback after bad candidate", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+    expect_u32("fallback selected active after bad candidate", active->id, selection.selected_slot);
+    expect_u32("bad candidate fallback cause", BOOT_SLOT_SELECTION_ERR_VERIFY, selection.fallback_cause);
+    expect_verify_status(
+        "candidate hash failure recorded",
+        VERIFY_BAD_PAYLOAD_HASH,
+        selection.candidate_verify_status
+    );
+
+    expect_metadata_status(
+        "recover rejected after bad candidate",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "bad candidate rejected metadata",
+        &recovered,
+        4U,
+        BOOT_METADATA_STATE_REJECTED_INVALID,
+        BOOT_SLOT_A,
+        BOOT_SLOT_B,
+        3U
+    );
+    expect_u32(
+        "bad candidate result code",
+        BOOT_SLOT_SELECTION_RESULT_CANDIDATE_VERIFY_FAILED,
+        recovered.result
+    );
+}
+
+static void test_slot_selection_recovers_torn_metadata_copy(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_metadata_record_t empty = metadata_empty_record();
+    boot_metadata_record_t confirmed =
+        metadata_confirmed(&empty, BOOT_SLOT_A, 2U);
+    boot_metadata_record_t confirmed_again =
+        metadata_confirmed(&confirmed, BOOT_SLOT_A, 2U);
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    expect_metadata_status(
+        "commit confirmed copy A",
+        BOOT_METADATA_OK,
+        boot_metadata_commit(&flash, &confirmed)
+    );
+    expect_metadata_status(
+        "commit confirmed copy B",
+        BOOT_METADATA_OK,
+        boot_metadata_commit(&flash, &confirmed_again)
+    );
+
+    sim.storage[flash_offset(STM32F429_BOOT_METADATA_B_BASE)] ^= 0x01U;
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "recover one corrupt metadata copy",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("single-copy recovery decision", BOOT_SLOT_SELECTION_DECISION_CONFIRMED, selection.decision);
+    expect_u32("single-copy selected active", active->id, selection.selected_slot);
+    expect_u32("copy A valid after corruption", 1U, selection.metadata_recovery.copy_a_valid);
+    expect_u32("copy B invalid after corruption", 0U, selection.metadata_recovery.copy_b_valid);
+    (void)candidate;
+}
+
+static void test_slot_selection_rejects_ambiguous_or_invalid_metadata(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    uint8_t copy_a[STM32F429_BOOT_METADATA_RECORD_SIZE];
+    uint8_t copy_b[STM32F429_BOOT_METADATA_RECORD_SIZE];
+    boot_metadata_record_t empty = metadata_empty_record();
+    boot_metadata_record_t confirmed_a =
+        metadata_confirmed(&empty, BOOT_SLOT_A, 2U);
+    boot_metadata_record_t confirmed_b = confirmed_a;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    confirmed_b.active_slot = BOOT_SLOT_B;
+    expect_metadata_status(
+        "encode selection ambiguous A",
+        BOOT_METADATA_OK,
+        boot_metadata_encode(&confirmed_a, copy_a)
+    );
+    expect_metadata_status(
+        "encode selection ambiguous B",
+        BOOT_METADATA_OK,
+        boot_metadata_encode(&confirmed_b, copy_b)
+    );
+    memcpy(&sim.storage[flash_offset(STM32F429_BOOT_METADATA_A_BASE)], copy_a, sizeof(copy_a));
+    memcpy(&sim.storage[flash_offset(STM32F429_BOOT_METADATA_B_BASE)], copy_b, sizeof(copy_b));
+
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "ambiguous metadata fails closed",
+        BOOT_SLOT_SELECTION_ERR_AMBIGUOUS_METADATA,
+        boot_slot_selection_select(&options, &selection)
+    );
+
+    make_installer_flash(&sim, &flash);
+    expect_metadata_status(
+        "encode invalid active slot source",
+        BOOT_METADATA_OK,
+        boot_metadata_encode(&confirmed_a, copy_a)
+    );
+    test_store_le32(&copy_a[20], 99UL);
+    refresh_metadata_crc(copy_a);
+    memcpy(&sim.storage[flash_offset(STM32F429_BOOT_METADATA_A_BASE)], copy_a, sizeof(copy_a));
+    expect_selection_status(
+        "invalid slot metadata rejected",
+        BOOT_SLOT_SELECTION_ERR_METADATA,
+        boot_slot_selection_select(&options, &selection)
+    );
+
+    make_installer_flash(&sim, &flash);
+    expect_selection_status(
+        "both metadata copies invalid fails closed",
+        BOOT_SLOT_SELECTION_ERR_METADATA,
+        boot_slot_selection_select(&options, &selection)
+    );
+    (void)active;
+    (void)candidate;
+}
+
+static void test_slot_selection_power_loss_before_attempt_commit_falls_back(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_metadata_record_t recovered;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_candidate_ready_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U
+    );
+
+    simulated_flash_fail_before_program_address(
+        &sim,
+        STM32F429_BOOT_METADATA_B_BASE + TEST_METADATA_COMMIT_OFFSET
+    );
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "pending commit power loss falls back",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("power-loss fallback decision", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+    expect_u32("power-loss fallback active", active->id, selection.selected_slot);
+    expect_u32("power-loss fallback cause", BOOT_SLOT_SELECTION_ERR_COMMIT, selection.fallback_cause);
+    expect_metadata_status(
+        "recover after pending commit power loss",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "ready metadata survives pending commit failure",
+        &recovered,
+        3U,
+        BOOT_METADATA_STATE_CANDIDATE_READY,
+        BOOT_SLOT_A,
+        BOOT_SLOT_B,
+        3U
+    );
+    (void)candidate;
+}
+
+static void test_slot_selection_logical_failure_injection(void)
+{
+    {
+        static simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+        selection_verify_context_t verify_context;
+        boot_slot_selection_result_t selection;
+        boot_metadata_record_t recovered;
+        selection_fault_config_t fault = {
+            BOOT_SLOT_SELECTION_FAULT_METADATA_PENDING_TRIAL,
+            BOOT_METADATA_MAX_BOOT_ATTEMPTS - 1UL,
+            1U
+        };
+
+        make_installer_flash(&sim, &flash);
+        setup_selection_images(&sim, BOOT_SLOT_A, 2U, 3U, &active, &candidate);
+        commit_candidate_ready_metadata(&flash, BOOT_SLOT_A, 2U, BOOT_SLOT_B, 3U);
+        boot_slot_selection_options_t options = make_selection_options(
+            &flash,
+            &verify_context,
+            image_buffer,
+            selection_fault_hook,
+            &fault
+        );
+        expect_selection_status(
+            "pending transition injection falls back",
+            BOOT_SLOT_SELECTION_OK,
+            boot_slot_selection_select(&options, &selection)
+        );
+        expect_u32("pending injection fallback", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+        expect_u32("pending injection cause", BOOT_SLOT_SELECTION_ERR_INJECTED, selection.fallback_cause);
+        expect_metadata_status(
+            "ready survives pending injection",
+            BOOT_METADATA_OK,
+            boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+        );
+        expect_metadata_record(
+            "ready after pending injection",
+            &recovered,
+            3U,
+            BOOT_METADATA_STATE_CANDIDATE_READY,
+            BOOT_SLOT_A,
+            BOOT_SLOT_B,
+            3U
+        );
+        (void)active;
+        (void)candidate;
+    }
+
+    {
+        static simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+        selection_verify_context_t verify_context;
+        boot_slot_selection_result_t selection;
+        boot_metadata_record_t recovered;
+        selection_fault_config_t fault = {
+            BOOT_SLOT_SELECTION_FAULT_METADATA_ATTEMPT_DECREMENT,
+            1U,
+            1U
+        };
+
+        make_installer_flash(&sim, &flash);
+        setup_selection_images(&sim, BOOT_SLOT_A, 2U, 3U, &active, &candidate);
+        commit_pending_metadata(&flash, BOOT_SLOT_A, 2U, BOOT_SLOT_B, 3U, 2U);
+        boot_slot_selection_options_t options = make_selection_options(
+            &flash,
+            &verify_context,
+            image_buffer,
+            selection_fault_hook,
+            &fault
+        );
+        expect_selection_status(
+            "attempt decrement injection falls back",
+            BOOT_SLOT_SELECTION_OK,
+            boot_slot_selection_select(&options, &selection)
+        );
+        expect_u32("attempt injection fallback", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+        expect_u32("attempt injection cause", BOOT_SLOT_SELECTION_ERR_INJECTED, selection.fallback_cause);
+        expect_metadata_status(
+            "pending survives attempt injection",
+            BOOT_METADATA_OK,
+            boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+        );
+        expect_metadata_record(
+            "pending after attempt injection",
+            &recovered,
+            4U,
+            BOOT_METADATA_STATE_PENDING_TRIAL,
+            BOOT_SLOT_A,
+            BOOT_SLOT_B,
+            3U
+        );
+        expect_u32("attempt count preserved", 2U, recovered.boot_attempt_count);
+        (void)active;
+        (void)candidate;
+    }
+
+    {
+        static simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+        selection_verify_context_t verify_context;
+        boot_slot_selection_result_t selection;
+        selection_fault_config_t fault = {
+            BOOT_SLOT_SELECTION_FAULT_VERIFY_CANDIDATE,
+            BOOT_SLOT_B,
+            1U
+        };
+
+        make_installer_flash(&sim, &flash);
+        setup_selection_images(&sim, BOOT_SLOT_A, 2U, 3U, &active, &candidate);
+        commit_candidate_ready_metadata(&flash, BOOT_SLOT_A, 2U, BOOT_SLOT_B, 3U);
+        boot_slot_selection_options_t options = make_selection_options(
+            &flash,
+            &verify_context,
+            image_buffer,
+            selection_fault_hook,
+            &fault
+        );
+        expect_selection_status(
+            "candidate verification injection falls back",
+            BOOT_SLOT_SELECTION_OK,
+            boot_slot_selection_select(&options, &selection)
+        );
+        expect_u32("verify injection fallback", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+        expect_u32("verify injection cause", BOOT_SLOT_SELECTION_ERR_INJECTED, selection.fallback_cause);
+        (void)active;
+        (void)candidate;
+    }
+
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+        selection_verify_context_t verify_context;
+        boot_slot_selection_result_t selection;
+        boot_metadata_record_t recovered;
+        selection_fault_config_t fault = {
+            BOOT_SLOT_SELECTION_FAULT_METADATA_REJECT_INVALID,
+            BOOT_SLOT_SELECTION_RESULT_CANDIDATE_VERIFY_FAILED,
+            1U
+        };
+
+        make_installer_flash(&sim, &flash);
+        setup_selection_images(&sim, BOOT_SLOT_A, 2U, 3U, &active, &candidate);
+        commit_candidate_ready_metadata(&flash, BOOT_SLOT_A, 2U, BOOT_SLOT_B, 3U);
+        sim.storage[
+            flash_offset(
+                candidate->signed_image_base +
+                SIGNED_IMAGE_HEADER_SIZE +
+                APPLICATION_VECTOR_MIN_SIZE
+            )
+        ] ^= 0x01U;
+        boot_slot_selection_options_t options = make_selection_options(
+            &flash,
+            &verify_context,
+            image_buffer,
+            selection_fault_hook,
+            &fault
+        );
+        expect_selection_status(
+            "reject-invalid injection still falls back",
+            BOOT_SLOT_SELECTION_OK,
+            boot_slot_selection_select(&options, &selection)
+        );
+        expect_u32("reject injection fallback", BOOT_SLOT_SELECTION_DECISION_FALLBACK, selection.decision);
+        expect_u32("reject injection selected active", active->id, selection.selected_slot);
+        expect_metadata_status(
+            "ready survives reject injection",
+            BOOT_METADATA_OK,
+            boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+        );
+        expect_metadata_record(
+            "ready after reject injection",
+            &recovered,
+            3U,
+            BOOT_METADATA_STATE_CANDIDATE_READY,
+            BOOT_SLOT_A,
+            BOOT_SLOT_B,
+            3U
+        );
+    }
+}
+
+static void test_confirmation_rejects_wrong_slot_and_commit_failure(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    boot_confirm_result_t confirmation;
+    boot_metadata_record_t recovered;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_pending_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U,
+        BOOT_METADATA_MAX_BOOT_ATTEMPTS - 1UL
+    );
+
+    expect_confirm_status(
+        "cannot confirm another slot",
+        BOOT_CONFIRM_ERR_NOT_PENDING,
+        boot_confirm_current_slot(&flash, BOOT_SLOT_A, &confirmation)
+    );
+
+    simulated_flash_fail_before_program_address(
+        &sim,
+        STM32F429_BOOT_METADATA_A_BASE + TEST_METADATA_COMMIT_OFFSET
+    );
+    expect_confirm_status(
+        "confirmation commit failure reported",
+        BOOT_CONFIRM_ERR_COMMIT,
+        boot_confirm_current_slot(&flash, BOOT_SLOT_B, &confirmation)
+    );
+    expect_metadata_status(
+        "recover pending after confirmation commit failure",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "pending survives confirmation commit failure",
+        &recovered,
+        4U,
+        BOOT_METADATA_STATE_PENDING_TRIAL,
+        BOOT_SLOT_A,
+        BOOT_SLOT_B,
+        3U
+    );
+    (void)active;
+    (void)candidate;
+}
+
 int main(void)
 {
     init_update_keys();
@@ -2668,6 +3756,15 @@ int main(void)
     test_update_installer_detects_post_program_corruption();
     test_update_installer_detects_final_hash_mismatch();
     test_update_installer_detects_verifier_failure_after_programming();
+
+    test_slot_selection_successful_upgrade_and_confirmation();
+    test_slot_selection_missing_confirmation_exhausts_attempts();
+    test_slot_selection_invalid_candidate_falls_back();
+    test_slot_selection_recovers_torn_metadata_copy();
+    test_slot_selection_rejects_ambiguous_or_invalid_metadata();
+    test_slot_selection_power_loss_before_attempt_commit_falls_back();
+    test_slot_selection_logical_failure_injection();
+    test_confirmation_rejects_wrong_slot_and_commit_failure();
 
     if (failures != 0) {
         printf("update storage tests failed: %d\n", failures);

@@ -20,7 +20,9 @@ SOURCES := \
 	$(BOOTLOADER)/src/boot_flash.c \
 	$(BOOTLOADER)/src/boot_flash_target.c \
 	$(BOOTLOADER)/src/boot_metadata.c \
+	$(BOOTLOADER)/src/boot_confirmation.c \
 	$(BOOTLOADER)/src/boot_slot.c \
+	$(BOOTLOADER)/src/boot_slot_selection.c \
 	$(BOOTLOADER)/src/signed_image.c \
 	$(BOOTLOADER)/src/update_installer.c \
 	$(BOOTLOADER)/src/update_package.c \
@@ -55,7 +57,13 @@ $(BUILD)/boot_flash_target.o: $(BOOTLOADER)/src/boot_flash_target.c | $(BUILD)
 $(BUILD)/boot_metadata.o: $(BOOTLOADER)/src/boot_metadata.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD)/boot_confirmation.o: $(BOOTLOADER)/src/boot_confirmation.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD)/boot_slot.o: $(BOOTLOADER)/src/boot_slot.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/boot_slot_selection.o: $(BOOTLOADER)/src/boot_slot_selection.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/signed_image.o: $(BOOTLOADER)/src/signed_image.c | $(BUILD)
