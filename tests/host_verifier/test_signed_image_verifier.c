@@ -234,6 +234,12 @@ static void test_enum_values_are_stable(void)
     expect_int("VERIFY_BAD_FLAGS", 10, (int)VERIFY_BAD_FLAGS);
     expect_int("VERIFY_BAD_RESERVED", 11, (int)VERIFY_BAD_RESERVED);
     expect_int("VERIFY_BAD_PAYLOAD_RANGE", 12, (int)VERIFY_BAD_PAYLOAD_RANGE);
+    expect_int(
+        "VERIFY_BAD_TARGET_COMPATIBILITY",
+        13,
+        (int)VERIFY_BAD_TARGET_COMPATIBILITY
+    );
+    expect_int("VERIFY_BAD_IMAGE_TYPE", 14, (int)VERIFY_BAD_IMAGE_TYPE);
 }
 
 static void test_boot_slot_descriptors(void)
@@ -871,6 +877,142 @@ static void test_rollback_rejection(void)
     );
 }
 
+static void test_update_package_slot_b_verification(void)
+{
+    const boot_slot_descriptor_t *slot_b = NULL;
+    const boot_slot_descriptor_t *slot_a = NULL;
+
+    expect_int(
+        "slot B for update package",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(BOOT_SLOT_B, &slot_b)
+    );
+    expect_int(
+        "slot A for update package mismatch",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(BOOT_SLOT_A, &slot_a)
+    );
+
+    build_image_with_vector_address(
+        MIN_IMAGE_VERSION + 1UL,
+        STM32F429_SLOT_B_PAYLOAD_BASE,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        STM32F429_SLOT_B_PAYLOAD_BASE | 1UL,
+        0U,
+        UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1,
+        UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION
+    );
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, header_version)],
+        UPDATE_PACKAGE_FORMAT_VERSION
+    );
+    crypto_ed25519_sign(signature, secret_key, manifest, SIGNED_MANIFEST_SIZE);
+
+    expect_status(
+        "update package slot B",
+        VERIFY_OK,
+        signed_image_verify_update_slot_buffer(
+            manifest,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key,
+            slot_b
+        )
+    );
+    expect_status(
+        "v2 package rejected by legacy verifier",
+        VERIFY_BAD_HEADER_VERSION,
+        signed_image_verify_buffer(
+            manifest,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key
+        )
+    );
+    expect_status(
+        "slot B package rejected for slot A",
+        VERIFY_BAD_VECTOR_ADDRESS,
+        signed_image_verify_update_slot_buffer(
+            manifest,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key,
+            slot_a
+        )
+    );
+}
+
+static void test_update_package_rejects_bad_authenticated_fields(void)
+{
+    const boot_slot_descriptor_t *slot_b = NULL;
+
+    expect_int(
+        "slot B for bad authenticated fields",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(BOOT_SLOT_B, &slot_b)
+    );
+
+    build_image_with_vector_address(
+        MIN_IMAGE_VERSION + 1UL,
+        STM32F429_SLOT_B_PAYLOAD_BASE,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        STM32F429_SLOT_B_PAYLOAD_BASE | 1UL,
+        0U,
+        UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1 + 1UL,
+        UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION
+    );
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, header_version)],
+        UPDATE_PACKAGE_FORMAT_VERSION
+    );
+    crypto_ed25519_sign(signature, secret_key, manifest, SIGNED_MANIFEST_SIZE);
+    expect_status(
+        "bad update target compatibility",
+        VERIFY_BAD_TARGET_COMPATIBILITY,
+        signed_image_verify_update_slot_buffer(
+            manifest,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key,
+            slot_b
+        )
+    );
+
+    build_image_with_vector_address(
+        MIN_IMAGE_VERSION + 1UL,
+        STM32F429_SLOT_B_PAYLOAD_BASE,
+        TEST_PAYLOAD_SIZE,
+        APPLICATION_MSP_END,
+        STM32F429_SLOT_B_PAYLOAD_BASE | 1UL,
+        0U,
+        UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1,
+        UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION + 1UL
+    );
+    store_le32(
+        &manifest[offsetof(signed_manifest_t, header_version)],
+        UPDATE_PACKAGE_FORMAT_VERSION
+    );
+    crypto_ed25519_sign(signature, secret_key, manifest, SIGNED_MANIFEST_SIZE);
+    expect_status(
+        "bad update image type",
+        VERIFY_BAD_IMAGE_TYPE,
+        signed_image_verify_update_slot_buffer(
+            manifest,
+            signature,
+            payload,
+            TEST_PAYLOAD_SIZE,
+            public_key,
+            slot_b
+        )
+    );
+}
+
 int main(void)
 {
     init_keys();
@@ -906,6 +1048,8 @@ int main(void)
     test_noncanonical_reserved_fields();
     test_noncanonical_reserved1();
     test_rollback_rejection();
+    test_update_package_slot_b_verification();
+    test_update_package_rejects_bad_authenticated_fields();
 
     if (failures != 0) {
         printf("host verifier tests failed: %d\n", failures);

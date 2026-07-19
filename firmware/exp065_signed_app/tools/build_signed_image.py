@@ -21,6 +21,9 @@ from stm32f429_layout import LAYOUT  # noqa: E402
 
 SIGNED_IMAGE_MAGIC = 0x31474953
 SIGNED_HEADER_VERSION = 1
+UPDATE_PACKAGE_FORMAT_VERSION = 2
+UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1 = 0xF429AB01
+UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION = 1
 IMAGE_VERSION = 2
 
 SIGNED_IMAGE_BASE = LAYOUT["signed_image_base"]
@@ -74,35 +77,65 @@ def validate_seed(seed: bytes) -> None:
         raise SigningError(f"Ed25519 seed must contain 32 bytes, got {len(seed)}")
 
 
-def validate_payload_size(application_size: int) -> int:
+def slot_layout(slot: str) -> dict[str, int]:
+    normalized = slot.lower()
+    if normalized not in ("a", "b"):
+        raise SigningError(f"Unknown slot '{slot}'")
+    return LAYOUT[f"slot_{normalized}"]
+
+
+def validate_payload_size(
+    application_size: int,
+    *,
+    vector_address: int = APPLICATION_BASE,
+    flash_end: int = APPLICATION_FLASH_END,
+    max_payload_size: int = MAX_PAYLOAD_SIZE,
+) -> int:
     require_u32(application_size, "Application size")
+    require_u32(vector_address, "Application vector address")
+    require_u32(flash_end, "Application flash end")
+    require_u32(max_payload_size, "Application maximum payload size")
+
+    if vector_address >= flash_end:
+        raise SigningError("Application vector address is outside the slot")
 
     if application_size < APPLICATION_MIN_SIZE:
         raise SigningError("Application is too small to contain a vector table")
 
-    if application_size > MAX_PAYLOAD_SIZE:
+    if application_size > max_payload_size:
         raise SigningError(
             "Application exceeds bootloader-supported application region: "
-            f"{application_size} bytes > {MAX_PAYLOAD_SIZE} bytes"
+            f"{application_size} bytes > {max_payload_size} bytes"
         )
 
     payload_end = checked_u32_add(
-        APPLICATION_BASE,
+        vector_address,
         application_size,
         "Application address range",
     )
 
-    if payload_end > APPLICATION_FLASH_END:
+    if payload_end > flash_end:
         raise SigningError(
             "Application extends beyond supported flash region: "
-            f"0x{payload_end:08X} > 0x{APPLICATION_FLASH_END:08X}"
+            f"0x{payload_end:08X} > 0x{flash_end:08X}"
         )
 
     return payload_end
 
 
-def validate_vector_table(application: bytes) -> tuple[int, int]:
-    payload_end = validate_payload_size(len(application))
+def validate_vector_table(
+    application: bytes,
+    *,
+    vector_address: int = APPLICATION_BASE,
+    flash_end: int = APPLICATION_FLASH_END,
+    max_payload_size: int = MAX_PAYLOAD_SIZE,
+) -> tuple[int, int]:
+    payload_end = validate_payload_size(
+        len(application),
+        vector_address=vector_address,
+        flash_end=flash_end,
+        max_payload_size=max_payload_size,
+    )
     initial_msp, reset_vector = struct.unpack_from("<II", application, 0)
 
     if not (APPLICATION_MSP_BASE < initial_msp <= APPLICATION_MSP_END):
@@ -124,7 +157,7 @@ def validate_vector_table(application: bytes) -> tuple[int, int]:
 
     reset_address = reset_vector & ~1
 
-    if not (APPLICATION_BASE <= reset_address < payload_end):
+    if not (vector_address <= reset_address < payload_end):
         raise SigningError(
             "Reset vector is outside application payload: "
             f"0x{reset_vector:08X}"
@@ -142,6 +175,8 @@ def build_manifest(
     flags: int = 0,
     reserved0: int = 0,
     reserved1: int = 0,
+    vector_address: int = APPLICATION_BASE,
+    update_package: bool = False,
 ) -> bytes:
     require_u32(header_version, "Header version")
     require_u32(image_version, "Image version")
@@ -149,11 +184,17 @@ def build_manifest(
     require_u32(flags, "Manifest flags")
     require_u32(reserved0, "Reserved field 0")
     require_u32(reserved1, "Reserved field 1")
+    require_u32(vector_address, "Application vector address")
 
-    if header_version != SIGNED_HEADER_VERSION:
+    expected_header_version = (
+        UPDATE_PACKAGE_FORMAT_VERSION
+        if update_package
+        else SIGNED_HEADER_VERSION
+    )
+    if header_version != expected_header_version:
         raise SigningError(
             "Unsupported signed-image header version: "
-            f"{header_version} (expected {SIGNED_HEADER_VERSION})"
+            f"{header_version} (expected {expected_header_version})"
         )
 
     unsupported_flags = flags & ~SIGNED_IMAGE_FLAGS_ALLOWED_MASK
@@ -163,7 +204,12 @@ def build_manifest(
             f"0x{unsupported_flags:08X}"
         )
 
-    if reserved0 != 0 or reserved1 != 0:
+    if update_package:
+        if reserved0 != UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1:
+            raise SigningError("Update package target compatibility is invalid")
+        if reserved1 != UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION:
+            raise SigningError("Update package image type is invalid")
+    elif reserved0 != 0 or reserved1 != 0:
         raise SigningError("Reserved manifest fields must be zero")
 
     if len(payload_hash) != 64:
@@ -175,7 +221,7 @@ def build_manifest(
         SIGNED_IMAGE_MAGIC,
         header_version,
         image_version,
-        APPLICATION_BASE,
+        vector_address,
         image_size,
         flags,
         reserved0,
@@ -198,9 +244,18 @@ def build_signed_image(
     flags: int = 0,
     reserved0: int = 0,
     reserved1: int = 0,
+    vector_address: int = APPLICATION_BASE,
+    flash_end: int = APPLICATION_FLASH_END,
+    max_payload_size: int = MAX_PAYLOAD_SIZE,
+    update_package: bool = False,
 ) -> tuple[bytes, bytes, int, int]:
     validate_seed(seed)
-    initial_msp, reset_vector = validate_vector_table(application)
+    initial_msp, reset_vector = validate_vector_table(
+        application,
+        vector_address=vector_address,
+        flash_end=flash_end,
+        max_payload_size=max_payload_size,
+    )
     payload_hash = hashlib.sha512(application).digest()
     manifest = build_manifest(
         image_version=image_version,
@@ -210,6 +265,8 @@ def build_signed_image(
         flags=flags,
         reserved0=reserved0,
         reserved1=reserved1,
+        vector_address=vector_address,
+        update_package=update_package,
     )
 
     signing_key = SigningKey(seed)
@@ -231,6 +288,28 @@ def build_signed_image(
     )
 
     return combined_image, payload_hash, initial_msp, reset_vector
+
+
+def build_update_package(
+    application: bytes,
+    seed: bytes,
+    *,
+    slot: str,
+    image_version: int = IMAGE_VERSION,
+) -> tuple[bytes, bytes, int, int]:
+    target_slot = slot_layout(slot)
+    return build_signed_image(
+        application,
+        seed,
+        image_version=image_version,
+        header_version=UPDATE_PACKAGE_FORMAT_VERSION,
+        reserved0=UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1,
+        reserved1=UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION,
+        vector_address=target_slot["payload_base"],
+        flash_end=target_slot["end"],
+        max_payload_size=target_slot["payload_max_size"],
+        update_package=True,
+    )
 
 
 def write_output_atomically(path: Path, data: bytes) -> None:

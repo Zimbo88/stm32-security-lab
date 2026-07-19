@@ -32,15 +32,18 @@ def make_application(
     *,
     msp: int | None = None,
     reset_vector: int | None = None,
+    vector_base: int | None = None,
 ) -> bytes:
     if size < 8:
         return b"\x00" * size
 
     image = bytearray(b"\x00" * size)
+    if vector_base is None:
+        vector_base = signer.APPLICATION_BASE
     if msp is None:
         msp = signer.APPLICATION_MSP_END
     if reset_vector is None:
-        reset_vector = signer.APPLICATION_BASE | 1
+        reset_vector = vector_base | 1
 
     struct.pack_into("<II", image, 0, msp, reset_vector)
     return bytes(image)
@@ -152,6 +155,34 @@ class SignedImageToolTests(unittest.TestCase):
             "Reserved manifest fields must be zero",
         ):
             signer.build_signed_image(image, SEED, reserved0=1)
+
+    def test_update_package_binds_slot_and_target_metadata(self) -> None:
+        slot_b = signer.LAYOUT["slot_b"]
+        image = make_application(vector_base=slot_b["payload_base"])
+        package, _, _, reset_vector = signer.build_update_package(
+            image,
+            SEED,
+            slot="b",
+            image_version=signer.IMAGE_VERSION + 1,
+        )
+
+        manifest = package[:signer.MANIFEST_SIZE]
+        unpacked = signer.MANIFEST_STRUCT.unpack(manifest)
+        self.assertEqual(unpacked[1], signer.UPDATE_PACKAGE_FORMAT_VERSION)
+        self.assertEqual(unpacked[2], signer.IMAGE_VERSION + 1)
+        self.assertEqual(unpacked[3], slot_b["payload_base"])
+        self.assertEqual(unpacked[6], signer.UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1)
+        self.assertEqual(unpacked[7], signer.UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION)
+        self.assertEqual(reset_vector, slot_b["payload_base"] | 1)
+
+    def test_update_package_rejects_payload_linked_for_wrong_slot(self) -> None:
+        image = make_application(vector_base=signer.APPLICATION_BASE)
+
+        with self.assertRaisesRegex(
+            signer.SigningError,
+            "Reset vector is outside application payload",
+        ):
+            signer.build_update_package(image, SEED, slot="b")
 
     def test_truncated_application_is_rejected(self) -> None:
         with self.assertRaisesRegex(

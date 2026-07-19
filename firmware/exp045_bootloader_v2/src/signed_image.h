@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "boot_slot.h"
 #include "flash_layout.h"
 #include "image_policy.h"
 
@@ -34,7 +35,9 @@ typedef enum {
     VERIFY_BAD_SIGNATURE,
     VERIFY_BAD_FLAGS,
     VERIFY_BAD_RESERVED,
-    VERIFY_BAD_PAYLOAD_RANGE
+    VERIFY_BAD_PAYLOAD_RANGE,
+    VERIFY_BAD_TARGET_COMPATIBILITY,
+    VERIFY_BAD_IMAGE_TYPE
 } verify_status_t;
 
 typedef struct {
@@ -52,6 +55,18 @@ verify_status_t signed_image_verify_buffer(
     const uint8_t *payload,
     size_t payload_capacity,
     const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE]
+);
+verify_status_t signed_image_decode_manifest(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    signed_manifest_t *manifest
+);
+verify_status_t signed_image_verify_update_slot_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t signature_bytes[SIGNED_SIGNATURE_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
+    const boot_slot_descriptor_t *slot
 );
 verify_status_t signed_image_verify(void);
 verify_status_t signed_image_prepare_jump(signed_image_jump_context_t *context);

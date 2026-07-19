@@ -23,6 +23,9 @@ from stm32f429_layout import LAYOUT  # noqa: E402
 
 SIGNED_IMAGE_MAGIC = 0x31474953
 SIGNED_HEADER_VERSION = 1
+UPDATE_PACKAGE_FORMAT_VERSION = 2
+UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1 = 0xF429AB01
+UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION = 1
 MIN_IMAGE_VERSION = 2
 MANIFEST_STRUCT = struct.Struct("<8I64s")
 
@@ -157,7 +160,13 @@ def decode_manifest(manifest: bytes) -> dict[str, Any]:
     }
 
 
-def validate_vector_table(payload: bytes, payload_end: int) -> dict[str, int]:
+def validate_vector_table(
+    payload: bytes,
+    payload_end: int,
+    *,
+    vector_address: int,
+    flash_end: int,
+) -> dict[str, int]:
     if len(payload) < LAYOUT["application_min_payload_size"]:
         raise VerificationError("payload is too small for vector table")
 
@@ -174,7 +183,10 @@ def validate_vector_table(payload: bytes, payload_end: int) -> dict[str, int]:
     if (reset_vector & 1) == 0:
         raise VerificationError(f"reset vector does not set Thumb bit: 0x{reset_vector:08X}")
 
-    if not (LAYOUT["application_base"] <= reset_address < payload_end):
+    if reset_address >= flash_end:
+        raise VerificationError(f"reset vector outside slot flash: 0x{reset_vector:08X}")
+
+    if not (vector_address <= reset_address < payload_end):
         raise VerificationError(f"reset vector outside payload: 0x{reset_vector:08X}")
 
     return {
@@ -189,10 +201,27 @@ def verify_signed_image(
     public_key: bytes,
     *,
     application: bytes | None = None,
+    update_package: bool = False,
+    slot: str | None = None,
 ) -> dict[str, Any]:
     manifest_size = LAYOUT["signed_manifest_size"]
     signature_size = LAYOUT["signed_signature_size"]
     header_size = LAYOUT["signed_image_header_size"]
+    if update_package:
+        if slot not in ("a", "b"):
+            raise VerificationError("update package verification requires slot 'a' or 'b'")
+        slot_layout = LAYOUT[f"slot_{slot}"]
+        expected_header_version = UPDATE_PACKAGE_FORMAT_VERSION
+        vector_address = slot_layout["payload_base"]
+        flash_end = slot_layout["end"]
+        max_payload_size = slot_layout["payload_max_size"]
+    else:
+        if slot is not None:
+            raise VerificationError("slot is only valid for update package verification")
+        expected_header_version = SIGNED_HEADER_VERSION
+        vector_address = LAYOUT["application_base"]
+        flash_end = LAYOUT["application_flash_end"]
+        max_payload_size = LAYOUT["application_payload_max_size"]
 
     if len(signed_image) < header_size + LAYOUT["application_min_payload_size"]:
         raise VerificationError("signed image is too small")
@@ -205,19 +234,24 @@ def verify_signed_image(
 
     if manifest["magic"] != SIGNED_IMAGE_MAGIC:
         raise VerificationError("bad signed-image magic")
-    if manifest["header_version"] != SIGNED_HEADER_VERSION:
+    if manifest["header_version"] != expected_header_version:
         raise VerificationError("unsupported manifest header version")
     if manifest["image_version"] < MIN_IMAGE_VERSION:
         raise VerificationError("image version is below rollback floor")
     if manifest["flags"] & ~LAYOUT["signed_image_flags_allowed_mask"]:
         raise VerificationError("unsupported manifest flags")
-    if manifest["reserved0"] != 0 or manifest["reserved1"] != 0:
+    if update_package:
+        if manifest["reserved0"] != UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1:
+            raise VerificationError("update package target compatibility is invalid")
+        if manifest["reserved1"] != UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION:
+            raise VerificationError("update package image type is invalid")
+    elif manifest["reserved0"] != 0 or manifest["reserved1"] != 0:
         raise VerificationError("reserved manifest fields must be zero")
-    if manifest["vector_address"] != LAYOUT["application_base"]:
+    if manifest["vector_address"] != vector_address:
         raise VerificationError("manifest vector address does not match application base")
     if manifest["image_size"] < LAYOUT["application_min_payload_size"]:
         raise VerificationError("payload size is below minimum")
-    if manifest["image_size"] > LAYOUT["application_payload_max_size"]:
+    if manifest["image_size"] > max_payload_size:
         raise VerificationError("payload size exceeds application region")
     if len(payload) != manifest["image_size"]:
         raise VerificationError("signed image length does not match manifest payload size")
@@ -225,7 +259,7 @@ def verify_signed_image(
         raise VerificationError("signed-image padding is not canonical 0xff")
 
     payload_end = manifest["vector_address"] + manifest["image_size"]
-    if payload_end > LAYOUT["application_flash_end"]:
+    if payload_end > flash_end:
         raise VerificationError("payload extends beyond supported application flash")
 
     if application is not None and payload != application:
@@ -240,7 +274,12 @@ def verify_signed_image(
     except BadSignatureError as exc:
         raise VerificationError("Ed25519 signature verification failed") from exc
 
-    vector = validate_vector_table(payload, payload_end)
+    vector = validate_vector_table(
+        payload,
+        payload_end,
+        vector_address=vector_address,
+        flash_end=flash_end,
+    )
 
     return {
         "manifest": manifest,

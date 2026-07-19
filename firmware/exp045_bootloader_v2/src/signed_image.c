@@ -116,6 +116,17 @@ typedef struct {
     uint32_t reset_address;
 } application_vector_t;
 
+typedef struct {
+    uint32_t header_version;
+    uint32_t vector_address;
+    uint32_t payload_flash_end;
+    uint32_t maximum_payload_size;
+    uint32_t allowed_flags_mask;
+    uint32_t target_compatibility;
+    uint32_t image_type;
+    uint8_t require_update_fields;
+} signed_image_validation_policy_t;
+
 #ifndef SIGNED_IMAGE_HOST_TEST
 static const uint8_t *signature(void)
 {
@@ -136,7 +147,7 @@ static uint32_t load_le32(const uint8_t bytes[4])
            (((uint32_t)bytes[3]) << 24);
 }
 
-static void decode_manifest(
+static void decode_manifest_bytes(
     const uint8_t bytes[SIGNED_MANIFEST_SIZE],
     signed_manifest_t *m
 )
@@ -159,6 +170,19 @@ static void decode_manifest(
     }
 }
 
+verify_status_t signed_image_decode_manifest(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    signed_manifest_t *manifest
+)
+{
+    if ((manifest_bytes == NULL) || (manifest == NULL)) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    decode_manifest_bytes(manifest_bytes, manifest);
+    return VERIFY_OK;
+}
+
 static uint8_t checked_u32_add(uint32_t left, uint32_t right, uint32_t *out)
 {
     if (right > (UINT32_MAX - left)) {
@@ -169,29 +193,42 @@ static uint8_t checked_u32_add(uint32_t left, uint32_t right, uint32_t *out)
     return 1U;
 }
 
-static verify_status_t validate_manifest_header(const signed_manifest_t *m)
+static verify_status_t validate_manifest_header(
+    const signed_manifest_t *m,
+    const signed_image_validation_policy_t *policy
+)
 {
-    if (sizeof(signed_manifest_t) != SIGNED_MANIFEST_SIZE) {
-        return VERIFY_BAD_HEADER_VERSION;
+    if ((m == NULL) || (policy == NULL)) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
     if (u32_equal_redundant(m->magic, SIGNED_IMAGE_MAGIC) == 0U) {
         return VERIFY_BAD_MAGIC;
     }
 
-    if (u32_equal_redundant(m->header_version, SIGNED_HEADER_VERSION) == 0U) {
+    if (u32_equal_redundant(m->header_version, policy->header_version) == 0U) {
         return VERIFY_BAD_HEADER_VERSION;
     }
 
     const uint32_t unsupported_flags =
-        m->flags & ~((uint32_t)SIGNED_IMAGE_FLAGS_ALLOWED_MASK);
+        m->flags & ~(policy->allowed_flags_mask);
 
     if (unsupported_flags != 0UL) {
         return VERIFY_BAD_FLAGS;
     }
 
-    if ((m->reserved0 != 0UL) || (m->reserved1 != 0UL)) {
-        return VERIFY_BAD_RESERVED;
+    if (policy->require_update_fields != 0U) {
+        if (m->reserved0 != policy->target_compatibility) {
+            return VERIFY_BAD_TARGET_COMPATIBILITY;
+        }
+
+        if (m->reserved1 != policy->image_type) {
+            return VERIFY_BAD_IMAGE_TYPE;
+        }
+    } else {
+        if ((m->reserved0 != 0UL) || (m->reserved1 != 0UL)) {
+            return VERIFY_BAD_RESERVED;
+        }
     }
 
     if (m->image_version < MIN_IMAGE_VERSION) {
@@ -203,12 +240,17 @@ static verify_status_t validate_manifest_header(const signed_manifest_t *m)
 
 static verify_status_t validate_payload_range(
     const signed_manifest_t *m,
+    const signed_image_validation_policy_t *policy,
     uint32_t *payload_end
 )
 {
+    if ((m == NULL) || (policy == NULL) || (payload_end == NULL)) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
     if (u32_equal_redundant(
             m->vector_address,
-            APPLICATION_BASE_ADDRESS
+            policy->vector_address
         ) == 0U) {
         return VERIFY_BAD_VECTOR_ADDRESS;
     }
@@ -221,11 +263,11 @@ static verify_status_t validate_payload_range(
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
-    if (m->image_size > MAX_PAYLOAD_SIZE) {
+    if (m->image_size > policy->maximum_payload_size) {
         return VERIFY_BAD_SIZE;
     }
 
-    if (*payload_end > APPLICATION_FLASH_END) {
+    if (*payload_end > policy->payload_flash_end) {
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
@@ -234,15 +276,21 @@ static verify_status_t validate_payload_range(
 
 static verify_status_t validate_payload_range_independent(
     const signed_manifest_t *m,
+    const signed_image_validation_policy_t *policy,
     uint32_t payload_end
 )
 {
+    if ((m == NULL) || (policy == NULL) ||
+        (policy->payload_flash_end < policy->vector_address)) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
     const uint32_t application_capacity =
-        APPLICATION_FLASH_END - APPLICATION_BASE_ADDRESS;
+        policy->payload_flash_end - policy->vector_address;
 
     if (u32_equal_redundant(
             m->vector_address,
-            APPLICATION_BASE_ADDRESS
+            policy->vector_address
         ) == 0U) {
         return VERIFY_BAD_VECTOR_ADDRESS;
     }
@@ -255,12 +303,12 @@ static verify_status_t validate_payload_range_independent(
         return VERIFY_BAD_SIZE;
     }
 
-    if ((APPLICATION_FLASH_END - m->vector_address) < m->image_size) {
+    if ((policy->payload_flash_end - m->vector_address) < m->image_size) {
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
     if ((payload_end < m->vector_address) ||
-        (payload_end > APPLICATION_FLASH_END)) {
+        (payload_end > policy->payload_flash_end)) {
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
@@ -286,14 +334,15 @@ static verify_status_t validate_application_reset(
     uint32_t reset_vector,
     uint32_t reset_address,
     uint32_t vector_address,
-    uint32_t payload_end
+    uint32_t payload_end,
+    uint32_t payload_flash_end
 )
 {
     if (((reset_vector & 1UL) == 0U) ||
         ((reset_vector & ~1UL) != reset_address) ||
         (reset_address < vector_address) ||
         (reset_address >= payload_end) ||
-        (reset_address >= APPLICATION_FLASH_END)) {
+        (reset_address >= payload_flash_end)) {
         return VERIFY_BAD_RESET_VECTOR;
     }
 
@@ -314,11 +363,16 @@ static void read_application_vector(
 
 static verify_status_t validate_vector_table(
     const signed_manifest_t *m,
+    const signed_image_validation_policy_t *policy,
     const uint8_t *payload,
     uint32_t payload_end,
     signed_image_jump_context_t *context
 )
 {
+    if ((m == NULL) || (policy == NULL) || (payload == NULL)) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
     application_vector_t vector;
     read_application_vector(payload, &vector);
 
@@ -332,7 +386,8 @@ static verify_status_t validate_vector_table(
         vector.reset_vector,
         vector.reset_address,
         m->vector_address,
-        payload_end
+        payload_end,
+        policy->payload_flash_end
     );
 
     if (status != VERIFY_OK) {
@@ -410,44 +465,47 @@ static verify_status_t validate_jump_context(
         context->reset_vector,
         context->reset_address,
         context->vector_address,
-        context->payload_end
+        context->payload_end,
+        APPLICATION_FLASH_END
     );
 
     return status;
 }
 
-verify_status_t signed_image_verify_buffer(
+static verify_status_t signed_image_verify_buffer_with_policy(
     const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
     const uint8_t signature_bytes[SIGNED_SIGNATURE_SIZE],
     const uint8_t *payload,
     size_t payload_capacity,
-    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE]
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
+    const signed_image_validation_policy_t *policy
 )
 {
     if ((manifest_bytes == NULL) ||
         (signature_bytes == NULL) ||
         (payload == NULL) ||
-        (public_key == NULL)) {
+        (public_key == NULL) ||
+        (policy == NULL)) {
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
     signed_manifest_t decoded_manifest;
-    decode_manifest(manifest_bytes, &decoded_manifest);
+    decode_manifest_bytes(manifest_bytes, &decoded_manifest);
 
     const signed_manifest_t *m = &decoded_manifest;
     uint32_t payload_end = 0U;
-    verify_status_t status = validate_manifest_header(m);
+    verify_status_t status = validate_manifest_header(m, policy);
 
     if (status != VERIFY_OK) {
         return status;
     }
 
-    status = validate_payload_range(m, &payload_end);
+    status = validate_payload_range(m, policy, &payload_end);
     if (status != VERIFY_OK) {
         return status;
     }
 
-    status = validate_payload_range_independent(m, payload_end);
+    status = validate_payload_range_independent(m, policy, payload_end);
     if (status != VERIFY_OK) {
         return status;
     }
@@ -456,7 +514,7 @@ verify_status_t signed_image_verify_buffer(
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
-    status = validate_vector_table(m, payload, payload_end, NULL);
+    status = validate_vector_table(m, policy, payload, payload_end, NULL);
     if (status != VERIFY_OK) {
         return status;
     }
@@ -499,6 +557,73 @@ verify_status_t signed_image_verify_buffer(
     return VERIFY_OK;
 }
 
+verify_status_t signed_image_verify_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t signature_bytes[SIGNED_SIGNATURE_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE]
+)
+{
+    const signed_image_validation_policy_t policy = {
+        .header_version = SIGNED_HEADER_VERSION,
+        .vector_address = APPLICATION_BASE_ADDRESS,
+        .payload_flash_end = APPLICATION_FLASH_END,
+        .maximum_payload_size = MAX_PAYLOAD_SIZE,
+        .allowed_flags_mask = (uint32_t)SIGNED_IMAGE_FLAGS_ALLOWED_MASK,
+        .target_compatibility = 0UL,
+        .image_type = 0UL,
+        .require_update_fields = 0U,
+    };
+
+    return signed_image_verify_buffer_with_policy(
+        manifest_bytes,
+        signature_bytes,
+        payload,
+        payload_capacity,
+        public_key,
+        &policy
+    );
+}
+
+verify_status_t signed_image_verify_update_slot_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t signature_bytes[SIGNED_SIGNATURE_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
+    const boot_slot_descriptor_t *slot
+)
+{
+    if ((slot == NULL) ||
+        (slot->payload_base <= slot->signed_image_base) ||
+        (slot->payload_base >= slot->slot_end) ||
+        (slot->maximum_payload_size !=
+            (slot->slot_end - slot->payload_base))) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    const signed_image_validation_policy_t policy = {
+        .header_version = UPDATE_PACKAGE_FORMAT_VERSION,
+        .vector_address = slot->payload_base,
+        .payload_flash_end = slot->slot_end,
+        .maximum_payload_size = slot->maximum_payload_size,
+        .allowed_flags_mask = (uint32_t)SIGNED_IMAGE_FLAGS_ALLOWED_MASK,
+        .target_compatibility = UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1,
+        .image_type = UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION,
+        .require_update_fields = 1U,
+    };
+
+    return signed_image_verify_buffer_with_policy(
+        manifest_bytes,
+        signature_bytes,
+        payload,
+        payload_capacity,
+        public_key,
+        &policy
+    );
+}
+
 const char *signed_image_status_text(verify_status_t status)
 {
     switch (status) {
@@ -515,6 +640,9 @@ const char *signed_image_status_text(verify_status_t status)
     case VERIFY_BAD_FLAGS:          return "UNSUPPORTED MANIFEST FLAGS";
     case VERIFY_BAD_RESERVED:       return "NONZERO MANIFEST RESERVED FIELD";
     case VERIFY_BAD_PAYLOAD_RANGE:  return "BAD PAYLOAD RANGE";
+    case VERIFY_BAD_TARGET_COMPATIBILITY:
+        return "BAD TARGET COMPATIBILITY";
+    case VERIFY_BAD_IMAGE_TYPE:     return "BAD IMAGE TYPE";
     default:                        return "UNKNOWN";
     }
 }
@@ -540,21 +668,34 @@ verify_status_t signed_image_prepare_jump(signed_image_jump_context_t *context)
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
-    decode_manifest((const uint8_t *)SIGNED_IMAGE_BASE, &decoded_manifest);
+    decode_manifest_bytes((const uint8_t *)SIGNED_IMAGE_BASE, &decoded_manifest);
 
-    verify_status_t status = validate_manifest_header(&decoded_manifest);
+    const signed_image_validation_policy_t policy = {
+        .header_version = SIGNED_HEADER_VERSION,
+        .vector_address = APPLICATION_BASE_ADDRESS,
+        .payload_flash_end = APPLICATION_FLASH_END,
+        .maximum_payload_size = MAX_PAYLOAD_SIZE,
+        .allowed_flags_mask = (uint32_t)SIGNED_IMAGE_FLAGS_ALLOWED_MASK,
+        .target_compatibility = 0UL,
+        .image_type = 0UL,
+        .require_update_fields = 0U,
+    };
+
+    verify_status_t status =
+        validate_manifest_header(&decoded_manifest, &policy);
 
     if (status != VERIFY_OK) {
         return status;
     }
 
-    status = validate_payload_range(&decoded_manifest, &payload_end);
+    status = validate_payload_range(&decoded_manifest, &policy, &payload_end);
     if (status != VERIFY_OK) {
         return status;
     }
 
     status = validate_payload_range_independent(
         &decoded_manifest,
+        &policy,
         payload_end
     );
     if (status != VERIFY_OK) {
@@ -563,6 +704,7 @@ verify_status_t signed_image_prepare_jump(signed_image_jump_context_t *context)
 
     status = validate_vector_table(
         &decoded_manifest,
+        &policy,
         (const uint8_t *)APPLICATION_BASE_ADDRESS,
         payload_end,
         context
@@ -619,7 +761,8 @@ static verify_status_t confirm_jump_context_matches_flash(
         vector.reset_vector,
         vector.reset_address,
         context->vector_address,
-        context->payload_end
+        context->payload_end,
+        APPLICATION_FLASH_END
     );
 
     return status;
