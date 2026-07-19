@@ -16,10 +16,16 @@ endif
 SOURCES := \
 	test_update_storage.c \
 	simulated_flash.c \
+	../host_verifier/performance_stub.c \
 	$(BOOTLOADER)/src/boot_flash.c \
 	$(BOOTLOADER)/src/boot_flash_target.c \
 	$(BOOTLOADER)/src/boot_metadata.c \
-	$(BOOTLOADER)/src/boot_slot.c
+	$(BOOTLOADER)/src/boot_slot.c \
+	$(BOOTLOADER)/src/signed_image.c \
+	$(BOOTLOADER)/src/update_installer.c \
+	$(BOOTLOADER)/src/update_package.c \
+	$(BOOTLOADER)/src/monocypher.c \
+	$(BOOTLOADER)/src/monocypher-ed25519.c
 
 OBJECTS := $(patsubst %.c,$(BUILD)/%.o,$(notdir $(SOURCES)))
 TARGET := $(BUILD)/update_storage_tests
@@ -37,6 +43,9 @@ $(BUILD)/test_update_storage.o: test_update_storage.c | $(BUILD)
 $(BUILD)/simulated_flash.o: simulated_flash.c simulated_flash.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BUILD)/performance_stub.o: ../host_verifier/performance_stub.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 $(BUILD)/boot_flash.o: $(BOOTLOADER)/src/boot_flash.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -47,6 +56,21 @@ $(BUILD)/boot_metadata.o: $(BOOTLOADER)/src/boot_metadata.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/boot_slot.o: $(BOOTLOADER)/src/boot_slot.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/signed_image.o: $(BOOTLOADER)/src/signed_image.c | $(BUILD)
+	$(CC) $(CFLAGS) -DSIGNED_IMAGE_HOST_TEST -c $< -o $@
+
+$(BUILD)/update_installer.o: $(BOOTLOADER)/src/update_installer.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/update_package.o: $(BOOTLOADER)/src/update_package.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/monocypher.o: $(BOOTLOADER)/src/monocypher.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/monocypher-ed25519.o: $(BOOTLOADER)/src/monocypher-ed25519.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJECTS)
