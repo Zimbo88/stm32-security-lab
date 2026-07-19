@@ -21,11 +21,11 @@ def assert_success(result: subprocess.CompletedProcess[str]) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_update_storage_foundation() -> None:
+def test_update_storage_and_installer() -> None:
     assert_success(run_make("clean", "test"))
 
 
-def test_update_storage_foundation_with_sanitizers_when_supported() -> None:
+def test_update_storage_and_installer_with_sanitizers_when_supported() -> None:
     result = run_make("clean", "test", "SANITIZE=1")
     output = result.stdout + result.stderr
 
