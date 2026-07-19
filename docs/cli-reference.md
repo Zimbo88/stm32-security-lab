@@ -8,6 +8,7 @@ Commands: `help`, `version`, `boot status`, `device info`, `device uid`,
 `device flash-size`, `device option-bytes`, `reset cause`, `clock show`, all
 required `registers` groups, `memory regions`, `log show`, `log clear`,
 `fault show`, `fault clear`, `health status`, `health acknowledge`,
+`confirmation status`, `telemetry show`, `reset decoded`,
 `led status`, `led test healthy|degraded|update|recovery|fault|security`,
 `led test stop`, `easteregg knightrider`, `easteregg retro`, `easteregg stop`,
 `test list`, `test run gpio|button|clock|ram`, `security status`, and
@@ -35,6 +36,16 @@ EXP071 health and Easter egg commands:
 - `easteregg retro` reports audio unavailable unless external audio hardware is
   explicitly added in a future revision.
 - `easteregg stop` stops temporary LED/audio activity.
+
+Pre-hardware diagnostic commands:
+
+- `confirmation status` prints the last health-gated application confirmation
+  result, running slot, confirmed slot, candidate slot, metadata state, and
+  remaining trial attempts.
+- `telemetry show` prints the bounded RAM experiment report. The report is
+  diagnostic only and does not change boot trust decisions.
+- `reset decoded` prints decoded `RCC_CSR` reset flags captured before the
+  firmware clears them for the current boot.
 
 How to trigger the Easter egg at the `rp> ` prompt:
 

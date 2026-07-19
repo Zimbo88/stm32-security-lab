@@ -11,7 +11,9 @@ The release workflow covers:
 - EXP045 Stage-0 bootloader build artifacts
 - EXP065/EXP066 application build artifacts
 - signed-image construction
+- authenticated Slot A/Slot B update-package construction
 - offline signed-image verification
+- offline update-package verification
 - release manifest generation
 - deterministic rebuild comparison
 
@@ -50,6 +52,20 @@ Expected application artifacts:
 - `firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf`
 - `firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin`
 - `firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex`
+
+Build both slot-linked update releases:
+
+```sh
+make -C firmware/exp066_research_platform_core slot-releases \
+  SIGNING_SEED=/path/to/release_signing_seed.bin \
+  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
+```
+
+This produces Slot A and Slot B ELF, BIN, HEX, map, update package, package
+inspection JSON, and offline verification JSON under:
+
+- `firmware/exp066_research_platform_core/build/slot_a`
+- `firmware/exp066_research_platform_core/build/slot_b`
 
 ## Sign Firmware
 
@@ -138,6 +154,8 @@ The release manifest includes:
 `tools/release_artifacts.py verify-signed` verifies only one signed image.
 `tools/release_artifacts.py verify-release` verifies the complete release
 artifact set.
+`tools/update_package.py verify` verifies an authenticated update package for a
+specific slot and target compatibility identifier.
 
 Both commands parse the manifest using explicit little-endian fields, verify
 the payload SHA-512, verify the detached Ed25519 signature over the manifest,
@@ -155,8 +173,9 @@ python3 tools/check_deterministic_build.py
 
 The deterministic check exports `HEAD` into two temporary source trees, builds
 EXP045, EXP065, and EXP066, signs deterministic test images with a non-secret
-test seed, generates release manifests, and compares the resulting ELF, BIN,
-HEX, signed image, and release JSON hashes.
+test seed, generates release manifests and Slot A/Slot B update packages, and
+compares the resulting ELF, BIN, HEX, signed image, update package, and release
+JSON hashes.
 
 CI uses the same deterministic test seed only for reproducibility checks. It is
 not a production signing key and is not a release trust anchor.
@@ -168,7 +187,6 @@ does not provide:
 
 - firmware update transport
 - physical recovery
-- A/B slots
 - hardware-backed rollback counters
 - option-byte provisioning
 - RDP or WRP configuration

@@ -1,8 +1,10 @@
 # EXP066 Research Platform Core
 
-EXP066 is a bounded Stage-1 application linked at `0x08008200` and signed by
-the existing EXP065 envelope. It uses direct STM32F429 register access,
-static buffers, and no heap. It is intended to be launched by verified Stage 0.
+EXP066 is a bounded Stage-1 application that can be linked for Slot A
+(`0x08020200`) or Slot B (`0x08100200`) and signed either as a legacy signed
+image or as an authenticated update package. It uses direct STM32F429 register
+access, static buffers, and no heap. It is intended to be launched by verified
+Stage 0.
 
 Build:
 
@@ -10,17 +12,21 @@ Build:
 make -C firmware/exp066_research_platform_core clean all
 make -C firmware/exp066_research_platform_core signed \
   SIGNING_SEED=/path/to/development_or_release_seed.bin
+make -C firmware/exp066_research_platform_core slot-releases \
+  SIGNING_SEED=/path/to/development_or_release_seed.bin \
+  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
 
 The signing seed must be supplied explicitly. No hardware flashing is performed
 by the build.
 
 The current implementation includes UART command dispatch, device identity,
-curated read-only diagnostics, a RAM log, retained fault record, reset/fault
-health policy, non-blocking LED health indication, bounded LED test commands,
-and a module-manager placeholder. Register groups that could require changing
-clock state are reported unavailable. Module execution, Flash installation,
-arbitrary memory access, option-byte changes, and RDP activation are absent.
+curated read-only diagnostics, RAM-only experiment telemetry, a RAM log,
+retained fault record, reset/fault health policy, non-blocking LED health
+indication, bounded LED test commands, a health-gated application confirmation
+service, and a module-manager placeholder. Register groups that could require
+changing clock state are reported unavailable. Module execution, arbitrary
+memory access, option-byte changes, and RDP activation are absent.
 
 EXP071 adds health commands (`health status`, `health acknowledge`), LED status
 and bounded test commands, and the bounded LED-only `easteregg knightrider`
@@ -31,10 +37,21 @@ Hardware procedure: connect USART1 (PA9/PA10, 115200 8-N-1), manually flash the
 signed image only after independent review, reset, and exercise commands from
 `docs/cli-reference.md`. Build and signing do not prove hardware behavior.
 
+## Confirmation Gate
+
+EXP066 does not confirm itself at reset. After the application reaches a stable
+idle point, the confirmation service calls the existing Stage-0
+`boot_confirm_current_slot` API only if early initialization completed, the
+running slot was identified from VTOR, core self-checks passed, no critical
+initialization failure was recorded, and metadata shows the running image is the
+pending candidate or is already confirmed. The service attempts confirmation
+once and reports the result through `confirmation status` and `telemetry show`.
+
 ## Cortex-M4 Vector Table
 
-EXP066 is linked so `.isr_vector` starts at `0x08008200`, the address expected
-by EXP045. The core exception vectors are ordered as:
+EXP066 is linked so `.isr_vector` starts at the selected slot payload base:
+`0x08020200` for Slot A and `0x08100200` for Slot B. The core exception vectors
+are ordered as:
 
 | Index | Handler |
 |---:|---|
