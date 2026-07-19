@@ -81,6 +81,62 @@ def test_valid_unchanged_reference(tmp_path: Path) -> None:
     assert data["changed_region_count"] == 0
 
 
+def test_reference_snapshots_match_and_detect_changes(tmp_path: Path) -> None:
+    reference_dump = write_flash(tmp_path / "flash.bin", flash_image())
+    reference = tmp_path / "reference.json"
+    report = tmp_path / "compare.json"
+
+    result = run_tool(
+        "create-reference",
+        "--flash-dump",
+        str(reference_dump),
+        "--option-snapshot",
+        "FLASH_OPTCR=0x0FFFAAED",
+        "--boot-register-snapshot",
+        "RCC_CSR=0x0C000000",
+        "--json-output",
+        str(reference),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    data = load(reference)
+    assert data["option_byte_snapshot"]["FLASH_OPTCR"] == 0x0FFFAAED
+    assert data["boot_state_register_snapshot"]["RCC_CSR"] == 0x0C000000
+
+    result = run_tool(
+        "compare",
+        "--reference",
+        str(reference),
+        "--flash-dump",
+        str(reference_dump),
+        "--option-snapshot",
+        "FLASH_OPTCR=0x0FFFAAED",
+        "--boot-register-snapshot",
+        "RCC_CSR=0x0C000000",
+        "--json-output",
+        str(report),
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    result = run_tool(
+        "compare",
+        "--reference",
+        str(reference),
+        "--flash-dump",
+        str(reference_dump),
+        "--option-snapshot",
+        "FLASH_OPTCR=0x0FFFAAEC",
+        "--boot-register-snapshot",
+        "RCC_CSR=0x0C000000",
+        "--json-output",
+        str(report),
+    )
+    assert result.returncode == 1
+    change = load(report)["snapshot_changes"][0]
+    assert change["kind"] == "option_byte_snapshot"
+    assert change["status"] == "modified"
+    assert change["xor_delta"] == 1
+
+
 def test_one_changed_byte_and_bit_transition_counts(tmp_path: Path) -> None:
     original = flash_image()
     modified = bytearray(original)
@@ -248,6 +304,19 @@ def test_malformed_reference_duplicate_overlap_and_address_overflow(tmp_path: Pa
         str(report),
     ).returncode == 1
     assert "overflows" in load(report)["error"]
+
+    assert run_tool(
+        "create-reference",
+        "--flash-dump",
+        str(dump),
+        "--option-snapshot",
+        "FLASH_OPTCR=1",
+        "--option-snapshot",
+        "FLASH_OPTCR=2",
+        "--json-output",
+        str(report),
+    ).returncode == 1
+    assert "duplicate option-byte snapshot" in load(report)["error"]
 
 
 def test_bounded_difference_output(tmp_path: Path) -> None:

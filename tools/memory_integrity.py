@@ -178,6 +178,23 @@ def parse_region_spec(spec: str, *, pattern_allowed: bool) -> Region:
     return Region(name, start, end, "laboratory_canary", pattern, seed)
 
 
+def parse_snapshot_specs(specs: list[str], label: str) -> dict[str, int]:
+    snapshots: dict[str, int] = {}
+    for spec in specs:
+        if "=" not in spec:
+            raise IntegrityError(f"{label} must use NAME=VALUE")
+        name, raw_value = spec.split("=", 1)
+        if not name or any(ch.isspace() for ch in name):
+            raise IntegrityError(f"{label} name must be nonempty and contain no whitespace")
+        if name in snapshots:
+            raise IntegrityError(f"duplicate {label}: {name}")
+        value = int(raw_value, 0)
+        if not (0 <= value <= 0xFFFFFFFF):
+            raise IntegrityError(f"{label} value must fit uint32: {name}")
+        snapshots[name] = value
+    return snapshots
+
+
 def ranges_overlap(left: Region, right: Region) -> bool:
     return left.start < right.end and right.start < left.end
 
@@ -197,6 +214,16 @@ def validate_regions(regions: list[Region]) -> None:
         for right in regions[index + 1 :]:
             if ranges_overlap(left, right):
                 raise IntegrityError(f"overlapping regions: {left.name} and {right.name}")
+
+
+def validate_snapshot_map(snapshot: object, label: str) -> None:
+    if not isinstance(snapshot, dict):
+        raise IntegrityError(f"{label} must be an object")
+    for name, value in snapshot.items():
+        if not isinstance(name, str) or not name or any(ch.isspace() for ch in name):
+            raise IntegrityError(f"malformed {label} name")
+        if not isinstance(value, int) or not (0 <= value <= 0xFFFFFFFF):
+            raise IntegrityError(f"malformed {label} value")
 
 
 def region_slice(dump: bytes, region: Region) -> bytes:
@@ -295,6 +322,14 @@ def create_reference(args: argparse.Namespace) -> int:
         for spec in args.canary_region:
             regions.append(parse_region_spec(spec, pattern_allowed=True))
         validate_regions(regions)
+        option_snapshot = parse_snapshot_specs(
+            args.option_snapshot,
+            "option-byte snapshot",
+        )
+        boot_register_snapshot = parse_snapshot_specs(
+            args.boot_register_snapshot,
+            "boot-register snapshot",
+        )
         block_size = require_block_size(args.block_size)
         manifest = {
             "schema_version": SCHEMA_VERSION,
@@ -308,6 +343,8 @@ def create_reference(args: argparse.Namespace) -> int:
             "memory_layout_digest": layout_digest(),
             "block_size": block_size,
             "reference_flash_sha512": hashlib.sha512(dump).hexdigest(),
+            "option_byte_snapshot": option_snapshot,
+            "boot_state_register_snapshot": boot_register_snapshot,
             "generation": {
                 "deterministic": True,
                 "endianness": "little",
@@ -355,6 +392,11 @@ def validate_reference(data: dict[str, Any]) -> None:
         raise IntegrityError("wrong target")
     if data.get("memory_layout_digest") != layout_digest():
         raise IntegrityError("wrong memory-layout digest")
+    validate_snapshot_map(data.get("option_byte_snapshot", {}), "option-byte snapshot")
+    validate_snapshot_map(
+        data.get("boot_state_register_snapshot", {}),
+        "boot-register snapshot",
+    )
     regions_raw = data.get("regions")
     if not isinstance(regions_raw, list):
         raise IntegrityError("reference regions must be a list")
@@ -409,6 +451,42 @@ def reference_block_index(reference: dict[str, Any]) -> dict[str, list[tuple[str
         for block in region.get("blocks", []):
             index.setdefault(block["sha512"], []).append((region["name"], block["index"]))
     return index
+
+
+def compare_snapshot_map(
+    label: str,
+    reference: dict[str, int],
+    observed: dict[str, int],
+) -> list[dict[str, Any]]:
+    changes: list[dict[str, Any]] = []
+    for name, expected in reference.items():
+        if name not in observed:
+            changes.append({
+                "kind": label,
+                "name": name,
+                "status": "missing_observation",
+                "expected": expected,
+            })
+            continue
+        actual = observed[name]
+        if actual != expected:
+            changes.append({
+                "kind": label,
+                "name": name,
+                "status": "modified",
+                "expected": expected,
+                "observed": actual,
+                "xor_delta": expected ^ actual,
+            })
+    for name, actual in observed.items():
+        if name not in reference:
+            changes.append({
+                "kind": label,
+                "name": name,
+                "status": "unexpected_observation",
+                "observed": actual,
+            })
+    return changes
 
 
 def count_bits(value: int) -> int:
@@ -536,6 +614,18 @@ def compare_reference(args: argparse.Namespace) -> int:
         block_size = require_block_size(int(reference["block_size"]))
         block_index = reference_block_index(reference)
         changed_regions = []
+        snapshot_changes = compare_snapshot_map(
+            "option_byte_snapshot",
+            reference.get("option_byte_snapshot", {}),
+            parse_snapshot_specs(args.option_snapshot, "option-byte snapshot"),
+        )
+        snapshot_changes.extend(
+            compare_snapshot_map(
+                "boot_state_register_snapshot",
+                reference.get("boot_state_register_snapshot", {}),
+                parse_snapshot_specs(args.boot_register_snapshot, "boot-register snapshot"),
+            )
+        )
 
         by_name = {region["name"]: region for region in reference["regions"]}
         for region_def in reference_regions(reference):
@@ -586,16 +676,18 @@ def compare_reference(args: argparse.Namespace) -> int:
 
         report = {
             "schema_version": SCHEMA_VERSION,
-            "result": "changed" if changed_regions else "ok",
+            "result": "changed" if changed_regions or snapshot_changes else "ok",
             "target": reference["target"],
             "memory_layout_digest": reference["memory_layout_digest"],
             "changed_region_count": len(changed_regions),
+            "snapshot_change_count": len(snapshot_changes),
             "changed_regions": changed_regions,
+            "snapshot_changes": snapshot_changes,
         }
         write_json(args.json_output, report)
         if args.report:
             print_human_compare(report)
-        return 1 if changed_regions else 0
+        return 1 if changed_regions or snapshot_changes else 0
     except Exception as exc:
         write_json(args.json_output, failure_report(exc))
         return 2
@@ -803,6 +895,10 @@ def decode_telemetry(args: argparse.Namespace) -> int:
 def print_human_reference(manifest: dict[str, Any]) -> None:
     print(f"target {manifest['target']}")
     print(f"layout {manifest['memory_layout_digest']}")
+    for name, value in manifest.get("option_byte_snapshot", {}).items():
+        print(f"option {name}=0x{value:08X}")
+    for name, value in manifest.get("boot_state_register_snapshot", {}).items():
+        print(f"boot-register {name}=0x{value:08X}")
     for region in manifest["regions"]:
         print(
             f"{region['name']} 0x{region['start']:08X}-0x{region['end']:08X} "
@@ -827,6 +923,11 @@ def print_human_compare(report: dict[str, Any]) -> None:
             )
         for heuristic in region["heuristics"]:
             print(f" heuristic {heuristic['type']} confidence={heuristic['confidence']}")
+    for change in report.get("snapshot_changes", []):
+        print(
+            f"snapshot {change['kind']} {change['name']} "
+            f"{change['status']}"
+        )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -844,6 +945,8 @@ def build_parser() -> argparse.ArgumentParser:
     create.add_argument("--expected-slot", choices=("a", "b"), default="a")
     create.add_argument("--block-size", type=int, default=DEFAULT_BLOCK_SIZE)
     create.add_argument("--canary-region", action="append", default=[])
+    create.add_argument("--option-snapshot", action="append", default=[])
+    create.add_argument("--boot-register-snapshot", action="append", default=[])
     create.set_defaults(func=create_reference)
 
     compare = sub.add_parser("compare")
@@ -854,6 +957,8 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--json-output", type=Path)
     compare.add_argument("--report", action="store_true")
     compare.add_argument("--max-examples", type=int, default=MAX_DIFF_EXAMPLES)
+    compare.add_argument("--option-snapshot", action="append", default=[])
+    compare.add_argument("--boot-register-snapshot", action="append", default=[])
     compare.set_defaults(func=compare_reference)
 
     provision = sub.add_parser("canary-provision")
