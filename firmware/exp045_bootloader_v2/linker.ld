@@ -27,8 +27,18 @@ SECTIONS
         *(.text*)
         *(.rodata*)
         . = ALIGN(4);
-        _etext = .;
     } > FLASH
+
+    .ramfunc : AT(ADDR(.text) + SIZEOF(.text))
+    {
+        . = ALIGN(4);
+        _sramfunc = .;
+        *(.ramfunc*)
+        . = ALIGN(4);
+        _eramfunc = .;
+    } > RAM
+    _siramfunc = LOADADDR(.ramfunc);
+    _etext = LOADADDR(.ramfunc) + SIZEOF(.ramfunc);
 
     .data : AT(_etext)
     {

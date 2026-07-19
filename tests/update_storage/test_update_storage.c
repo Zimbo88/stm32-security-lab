@@ -517,6 +517,240 @@ static void test_target_flash_stub_fails_closed(void)
     );
 }
 
+static void make_target_host_flash(
+    boot_flash_target_host_context_t *target,
+    boot_flash_t *flash,
+    const boot_flash_region_t *regions,
+    size_t region_count
+)
+{
+    boot_flash_target_host_context_init(target);
+    expect_status(
+        "target host flash init",
+        BOOT_FLASH_OK,
+        boot_flash_target_init_host(flash, target, regions, region_count)
+    );
+}
+
+static void target_snapshot(
+    const boot_flash_target_host_context_t *target,
+    uint32_t address,
+    uint8_t *snapshot,
+    size_t length
+)
+{
+    memcpy(snapshot, &target->storage[flash_offset(address)], length);
+}
+
+static void expect_target_region_unchanged(
+    const char *name,
+    const boot_flash_target_host_context_t *target,
+    uint32_t address,
+    const uint8_t *snapshot,
+    size_t length
+)
+{
+    if (memcmp(&target->storage[flash_offset(address)], snapshot, length) != 0) {
+        printf("%s changed unexpectedly\n", name);
+        failures += 1;
+    }
+}
+
+static void test_target_flash_backend_model_success_and_policy(void)
+{
+    boot_flash_target_host_context_t target;
+    boot_flash_t flash;
+    uint8_t data[4] = {0x12U, 0x34U, 0x56U, 0x78U};
+    uint8_t readback[4] = {0U};
+    uint8_t stage0_before[16];
+    uint8_t recovery_before[16];
+
+    make_target_host_flash(
+        &target,
+        &flash,
+        write_regions,
+        sizeof(write_regions) / sizeof(write_regions[0])
+    );
+
+    for (size_t i = 0U; i < sizeof(stage0_before); ++i) {
+        target.storage[flash_offset(STM32F429_BOOTLOADER_BASE) + i] =
+            (uint8_t)(0x20U + i);
+        target.storage[flash_offset(STM32F429_RECOVERY_BASE) + i] =
+            (uint8_t)(0x80U + i);
+    }
+    target_snapshot(&target, STM32F429_BOOTLOADER_BASE, stage0_before, sizeof(stage0_before));
+    target_snapshot(&target, STM32F429_RECOVERY_BASE, recovery_before, sizeof(recovery_before));
+
+    expect_status(
+        "target host zero program no-op",
+        BOOT_FLASH_OK,
+        boot_flash_program_aligned(&flash, STM32F429_SLOT_B_SIGNED_IMAGE_BASE, NULL, 0U)
+    );
+    expect_status(
+        "target host erase slot B",
+        BOOT_FLASH_OK,
+        boot_flash_erase_sector(&flash, STM32F429_SLOT_B_FIRST_SECTOR)
+    );
+    expect_status(
+        "target host program slot B",
+        BOOT_FLASH_OK,
+        boot_flash_program_aligned(
+            &flash,
+            STM32F429_SLOT_B_SIGNED_IMAGE_BASE,
+            data,
+            sizeof(data)
+        )
+    );
+    expect_status(
+        "target host read slot B",
+        BOOT_FLASH_OK,
+        boot_flash_read(&flash, STM32F429_SLOT_B_SIGNED_IMAGE_BASE, readback, sizeof(readback))
+    );
+    if (memcmp(data, readback, sizeof(data)) != 0) {
+        printf("target host readback mismatch\n");
+        failures += 1;
+    }
+    expect_u32("target relocked", (1UL << 31), target.cr & (1UL << 31));
+    expect_u32("interrupt enter count", 2U, target.critical_enter_count);
+    expect_u32("interrupt exit count", 2U, target.critical_exit_count);
+    expect_u32("interrupt restored", 0U, target.restored_primask);
+    expect_target_region_unchanged(
+        "target Stage 0",
+        &target,
+        STM32F429_BOOTLOADER_BASE,
+        stage0_before,
+        sizeof(stage0_before)
+    );
+    expect_target_region_unchanged(
+        "target recovery",
+        &target,
+        STM32F429_RECOVERY_BASE,
+        recovery_before,
+        sizeof(recovery_before)
+    );
+
+    expect_status(
+        "target host protected Stage 0 erase",
+        BOOT_FLASH_ERR_PROTECTED_REGION,
+        boot_flash_erase_sector(&flash, STM32F429_BOOTLOADER_FIRST_SECTOR)
+    );
+    expect_status(
+        "target host protected recovery erase",
+        BOOT_FLASH_ERR_PROTECTED_REGION,
+        boot_flash_erase_sector(&flash, STM32F429_RECOVERY_FIRST_SECTOR)
+    );
+    expect_status(
+        "target host spanning boundary rejected",
+        BOOT_FLASH_ERR_PROTECTED_REGION,
+        boot_flash_program_aligned(&flash, STM32F429_SLOT_B_END - 1UL, data, 2U)
+    );
+}
+
+static void test_target_flash_backend_error_mapping(void)
+{
+    const boot_flash_region_t only_slot_b[] = {
+        {STM32F429_SLOT_B_SIGNED_IMAGE_BASE, STM32F429_SLOT_B_END},
+    };
+    boot_flash_target_host_context_t target;
+    boot_flash_t flash;
+    uint8_t data[4] = {0xAAU, 0x55U, 0x11U, 0x22U};
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    target.unlock_failure = 1U;
+    expect_status(
+        "target unlock failure",
+        BOOT_FLASH_ERR_BACKEND,
+        boot_flash_erase_sector(&flash, STM32F429_SLOT_B_FIRST_SECTOR)
+    );
+    expect_u32("unlock failure kept lock", (1UL << 31), target.cr & (1UL << 31));
+    expect_u32("unlock failure no critical enter", 0U, target.critical_enter_count);
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    target.busy_timeout = 1U;
+    expect_status(
+        "target busy timeout",
+        BOOT_FLASH_ERR_BACKEND,
+        boot_flash_erase_sector(&flash, STM32F429_SLOT_B_FIRST_SECTOR)
+    );
+    expect_u32("busy timeout restored interrupt", 1U, target.critical_exit_count);
+    expect_u32("busy timeout relocked", (1UL << 31), target.cr & (1UL << 31));
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    target.erase_error = 1U;
+    expect_status(
+        "target erase error",
+        BOOT_FLASH_ERR_BACKEND,
+        boot_flash_erase_sector(&flash, STM32F429_SLOT_B_FIRST_SECTOR)
+    );
+    expect_u32("erase error relocked", (1UL << 31), target.cr & (1UL << 31));
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    target.program_error = 1U;
+    expect_status(
+        "target program error",
+        BOOT_FLASH_ERR_BACKEND,
+        boot_flash_program_aligned(
+            &flash,
+            STM32F429_SLOT_B_SIGNED_IMAGE_BASE,
+            data,
+            sizeof(data)
+        )
+    );
+    expect_u32("program error relocked", (1UL << 31), target.cr & (1UL << 31));
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    target.lock_failure = 1U;
+    expect_status(
+        "target lock failure",
+        BOOT_FLASH_ERR_BACKEND,
+        boot_flash_erase_sector(&flash, STM32F429_SLOT_B_FIRST_SECTOR)
+    );
+    expect_u32("lock failure visible", 0U, target.cr & (1UL << 31));
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    target.corrupt_after_program = 1U;
+    expect_status(
+        "target readback mismatch",
+        BOOT_FLASH_ERR_VERIFY,
+        boot_flash_program_aligned(
+            &flash,
+            STM32F429_SLOT_B_SIGNED_IMAGE_BASE,
+            data,
+            sizeof(data)
+        )
+    );
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    expect_status(
+        "target wrong sector protected",
+        BOOT_FLASH_ERR_PROTECTED_REGION,
+        boot_flash_erase_sector(&flash, STM32F429_SLOT_A_FIRST_SECTOR)
+    );
+}
+
+static void test_target_flash_backend_init_guards(void)
+{
+    boot_flash_target_host_context_t target;
+    boot_flash_t flash;
+    boot_flash_region_t canary = {
+        STM32F429_SLOT_B_PAYLOAD_BASE,
+        STM32F429_SLOT_B_PAYLOAD_BASE + 16UL,
+    };
+
+    boot_flash_target_host_context_init(&target);
+    target.ramfunc_valid = 0U;
+    expect_status(
+        "target ramfunc invalid",
+        BOOT_FLASH_ERR_BACKEND,
+        boot_flash_target_init_host(&flash, &target, write_regions, 1U)
+    );
+    expect_status(
+        "lab canary disabled",
+        BOOT_FLASH_ERR_PROTECTED_REGION,
+        boot_flash_target_init_lab_canary(&flash, &canary, 1U)
+    );
+}
+
 static void test_program_alignment_bounds_and_readback(void)
 {
     simulated_flash_t sim;
@@ -3732,6 +3966,9 @@ int main(void)
     test_sector_lookup_and_bounds();
     test_allowed_erase_policy();
     test_target_flash_stub_fails_closed();
+    test_target_flash_backend_model_success_and_policy();
+    test_target_flash_backend_error_mapping();
+    test_target_flash_backend_init_guards();
     test_program_alignment_bounds_and_readback();
     test_read_rejects_address_overflow_before_backend();
     test_readback_verification_failure_is_reported();

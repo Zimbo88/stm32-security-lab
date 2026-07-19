@@ -5,6 +5,7 @@ COMMON := ../../firmware/common
 
 CFLAGS := -std=c11 -O2 -g -Wall -Wextra -Werror -Wpedantic \
 	-Wshadow -Wpointer-arith -Wcast-align \
+	-DBOOT_FLASH_TARGET_HOST_TEST \
 	-I$(BOOTLOADER)/src -I$(BOOTLOADER)/include -I$(COMMON)
 LDFLAGS :=
 

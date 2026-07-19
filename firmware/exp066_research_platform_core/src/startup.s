@@ -6,6 +6,10 @@
 .global Default_Handler
 .global vector_table
 
+.extern _siramfunc
+.extern _sramfunc
+.extern _eramfunc
+
 .weak NMI_Handler
 .thumb_set NMI_Handler, Default_Handler
 .weak HardFault_Handler
@@ -51,23 +55,32 @@ vector_table:
 .type Reset_Handler,%function
 .global Reset_Handler
 Reset_Handler:
+    ldr r0, =_siramfunc
+    ldr r1, =_sramfunc
+    ldr r2, =_eramfunc
+1:  cmp r1, r2
+    bcs 2f
+    ldr r3, [r0], #4
+    str r3, [r1], #4
+    b 1b
+2:
     ldr r0, =_sdata
     ldr r1, =_edata
     ldr r2, =_etext
-1:  cmp r0, r1
-    bcs 2f
-    ldr r3, [r2], #4
-    str r3, [r0], #4
-    b 1b
-2:  ldr r0, =_sbss
-    ldr r1, =_ebss
-    movs r2, #0
 3:  cmp r0, r1
     bcs 4f
-    str r2, [r0], #4
+    ldr r3, [r2], #4
+    str r3, [r0], #4
     b 3b
-4:  bl main
-5:  b 5b
+4:  ldr r0, =_sbss
+    ldr r1, =_ebss
+    movs r2, #0
+5:  cmp r0, r1
+    bcs 6f
+    str r2, [r0], #4
+    b 5b
+6:  bl main
+7:  b 7b
 
 .thumb_func
 .type Default_Handler,%function

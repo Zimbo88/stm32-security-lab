@@ -235,9 +235,12 @@ boot_flash_status_t boot_flash_program_aligned(
     if ((flash == NULL) ||
         (flash->ops == NULL) ||
         (flash->ops->program == NULL) ||
-        (data == NULL) ||
-        (length == 0U)) {
+        ((length != 0U) && (data == NULL))) {
         return BOOT_FLASH_ERR_INVALID_ARGUMENT;
+    }
+
+    if (length == 0U) {
+        return BOOT_FLASH_OK;
     }
 
     if (((address & (flash->program_alignment - 1UL)) != 0UL) ||
