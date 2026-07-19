@@ -16,3 +16,6 @@ __pycache__/
 # Private signing keys
 *_private.pem
 *.key
+
+# Local reference material
+archive/
