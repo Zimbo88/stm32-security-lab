@@ -406,21 +406,51 @@ static verify_status_t validate_vector_table(
     return VERIFY_OK;
 }
 
+static verify_status_t slot_for_vector_address(
+    uint32_t vector_address,
+    const boot_slot_descriptor_t **slot
+)
+{
+    const boot_slot_descriptor_t *candidate = NULL;
+
+    if (slot == NULL) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    *slot = NULL;
+
+    if (boot_slot_lookup((uint32_t)BOOT_SLOT_A, &candidate) ==
+            BOOT_SLOT_LOOKUP_OK &&
+        candidate->payload_base == vector_address) {
+        *slot = candidate;
+        return VERIFY_OK;
+    }
+
+    if (boot_slot_lookup((uint32_t)BOOT_SLOT_B, &candidate) ==
+            BOOT_SLOT_LOOKUP_OK &&
+        candidate->payload_base == vector_address) {
+        *slot = candidate;
+        return VERIFY_OK;
+    }
+
+    return VERIFY_BAD_VECTOR_ADDRESS;
+}
+
 static verify_status_t validate_jump_context(
     const signed_image_jump_context_t *context
 )
 {
     uint32_t recomputed_payload_end = 0U;
+    const boot_slot_descriptor_t *slot = NULL;
 
     if (context == NULL) {
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
-    if (u32_equal_redundant(
-            context->vector_address,
-            APPLICATION_BASE_ADDRESS
-        ) == 0U) {
-        return VERIFY_BAD_VECTOR_ADDRESS;
+    verify_status_t status =
+        slot_for_vector_address(context->vector_address, &slot);
+    if (status != VERIFY_OK) {
+        return status;
     }
 
     if ((context->vector_address & (APPLICATION_VTOR_ALIGNMENT - 1UL)) != 0UL) {
@@ -431,7 +461,7 @@ static verify_status_t validate_jump_context(
         return VERIFY_BAD_SIZE;
     }
 
-    if (context->image_size > MAX_PAYLOAD_SIZE) {
+    if (context->image_size > slot->maximum_payload_size) {
         return VERIFY_BAD_SIZE;
     }
 
@@ -451,11 +481,11 @@ static verify_status_t validate_jump_context(
     }
 
     if ((context->payload_end <= context->vector_address) ||
-        (context->payload_end > APPLICATION_FLASH_END)) {
+        (context->payload_end > slot->slot_end)) {
         return VERIFY_BAD_PAYLOAD_RANGE;
     }
 
-    verify_status_t status = validate_application_msp(context->initial_msp);
+    status = validate_application_msp(context->initial_msp);
 
     if (status != VERIFY_OK) {
         return status;
@@ -466,7 +496,7 @@ static verify_status_t validate_jump_context(
         context->reset_address,
         context->vector_address,
         context->payload_end,
-        APPLICATION_FLASH_END
+        slot->slot_end
     );
 
     return status;
@@ -624,6 +654,78 @@ verify_status_t signed_image_verify_update_slot_buffer(
     );
 }
 
+verify_status_t signed_image_prepare_update_slot_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const boot_slot_descriptor_t *slot,
+    signed_image_jump_context_t *context
+)
+{
+    if ((manifest_bytes == NULL) ||
+        (payload == NULL) ||
+        (slot == NULL) ||
+        (context == NULL) ||
+        (slot->payload_base <= slot->signed_image_base) ||
+        (slot->payload_base >= slot->slot_end) ||
+        (slot->maximum_payload_size !=
+            (slot->slot_end - slot->payload_base))) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    signed_manifest_t decoded_manifest;
+    decode_manifest_bytes(manifest_bytes, &decoded_manifest);
+
+    const signed_image_validation_policy_t policy = {
+        .header_version = UPDATE_PACKAGE_FORMAT_VERSION,
+        .vector_address = slot->payload_base,
+        .payload_flash_end = slot->slot_end,
+        .maximum_payload_size = slot->maximum_payload_size,
+        .allowed_flags_mask = (uint32_t)SIGNED_IMAGE_FLAGS_ALLOWED_MASK,
+        .target_compatibility = UPDATE_PACKAGE_TARGET_STM32F429IGT6_AB_V1,
+        .image_type = UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION,
+        .require_update_fields = 1U,
+    };
+    uint32_t payload_end = 0U;
+    verify_status_t status =
+        validate_manifest_header(&decoded_manifest, &policy);
+
+    if (status != VERIFY_OK) {
+        return status;
+    }
+
+    status = validate_payload_range(&decoded_manifest, &policy, &payload_end);
+    if (status != VERIFY_OK) {
+        return status;
+    }
+
+    status = validate_payload_range_independent(
+        &decoded_manifest,
+        &policy,
+        payload_end
+    );
+    if (status != VERIFY_OK) {
+        return status;
+    }
+
+    if ((size_t)decoded_manifest.image_size > payload_capacity) {
+        return VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    status = validate_vector_table(
+        &decoded_manifest,
+        &policy,
+        payload,
+        payload_end,
+        context
+    );
+    if (status != VERIFY_OK) {
+        return status;
+    }
+
+    return validate_jump_context(context);
+}
+
 const char *signed_image_status_text(verify_status_t status)
 {
     switch (status) {
@@ -731,6 +833,14 @@ static verify_status_t confirm_jump_context_matches_flash(
 )
 {
     application_vector_t vector;
+    const boot_slot_descriptor_t *slot = NULL;
+    verify_status_t status =
+        slot_for_vector_address(context->vector_address, &slot);
+
+    if (status != VERIFY_OK) {
+        return status;
+    }
+
     read_application_vector((const uint8_t *)context->vector_address, &vector);
 
     if (u32_equal_redundant(
@@ -751,7 +861,7 @@ static verify_status_t confirm_jump_context_matches_flash(
         return VERIFY_BAD_RESET_VECTOR;
     }
 
-    verify_status_t status = validate_application_msp(vector.initial_msp);
+    status = validate_application_msp(vector.initial_msp);
 
     if (status != VERIFY_OK) {
         return status;
@@ -762,7 +872,7 @@ static verify_status_t confirm_jump_context_matches_flash(
         vector.reset_address,
         context->vector_address,
         context->payload_end,
-        APPLICATION_FLASH_END
+        slot->slot_end
     );
 
     return status;

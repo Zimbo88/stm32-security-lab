@@ -108,10 +108,6 @@ static uint8_t state_record_is_canonical(const boot_metadata_record_t *record)
              (record->active_slot == record->candidate_slot))) {
             return 0U;
         }
-        if ((record->state == BOOT_METADATA_STATE_PENDING_TRIAL) &&
-            (record->boot_attempt_count == 0UL)) {
-            return 0U;
-        }
         if ((record->state != BOOT_METADATA_STATE_PENDING_TRIAL) &&
             (record->boot_attempt_count != 0UL)) {
             return 0U;
@@ -145,7 +141,8 @@ static uint8_t transition_state_allowed(
             ? 1U
             : 0U;
     case BOOT_METADATA_STATE_PENDING_TRIAL:
-        return ((next == BOOT_METADATA_STATE_CONFIRMED) ||
+        return ((next == BOOT_METADATA_STATE_PENDING_TRIAL) ||
+                (next == BOOT_METADATA_STATE_CONFIRMED) ||
                 (next == BOOT_METADATA_STATE_REJECTED_INVALID))
             ? 1U
             : 0U;
@@ -159,6 +156,58 @@ static uint8_t transition_state_allowed(
     default:
         return 0U;
     }
+}
+
+static uint8_t transition_fields_allowed(
+    const boot_metadata_record_t *current,
+    const boot_metadata_record_t *next
+)
+{
+    if ((current == NULL) || (next == NULL)) {
+        return 0U;
+    }
+
+    if ((current->state == BOOT_METADATA_STATE_PENDING_TRIAL) &&
+        (next->state == BOOT_METADATA_STATE_PENDING_TRIAL)) {
+        if (current->boot_attempt_count == 0UL) {
+            return 0U;
+        }
+        return ((next->active_slot == current->active_slot) &&
+                (next->candidate_slot == current->candidate_slot) &&
+                (next->candidate_image_version ==
+                    current->candidate_image_version) &&
+                ((next->boot_attempt_count + 1UL) ==
+                    current->boot_attempt_count) &&
+                (next->confirmation_state == 0UL))
+            ? 1U
+            : 0U;
+    }
+
+    if ((current->state == BOOT_METADATA_STATE_PENDING_TRIAL) &&
+        (next->state == BOOT_METADATA_STATE_CONFIRMED)) {
+        return ((next->active_slot == current->candidate_slot) &&
+                (next->candidate_slot == BOOT_SLOT_NONE) &&
+                (next->candidate_image_version ==
+                    current->candidate_image_version) &&
+                (next->boot_attempt_count == 0UL) &&
+                (next->confirmation_state == 1UL))
+            ? 1U
+            : 0U;
+    }
+
+    if ((current->state == BOOT_METADATA_STATE_CONFIRMED) &&
+        (next->state == BOOT_METADATA_STATE_CONFIRMED)) {
+        return ((next->active_slot == current->active_slot) &&
+                (next->candidate_slot == BOOT_SLOT_NONE) &&
+                (next->candidate_image_version ==
+                    current->candidate_image_version) &&
+                (next->boot_attempt_count == 0UL) &&
+                (next->confirmation_state == 1UL))
+            ? 1U
+            : 0U;
+    }
+
+    return 1U;
 }
 
 static uint8_t records_are_equal(
@@ -388,6 +437,10 @@ boot_metadata_status_t boot_metadata_validate_transition(
     }
 
     if (transition_state_allowed(current->state, next->state) == 0U) {
+        return BOOT_METADATA_ERR_BAD_TRANSITION;
+    }
+
+    if (transition_fields_allowed(current, next) == 0U) {
         return BOOT_METADATA_ERR_BAD_TRANSITION;
     }
 

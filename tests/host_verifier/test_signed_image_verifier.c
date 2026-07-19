@@ -219,6 +219,23 @@ static signed_image_jump_context_t valid_jump_context(uint32_t image_size)
     return context;
 }
 
+static signed_image_jump_context_t valid_slot_jump_context(
+    const boot_slot_descriptor_t *slot,
+    uint32_t image_size
+)
+{
+    signed_image_jump_context_t context;
+
+    context.vector_address = slot->payload_base;
+    context.image_size = image_size;
+    context.payload_end = slot->payload_base + image_size;
+    context.initial_msp = APPLICATION_MSP_END;
+    context.reset_vector = slot->payload_base | 1UL;
+    context.reset_address = slot->payload_base;
+
+    return context;
+}
+
 static void test_enum_values_are_stable(void)
 {
     expect_int("VERIFY_OK", 0, (int)VERIFY_OK);
@@ -483,6 +500,7 @@ static void test_payload_one_byte_too_large(void)
 static void test_jump_context_revalidation(void)
 {
     signed_image_jump_context_t context = valid_jump_context(TEST_PAYLOAD_SIZE);
+    const boot_slot_descriptor_t *slot_b = NULL;
 
     expect_status(
         "valid jump context",
@@ -526,6 +544,20 @@ static void test_jump_context_revalidation(void)
         VERIFY_BAD_VECTOR_ADDRESS,
         signed_image_jump(&context)
     );
+
+    expect_int(
+        "lookup slot B for jump",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(BOOT_SLOT_B, &slot_b)
+    );
+    if (slot_b != NULL) {
+        context = valid_slot_jump_context(slot_b, TEST_PAYLOAD_SIZE);
+        expect_status(
+            "valid slot B jump context",
+            VERIFY_OK,
+            signed_image_jump(&context)
+        );
+    }
 }
 
 static void test_bad_magic(void)

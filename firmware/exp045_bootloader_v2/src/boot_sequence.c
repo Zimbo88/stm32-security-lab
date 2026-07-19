@@ -59,33 +59,32 @@ _Noreturn void boot_sequence_execute(void)
         boot_result_halt();
     }
 
-    boot_info_print_manifest();
-
-    uart_puts("Computing SHA-512 and verifying Ed25519...\n");
+    uart_puts("Selecting boot slot and verifying image...\n");
 
     performance_measurements_reset();
 
     const uint32_t verification_start = performance_cycles();
-    const verify_status_t status = boot_policy_verify();
+    boot_slot_selection_result_t selection;
+    const boot_slot_selection_status_t selection_status =
+        boot_policy_select(&selection);
     const uint32_t verification_end = performance_cycles();
 
     performance_record_verification_cycles(
         verification_end - verification_start
     );
 
-    boot_result_print(status);
+    uart_puts("Slot policy      = ");
+    uart_puts(boot_slot_selection_status_text(selection_status));
+    uart_puts("\n");
+
+    uart_puts("Slot decision    = ");
+    uart_puts(boot_slot_selection_decision_text(selection.decision));
+    uart_puts("\n");
+
+    boot_result_print(selection.selected_verify_status);
     boot_performance_print();
 
-    if (status != VERIFY_OK) {
-        boot_result_halt();
-    }
-
-    signed_image_jump_context_t jump_context;
-    const verify_status_t jump_prepare_status =
-        signed_image_prepare_jump(&jump_context);
-
-    if (jump_prepare_status != VERIFY_OK) {
-        boot_result_print(jump_prepare_status);
+    if (selection_status != BOOT_SLOT_SELECTION_OK) {
         boot_result_halt();
     }
 
@@ -93,7 +92,7 @@ _Noreturn void boot_sequence_execute(void)
     uart_puts("Jumping to application...\n");
     delay_cycles(4000000U);
 
-    const verify_status_t jump_status = signed_image_jump(&jump_context);
+    const verify_status_t jump_status = signed_image_jump(&selection.jump_context);
     boot_result_print(jump_status);
 
     boot_result_halt();

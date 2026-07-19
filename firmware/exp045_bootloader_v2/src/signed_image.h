@@ -68,6 +68,13 @@ verify_status_t signed_image_verify_update_slot_buffer(
     const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
     const boot_slot_descriptor_t *slot
 );
+verify_status_t signed_image_prepare_update_slot_buffer(
+    const uint8_t manifest_bytes[SIGNED_MANIFEST_SIZE],
+    const uint8_t *payload,
+    size_t payload_capacity,
+    const boot_slot_descriptor_t *slot,
+    signed_image_jump_context_t *context
+);
 verify_status_t signed_image_verify(void);
 verify_status_t signed_image_prepare_jump(signed_image_jump_context_t *context);
 const char *signed_image_status_text(verify_status_t status);
