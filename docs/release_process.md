@@ -12,6 +12,7 @@ The release workflow covers:
 - EXP065/EXP066 application build artifacts
 - signed-image construction
 - authenticated Slot A/Slot B update-package construction
+- initial factory boot-metadata construction
 - offline signed-image verification
 - offline update-package verification
 - release manifest generation
@@ -170,6 +171,25 @@ the payload SHA-512, verify the detached Ed25519 signature over the manifest,
 validate vector-table policy, and reject malformed or incomplete artifacts.
 
 The verifier does not require target hardware.
+
+## Factory Metadata Provisioning
+
+After building and verifying the initial Slot A signed image, create the first
+redundant `CONFIRMED` metadata records with:
+
+```sh
+make -C tools boot-metadata-provision
+mkdir -p build/factory
+tools/build/boot_metadata_provision.bin create-confirmed \
+  --slot a \
+  --image-version <initial-image-version> \
+  --copy-a-output build/factory/boot_metadata_a.bin \
+  --copy-b-output build/factory/boot_metadata_b.bin \
+  --json-output build/factory/boot_metadata_provision.json
+```
+
+The complete mass-erase-to-first-boot workflow is documented in
+`docs/factory_provisioning.md`.
 
 ## Reproducibility
 

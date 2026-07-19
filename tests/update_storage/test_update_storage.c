@@ -7,6 +7,7 @@
 #include "boot_flash_target.h"
 #include "boot_confirmation.h"
 #include "boot_metadata.h"
+#include "boot_metadata_provision_core.h"
 #include "boot_slot.h"
 #include "boot_slot_selection.h"
 #include "monocypher-ed25519.h"
@@ -2192,6 +2193,126 @@ static void test_metadata_commit_failure_boundaries_are_deterministic(void)
     }
 }
 
+static void test_blank_device_can_be_factory_provisioned_and_boots_slot_a(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t copy_a[STM32F429_BOOT_METADATA_RECORD_SIZE];
+    uint8_t copy_b[STM32F429_BOOT_METADATA_RECORD_SIZE];
+    boot_metadata_record_t decoded;
+    boot_metadata_record_t recovered;
+    boot_metadata_recovery_t recovery;
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "blank metadata fails closed",
+        BOOT_SLOT_SELECTION_ERR_METADATA,
+        boot_slot_selection_select(&options, &selection)
+    );
+
+    expect_metadata_status(
+        "factory provision copy A",
+        BOOT_METADATA_OK,
+        boot_metadata_provision_confirmed_image(BOOT_SLOT_A, 2U, copy_a)
+    );
+    expect_metadata_status(
+        "factory provision copy B",
+        BOOT_METADATA_OK,
+        boot_metadata_provision_confirmed_image(BOOT_SLOT_A, 2U, copy_b)
+    );
+    expect_u32(
+        "factory copies deterministic",
+        0U,
+        (uint32_t)memcmp(copy_a, copy_b, sizeof(copy_a))
+    );
+    expect_metadata_status(
+        "factory metadata decodes",
+        BOOT_METADATA_OK,
+        boot_metadata_decode(copy_a, sizeof(copy_a), &decoded)
+    );
+    expect_metadata_record(
+        "factory metadata confirmed",
+        &decoded,
+        1U,
+        BOOT_METADATA_STATE_CONFIRMED,
+        BOOT_SLOT_A,
+        BOOT_SLOT_NONE,
+        2U
+    );
+
+    memcpy(
+        &sim.storage[flash_offset(STM32F429_BOOT_METADATA_A_BASE)],
+        copy_a,
+        sizeof(copy_a)
+    );
+    memcpy(
+        &sim.storage[flash_offset(STM32F429_BOOT_METADATA_B_BASE)],
+        copy_b,
+        sizeof(copy_b)
+    );
+    expect_metadata_status(
+        "factory metadata recovers",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, &recovery)
+    );
+    expect_u32("factory copy A valid", 1U, recovery.copy_a_valid);
+    expect_u32("factory copy B valid", 1U, recovery.copy_b_valid);
+    expect_u32("factory selected copy A", BOOT_METADATA_COPY_A, recovery.selected_copy);
+    expect_metadata_record(
+        "factory recovered confirmed",
+        &recovered,
+        1U,
+        BOOT_METADATA_STATE_CONFIRMED,
+        BOOT_SLOT_A,
+        BOOT_SLOT_NONE,
+        2U
+    );
+
+    expect_selection_status(
+        "factory metadata boots Slot A",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32(
+        "factory boot decision confirmed",
+        BOOT_SLOT_SELECTION_DECISION_CONFIRMED,
+        selection.decision
+    );
+    expect_u32("factory selected Slot A", BOOT_SLOT_A, selection.selected_slot);
+    expect_verify_status(
+        "factory selected image verified",
+        VERIFY_OK,
+        selection.selected_verify_status
+    );
+    expect_u32(
+        "factory reset vector in Slot A",
+        active->payload_base | 1UL,
+        selection.jump_context.reset_vector | 1UL
+    );
+    (void)candidate;
+}
+
 static void test_update_package_parse_and_verify_security_cases(void)
 {
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
@@ -4001,6 +4122,7 @@ int main(void)
     test_metadata_power_loss_during_copy_write_keeps_previous_copy();
     test_metadata_uncommitted_record_is_not_selected();
     test_metadata_commit_failure_boundaries_are_deterministic();
+    test_blank_device_can_be_factory_provisioned_and_boots_slot_a();
     test_update_package_parse_and_verify_security_cases();
     test_update_installer_success_to_candidate_ready();
     test_update_installer_uses_opposite_inactive_slot();

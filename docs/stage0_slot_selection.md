@@ -104,8 +104,8 @@ through the metadata API. No host or CI command performs hardware flashing.
 
 ## Hardware Limitations
 
-The target flash backend remains write-disabled. Stage 0 can read memory-mapped
-flash through a read-only target backend, but production erase/program support
-is intentionally deferred. Trial boot and confirmation that require metadata
-writes must be validated on hardware only after an explicitly reviewed target
-flash backend, WRP/RDP/option-byte policy, and provisioning process exist.
+The STM32F429 target flash backend is implemented for the reviewed internal
+flash layout, but physical erase/program behavior still requires controlled
+hardware validation on the exact target. CI and default host workflows do not
+flash hardware. WRP/RDP, option-byte policy, irreversible provisioning, and
+hardware-backed rollback protection remain deferred.

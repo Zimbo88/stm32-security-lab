@@ -8,7 +8,8 @@ transport, option-byte programming, WRP, RDP, or hardware flash programming.
 The follow-on host-simulated authenticated package and inactive-slot installer
 phase is documented in `docs/authenticated_update_installation.md`.
 Stage-0 slot selection, trial boot, confirmation, and fallback are documented
-in `docs/stage0_slot_selection.md`.
+in `docs/stage0_slot_selection.md`. Initial factory creation of the first
+`CONFIRMED` metadata record is documented in `docs/factory_provisioning.md`.
 
 ## Storage Model
 
@@ -134,6 +135,10 @@ copy is selected. If both are valid and have different sequence numbers, the
 higher sequence is selected. If both are valid with the same sequence but
 different fields, recovery fails as ambiguous. If neither copy is valid, recovery
 returns an empty in-RAM baseline and reports no valid copy.
+
+Stage 0 treats no valid copy as a fail-closed boot-selection error. A freshly
+erased device therefore requires the documented factory provisioning step before
+first boot.
 
 A metadata update writes the alternate or missing copy. The target sector is
 erased, the body is programmed and verified, then the commit marker is

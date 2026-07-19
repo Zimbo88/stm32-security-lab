@@ -6,7 +6,7 @@ COMMON := ../../firmware/common
 CFLAGS := -std=c11 -O2 -g -Wall -Wextra -Werror -Wpedantic \
 	-Wshadow -Wpointer-arith -Wcast-align \
 	-DBOOT_FLASH_TARGET_HOST_TEST \
-	-I$(BOOTLOADER)/src -I$(BOOTLOADER)/include -I$(COMMON)
+	-I../../tools -I$(BOOTLOADER)/src -I$(BOOTLOADER)/include -I$(COMMON)
 LDFLAGS :=
 
 ifeq ($(SANITIZE),1)
@@ -17,6 +17,7 @@ endif
 SOURCES := \
 	test_update_storage.c \
 	simulated_flash.c \
+	../../tools/boot_metadata_provision_core.c \
 	../host_verifier/performance_stub.c \
 	$(BOOTLOADER)/src/boot_flash.c \
 	$(BOOTLOADER)/src/boot_flash_target.c \
@@ -44,6 +45,9 @@ $(BUILD)/test_update_storage.o: test_update_storage.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/simulated_flash.o: simulated_flash.c simulated_flash.h | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/boot_metadata_provision_core.o: ../../tools/boot_metadata_provision_core.c ../../tools/boot_metadata_provision_core.h | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/performance_stub.o: ../host_verifier/performance_stub.c | $(BUILD)

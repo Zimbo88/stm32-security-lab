@@ -4,9 +4,9 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import struct
+import subprocess
 import sys
-import zlib
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -26,20 +26,13 @@ import release_artifacts  # noqa: E402
 from stm32f429_layout import LAYOUT  # noqa: E402
 
 
+METADATA_TOOL = ROOT / "tools" / "build" / "boot_metadata_provision.bin"
 spec = importlib.util.spec_from_file_location("build_signed_image", SIGNER_PATH)
 if spec is None or spec.loader is None:
     raise RuntimeError("failed to load signed-image builder")
 signer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(signer)
 
-
-METADATA_MAGIC = 0x314D5442
-METADATA_COMMIT0 = 0xC0DEF00D
-METADATA_COMMIT1 = 0x3F210FF2
-BOOT_SLOT_NONE = 0xFFFFFFFF
-STATE_WRITING = 1
-STATE_CANDIDATE_READY = 2
-STATE_CONFIRMED = 4
 
 EXIT_OK = 0
 EXIT_FAILED = 1
@@ -164,37 +157,89 @@ def flash_offset(address: int) -> int:
     return address - LAYOUT["flash_base"]
 
 
-def metadata_record(
+def ensure_metadata_tool() -> Path:
+    if METADATA_TOOL.exists():
+        return METADATA_TOOL
+
+    try:
+        subprocess.run(
+            ["make", "-C", str(ROOT / "tools"), "boot-metadata-provision"],
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = (
+            exc.stderr.strip()
+            if isinstance(exc, subprocess.CalledProcessError)
+            else str(exc)
+        )
+        raise PackageError(
+            f"failed to build boot metadata provisioning tool: {detail}"
+        ) from exc
+
+    if not METADATA_TOOL.exists():
+        raise PackageError("boot metadata provisioning tool was not produced")
+    return METADATA_TOOL
+
+
+def metadata_update_sequence(
     *,
-    sequence: int,
-    state: int,
-    active_slot: int,
-    candidate_slot: int,
-    image_version: int,
-    confirmation_state: int,
-) -> bytes:
-    body = struct.pack(
-        "<11I",
-        METADATA_MAGIC,
-        LAYOUT["boot_metadata_format_version"],
-        LAYOUT["boot_metadata_record_size"],
-        sequence,
-        state,
-        active_slot,
-        candidate_slot,
-        image_version,
-        0,
-        confirmation_state,
-        0,
-    )
-    body += b"\x00" * 16
-    crc = zlib.crc32(body) & 0xFFFFFFFF
-    padding = b"\x00" * 56
-    return body + struct.pack("<I", crc) + padding + struct.pack(
-        "<II",
-        METADATA_COMMIT0,
-        METADATA_COMMIT1,
-    )
+    active_slot: str,
+    active_version: int,
+    candidate_slot: str,
+    candidate_version: int,
+) -> tuple[bytes, bytes, bytes]:
+    tool = ensure_metadata_tool()
+
+    with tempfile.TemporaryDirectory(prefix="boot_metadata_") as tmp:
+        tmpdir = Path(tmp)
+        confirmed = tmpdir / "confirmed.bin"
+        writing = tmpdir / "writing.bin"
+        ready = tmpdir / "candidate_ready.bin"
+        command = [
+            str(tool),
+            "create-update-sequence",
+            "--active-slot",
+            active_slot,
+            "--active-version",
+            str(active_version),
+            "--candidate-slot",
+            candidate_slot,
+            "--candidate-version",
+            str(candidate_version),
+            "--confirmed-output",
+            str(confirmed),
+            "--writing-output",
+            str(writing),
+            "--candidate-ready-output",
+            str(ready),
+        ]
+        try:
+            subprocess.run(
+                command,
+                check=True,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+        except (OSError, subprocess.CalledProcessError) as exc:
+            detail = (
+                exc.stderr.strip()
+                if isinstance(exc, subprocess.CalledProcessError)
+                else str(exc)
+            )
+            raise PackageError(
+                f"failed to create metadata update sequence: {detail}"
+            ) from exc
+
+        records = (confirmed.read_bytes(), writing.read_bytes(), ready.read_bytes())
+
+    for record in records:
+        if len(record) != LAYOUT["boot_metadata_record_size"]:
+            raise PackageError("metadata provisioning tool produced an invalid record size")
+    return records
 
 
 def install_simulated(
@@ -207,8 +252,6 @@ def install_simulated(
     if active_slot not in ("a", "b"):
         raise PackageError("active slot must be 'a' or 'b'")
     inactive_slot = "b" if active_slot == "a" else "a"
-    active_slot_id = LAYOUT[f"slot_{active_slot}"]["id"]
-    inactive_slot_id = LAYOUT[f"slot_{inactive_slot}"]["id"]
 
     verified = verify_package_bytes(package, public_key, slot=inactive_slot)
     image_version = verified["manifest"]["image_version"]
@@ -216,29 +259,11 @@ def install_simulated(
         raise PackageError("update package image version does not advance metadata version")
 
     flash = bytearray(b"\xFF" * LAYOUT["flash_total_size"])
-    confirmed = metadata_record(
-        sequence=1,
-        state=STATE_CONFIRMED,
-        active_slot=active_slot_id,
-        candidate_slot=BOOT_SLOT_NONE,
-        image_version=active_version,
-        confirmation_state=1,
-    )
-    writing = metadata_record(
-        sequence=2,
-        state=STATE_WRITING,
-        active_slot=active_slot_id,
-        candidate_slot=inactive_slot_id,
-        image_version=image_version,
-        confirmation_state=0,
-    )
-    ready = metadata_record(
-        sequence=3,
-        state=STATE_CANDIDATE_READY,
-        active_slot=active_slot_id,
-        candidate_slot=inactive_slot_id,
-        image_version=image_version,
-        confirmation_state=0,
+    confirmed, writing, ready = metadata_update_sequence(
+        active_slot=active_slot,
+        active_version=active_version,
+        candidate_slot=inactive_slot,
+        candidate_version=image_version,
     )
 
     a_off = flash_offset(LAYOUT["boot_metadata_a_base"])
