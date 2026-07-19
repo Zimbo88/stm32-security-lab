@@ -50,6 +50,11 @@ jobs:
       - name: Run authenticated update package tool tests
         run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_package_tool.py
 
+      - name: Build factory metadata provisioning tool
+        run: |
+          make -C tools clean test
+          make -C tools clean test SANITIZE=1
+
       - name: Run Stage-0 slot-selection simulation tests
         run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_storage.py
 
