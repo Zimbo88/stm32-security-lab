@@ -41,6 +41,9 @@ jobs:
       - name: Run Python and host tests
         run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
 
+      - name: Run authenticated update package tool tests
+        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_package_tool.py
+
       - name: Build firmware projects
         run: |
           make -C firmware/exp045_bootloader_v2 clean all
