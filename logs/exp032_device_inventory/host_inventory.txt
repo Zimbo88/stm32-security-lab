@@ -5,7 +5,7 @@ Date:
 2026-07-17T09:59:59+02:00
 
 Kernel:
-Linux mathias-zimmermann-MS-7D32 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+Linux workstation 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 19:30:42 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
 
 Git:
 git version 2.43.0

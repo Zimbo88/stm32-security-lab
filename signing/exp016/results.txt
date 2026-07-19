@@ -4,13 +4,13 @@ Algorithm:
 - Ed25519
 
 Signed object:
-- /home/mathias-zimmermann/stm32-security-lab/firmware/exp014_application_crc/build/exp014_application_crc_image.bin
+- /path/to/stm32-security-lab/firmware/exp014_application_crc/build/exp014_application_crc_image.bin
 
 Artifacts:
-- Private key: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/firmware_signing_private.pem
-- Public key: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/firmware_signing_public.pem
-- Signature: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/exp014_application_crc_image.sig
-- Tampered image: /home/mathias-zimmermann/stm32-security-lab/signing/exp016/exp014_application_crc_image_tampered.bin
+- Private key: /path/to/stm32-security-lab/signing/exp016/firmware_signing_private.pem
+- Public key: /path/to/stm32-security-lab/signing/exp016/firmware_signing_public.pem
+- Signature: /path/to/stm32-security-lab/signing/exp016/exp014_application_crc_image.sig
+- Tampered image: /path/to/stm32-security-lab/signing/exp016/exp014_application_crc_image_tampered.bin
 
 Results:
 - Original image signature: PASS
