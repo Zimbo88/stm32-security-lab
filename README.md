@@ -401,3 +401,24 @@ Third-party components remain under their respective licenses.
 ## Citation
 
 Citation metadata is provided in [`CITATION.cff`](CITATION.cff).
+
+## Author
+
+**Mathias Zimmermann**
+
+STM32 Security Lab is an independent embedded security research project
+created and maintained by Mathias Zimmermann.
+
+The project documents practical research on secure boot, authenticated
+firmware updates and embedded security on STM32F429 devices.
+
+## Development
+
+This repository was developed by Mathias Zimmermann.
+
+AI tools were used during development for documentation editing,
+refactoring suggestions, test generation and code review.
+
+System architecture, implementation decisions, debugging, hardware
+validation and final integration were performed manually on real STM32
+hardware.

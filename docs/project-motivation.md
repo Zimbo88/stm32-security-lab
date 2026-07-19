@@ -1,5 +1,19 @@
 # Project Motivation
 
+## Personal motivation
+
+I started this repository as a personal embedded security research project.
+
+My goal was not only to build a secure boot chain, but to understand every
+step involved, verify it on real hardware and document the complete process.
+
+Over time, the repository evolved from small experiments into a structured
+research platform covering secure boot, authenticated firmware updates,
+rollback protection and hardware-in-the-loop validation.
+
+If this repository helps other embedded developers understand these topics,
+then it has achieved its purpose.
+
 ## Research objective
 
 STM32 Security Lab was created to establish a controlled and reproducible

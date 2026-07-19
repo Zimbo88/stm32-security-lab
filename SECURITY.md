@@ -1,5 +1,10 @@
 # Security Policy
 
+STM32 Security Lab is maintained by Mathias Zimmermann.
+
+If you discover a security issue, please use GitHub Security Advisories or
+contact the maintainer before making the issue public.
+
 ## Project scope
 
 STM32 Security Lab is a defensive embedded-security research platform. It is

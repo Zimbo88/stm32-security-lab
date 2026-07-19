@@ -1,5 +1,9 @@
 # Contributing
 
+This project is currently maintained by Mathias Zimmermann.
+
+Bug reports, technical discussions and contributions are welcome.
+
 Contributions that improve reproducibility, documentation, test coverage,
 hardware support, or defensive security analysis are welcome.
 
