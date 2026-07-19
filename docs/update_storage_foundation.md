@@ -5,6 +5,9 @@ authenticated firmware update flow. It does not implement package installation,
 Stage-0 slot selection, trial boot, application confirmation, fallback policy,
 transport, option-byte programming, WRP, RDP, or hardware flash programming.
 
+The follow-on host-simulated authenticated package and inactive-slot installer
+phase is documented in `docs/authenticated_update_installation.md`.
+
 ## Storage Model
 
 The update-storage foundation uses the authoritative dual-slot layout in
