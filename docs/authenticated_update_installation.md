@@ -1,9 +1,10 @@
 # Authenticated Update Installation
 
-This phase adds a host-simulated authenticated firmware update installer. It
-does not add Stage-0 slot selection, trial boot, application confirmation,
-automatic fallback, real target flash programming, transport, option-byte
-programming, WRP, RDP, or physical hardware flashing.
+This phase adds a host-simulated authenticated firmware update installer. The
+follow-on Stage-0 slot-selection, trial boot, confirmation, and fallback phase
+is documented in `docs/stage0_slot_selection.md`. This installer phase does not
+add real target flash programming, transport, option-byte programming, WRP, RDP,
+or physical hardware flashing.
 
 ## Package Format
 
@@ -134,8 +135,6 @@ Default commands and CI jobs are host-only and do not flash hardware.
 
 ## Deferred Work
 
-Later phases must add Stage-0 slot selection, pending trial boot, boot-attempt
-accounting, application confirmation, automatic fallback, hardware-backed
-rollback protection, target flash-controller programming, transport, USB DFU,
-UART update handling, WRP/RDP/option-byte provisioning, and physical hardware
-validation.
+Later phases must add hardware-backed rollback protection, target
+flash-controller programming, transport, USB DFU, UART update handling,
+WRP/RDP/option-byte provisioning, and physical hardware validation.

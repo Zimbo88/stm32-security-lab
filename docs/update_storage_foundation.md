@@ -7,6 +7,8 @@ transport, option-byte programming, WRP, RDP, or hardware flash programming.
 
 The follow-on host-simulated authenticated package and inactive-slot installer
 phase is documented in `docs/authenticated_update_installation.md`.
+Stage-0 slot selection, trial boot, confirmation, and fallback are documented
+in `docs/stage0_slot_selection.md`.
 
 ## Storage Model
 
@@ -113,6 +115,7 @@ WRITING -> REJECTED_INVALID
 CANDIDATE_READY -> PENDING_TRIAL
 CANDIDATE_READY -> REJECTED_INVALID
 PENDING_TRIAL -> CONFIRMED
+PENDING_TRIAL -> PENDING_TRIAL
 PENDING_TRIAL -> REJECTED_INVALID
 REJECTED_INVALID -> WRITING
 ```

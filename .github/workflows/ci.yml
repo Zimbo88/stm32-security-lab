@@ -44,6 +44,9 @@ jobs:
       - name: Run authenticated update package tool tests
         run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_package_tool.py
 
+      - name: Run Stage-0 slot-selection simulation tests
+        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_storage.py
+
       - name: Build firmware projects
         run: |
           make -C firmware/exp045_bootloader_v2 clean all
