@@ -169,8 +169,27 @@ def test_verify_signed_image_outputs_json(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     data = json.loads(report.read_text(encoding="ascii"))
     assert data["result"] == "ok"
+    assert data["target_layout"]["mcu"] == "STM32F429IGT6"
+    assert data["target_layout"]["layout_profile"] == "stm32f429_1m"
+    assert data["target_layout"]["flash_size"] == 0x00100000
     assert data["manifest"]["image_version"] == signer.IMAGE_VERSION
     assert data["verification"]["signature_valid"] is True
+
+
+def test_verify_release_outputs_target_layout(tmp_path: Path) -> None:
+    application = make_application()
+    paths = write_release_artifacts(tmp_path, application, sign_application(application))
+
+    result = run_tool(*release_args(paths))
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    manifest = json.loads(paths["manifest"].read_text(encoding="ascii"))
+    assert manifest["target_layout"]["mcu"] == "STM32F429IGT6"
+    assert manifest["target_layout"]["layout_profile"] == "stm32f429_1m"
+    assert manifest["target_layout"]["flash_size"] == 0x00100000
+    assert manifest["target_layout"]["sector_count"] == 12
+    assert manifest["target_layout"]["slots"]["a"]["payload_base"] == 0x08020200
+    assert manifest["target_layout"]["slots"]["b"]["payload_base"] == 0x08080200
 
 
 def test_verify_signed_rejects_modified_payload(tmp_path: Path) -> None:

@@ -51,6 +51,42 @@ _Static_assert(
     "Slot A and Slot B must have equal payload capacity"
 );
 _Static_assert(
+    STM32F429_SIGNED_IMAGE_HEADER_SIZE == 0x200UL,
+    "signed-image header size must remain 0x200 bytes"
+);
+_Static_assert(
+    STM32F429_SLOT_A_PAYLOAD_MAX_SIZE ==
+        (STM32F429_SLOT_A_END - STM32F429_SLOT_A_PAYLOAD_BASE),
+    "Slot A payload capacity must match its slot end"
+);
+_Static_assert(
+    STM32F429_SLOT_B_PAYLOAD_MAX_SIZE ==
+        (STM32F429_SLOT_B_END - STM32F429_SLOT_B_PAYLOAD_BASE),
+    "Slot B payload capacity must match its slot end"
+);
+_Static_assert(
+    STM32F429_SLOT_A_SIGNED_IMAGE_BASE >= STM32F429_UPDATE_METADATA_END,
+    "Slot A must not overlap update metadata"
+);
+_Static_assert(
+    STM32F429_SLOT_A_END <= STM32F429_SLOT_B_SIGNED_IMAGE_BASE,
+    "Slot A must not overlap Slot B"
+);
+_Static_assert(
+    STM32F429_SLOT_B_END <= STM32F429_RECOVERY_BASE,
+    "Slot B must not overlap recovery"
+);
+_Static_assert(
+    STM32F429_RECOVERY_END == STM32F429_FLASH_END,
+    "recovery must end exactly at physical flash end"
+);
+_Static_assert(
+    STM32F429_SLOT_A_LAST_SECTOR <= 11UL &&
+        STM32F429_SLOT_B_LAST_SECTOR <= 11UL &&
+        STM32F429_RECOVERY_LAST_SECTOR <= 11UL,
+    "STM32F429IGT6 1 MiB profile cannot reference sectors above 11"
+);
+_Static_assert(
     (STM32F429_SLOT_A_PAYLOAD_BASE & 0xFFUL) == 0UL,
     "Slot A payload base must be VTOR-aligned"
 );

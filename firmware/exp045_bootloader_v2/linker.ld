@@ -74,4 +74,19 @@ SECTIONS
         _flash_region_end == STM32F429_BOOTLOADER_END,
         "ERROR: bootloader linker region diverges from target memory layout"
     )
+
+    ASSERT(
+        STM32F429_LAYOUT_PROFILE_ID == STM32F429_LAYOUT_PROFILE_STM32F429_1M,
+        "ERROR: bootloader hardware-validation build must use stm32f429_1m"
+    )
+
+    ASSERT(
+        STM32F429_FLASH_END == 0x08100000,
+        "ERROR: STM32F429IGT6 hardware-validation flash must end at 0x08100000"
+    )
+
+    ASSERT(
+        _flash_image_end <= STM32F429_FLASH_END,
+        "ERROR: bootloader load image exceeds STM32F429IGT6 1 MiB flash"
+    )
 }

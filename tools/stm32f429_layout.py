@@ -8,6 +8,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = ROOT / "config" / "stm32f429_memory_layout.json"
 UINT32_MAX = 0xFFFFFFFF
+PROFILE_IDS = {
+    "stm32f429_1m": 1,
+    "stm32f429_2m": 2,
+}
 
 
 def _int(value: Any) -> int:
@@ -106,8 +110,32 @@ def _slot_from_region(
     }
 
 
-def load_layout(path: Path = CONFIG_PATH) -> dict[str, Any]:
+def _select_profile(raw: dict[str, Any], profile: str | None) -> tuple[str, dict[str, Any]]:
+    if "profiles" not in raw:
+        if profile is not None:
+            raise ValueError("profile selection requires a profiled layout config")
+        return "legacy-single", raw
+
+    profiles = raw["profiles"]
+    if not isinstance(profiles, dict) or not profiles:
+        raise ValueError("layout config must define profiles")
+
+    selected_profile = profile or str(raw.get("default_profile", ""))
+    if selected_profile not in profiles:
+        raise ValueError(f"unknown STM32F429 layout profile: {selected_profile}")
+
+    if selected_profile not in PROFILE_IDS:
+        raise ValueError(f"layout profile lacks a stable numeric ID: {selected_profile}")
+
+    selected = dict(profiles[selected_profile])
+    selected["profile"] = selected_profile
+    selected["default_profile"] = raw.get("default_profile")
+    return selected_profile, selected
+
+
+def load_layout(path: Path = CONFIG_PATH, profile: str | None = None) -> dict[str, Any]:
     raw = json.loads(path.read_text(encoding="ascii"))
+    profile_name, raw = _select_profile(raw, profile)
 
     flash_base = _int(raw["flash"]["base"])
     flash_total_size = _int(raw["flash"]["total_size"])
@@ -187,8 +215,28 @@ def load_layout(path: Path = CONFIG_PATH) -> dict[str, Any]:
     ccm_size = _int(raw["ccm"]["size"])
     ccm_end = _checked_add(ccm_base, ccm_size, "CCM end")
 
+    if len(banks) == 1:
+        bank2 = {
+            "id": 2,
+            "base": flash_end,
+            "size": 0,
+            "end": flash_end,
+            "first_sector": len(sectors),
+            "last_sector": len(sectors) - 1,
+        }
+    elif len(banks) >= 2:
+        bank2 = banks[1]
+    else:
+        raise ValueError("STM32F429 flash must have at least one bank")
+
     layout = {
+        "profile": profile_name,
+        "layout_profile": profile_name,
+        "layout_profile_id": PROFILE_IDS.get(profile_name, 0),
+        "default_profile": raw.get("default_profile"),
         "target": raw["target"],
+        "mcu": raw.get("mcu", raw["target"]),
+        "profile_description": raw.get("description", ""),
         "flash_base": flash_base,
         "flash_total_size": flash_total_size,
         "flash_end": flash_end,
@@ -197,9 +245,9 @@ def load_layout(path: Path = CONFIG_PATH) -> dict[str, Any]:
         "flash_bank1_base": banks[0]["base"],
         "flash_bank1_size": banks[0]["size"],
         "flash_bank1_end": banks[0]["end"],
-        "flash_bank2_base": banks[1]["base"],
-        "flash_bank2_size": banks[1]["size"],
-        "flash_bank2_end": banks[1]["end"],
+        "flash_bank2_base": bank2["base"],
+        "flash_bank2_size": bank2["size"],
+        "flash_bank2_end": bank2["end"],
         "bootloader_base": bootloader["base"],
         "bootloader_size": bootloader["size"],
         "bootloader_end": bootloader["end"],
@@ -303,23 +351,53 @@ def validate_layout(layout: dict[str, Any]) -> None:
 
     if layout["target"] != "STM32F429IGT6":
         raise ValueError("unexpected STM32 target")
-    if layout["flash_base"] != 0x08000000 or layout["flash_total_size"] != 0x00200000:
-        raise ValueError("STM32F429IGT6 physical flash must remain 2 MiB at 0x08000000")
-    if len(banks) != 2 or banks[0]["id"] != 1 or banks[1]["id"] != 2:
-        raise ValueError("STM32F429 flash must have two configured banks")
+    if layout["mcu"] != "STM32F429IGT6":
+        raise ValueError("unexpected STM32 MCU")
+    if layout["profile"] not in PROFILE_IDS:
+        raise ValueError("unknown STM32F429 layout profile")
+    if layout["layout_profile_id"] != PROFILE_IDS[layout["profile"]]:
+        raise ValueError("layout profile ID changed")
+    if layout["flash_base"] != 0x08000000:
+        raise ValueError("STM32F429 flash must start at 0x08000000")
+    if len(banks) not in (1, 2) or banks[0]["id"] != 1:
+        raise ValueError("STM32F429 flash must have one or two configured banks")
     if banks[0]["base"] != layout["flash_base"]:
         raise ValueError("bank 1 must start at flash base")
-    if banks[0]["size"] != 0x00100000 or banks[1]["size"] != 0x00100000:
-        raise ValueError("each STM32F429IGT6 bank must be 1 MiB")
-    if banks[0]["end"] != banks[1]["base"]:
-        raise ValueError("bank 2 must start exactly at the bank 1 boundary")
-    if banks[1]["end"] != layout["flash_end"]:
-        raise ValueError("bank 2 must end at physical flash end")
+    if banks[0]["size"] != 0x00100000:
+        raise ValueError("STM32F429 bank 1 must be 1 MiB")
+    if len(banks) == 1:
+        if banks[0]["end"] != layout["flash_end"]:
+            raise ValueError("single-bank profile must end at physical flash end")
+    else:
+        if banks[1]["id"] != 2:
+            raise ValueError("second STM32F429 bank must have bank id 2")
+        if banks[1]["size"] != 0x00100000:
+            raise ValueError("legacy STM32F429 bank 2 must be 1 MiB")
+        if banks[0]["end"] != banks[1]["base"]:
+            raise ValueError("bank 2 must start exactly at the bank 1 boundary")
+        if banks[1]["end"] != layout["flash_end"]:
+            raise ValueError("bank 2 must end at physical flash end")
 
-    if len(sectors) != 24 or [sector["id"] for sector in sectors] != list(range(24)):
-        raise ValueError("STM32F429IGT6 layout must enumerate sectors 0 through 23")
+    if layout["profile"] == "stm32f429_1m":
+        if layout["flash_total_size"] != 0x00100000 or layout["flash_end"] != 0x08100000:
+            raise ValueError("STM32F429IGT6 hardware profile must be 1 MiB")
+        if len(banks) != 1:
+            raise ValueError("STM32F429IGT6 hardware profile must not define bank 2")
+        if len(sectors) != 12 or [sector["id"] for sector in sectors] != list(range(12)):
+            raise ValueError("STM32F429IGT6 hardware profile must enumerate sectors 0 through 11")
+    elif layout["profile"] == "stm32f429_2m":
+        if layout["flash_total_size"] != 0x00200000 or layout["flash_end"] != 0x08200000:
+            raise ValueError("legacy STM32F429 reference profile must remain 2 MiB")
+        if len(banks) != 2:
+            raise ValueError("legacy STM32F429 reference profile must retain two banks")
+        if len(sectors) != 24 or [sector["id"] for sector in sectors] != list(range(24)):
+            raise ValueError("legacy STM32F429 reference profile must enumerate sectors 0 through 23")
+    else:
+        raise ValueError("unsupported STM32F429 layout profile")
+
     expected_sector_sizes = [0x4000] * 4 + [0x10000] + [0x20000] * 7
-    expected_sector_sizes += [0x4000] * 4 + [0x10000] + [0x20000] * 7
+    if layout["profile"] == "stm32f429_2m":
+        expected_sector_sizes += [0x4000] * 4 + [0x10000] + [0x20000] * 7
     expected = layout["flash_base"]
     for sector, size in zip(sectors, expected_sector_sizes, strict=True):
         if sector["base"] != expected or sector["size"] != size:
@@ -352,7 +430,10 @@ def validate_layout(layout: dict[str, Any]) -> None:
     _expect_range("boot_metadata_a", layout, 0x08008000, 0x0800C000, 2, 2)
     _expect_range("boot_metadata_b", layout, 0x0800C000, 0x08010000, 3, 3)
     _expect_range("update_metadata", layout, 0x08010000, 0x08020000, 4, 4)
-    _expect_range("recovery", layout, 0x081E0000, 0x08200000, 23, 23)
+    if layout["profile"] == "stm32f429_1m":
+        _expect_range("recovery", layout, 0x080E0000, 0x08100000, 11, 11)
+    else:
+        _expect_range("recovery", layout, 0x081E0000, 0x08200000, 23, 23)
 
     if layout["bootloader_size"] != 0x8000:
         raise ValueError("Stage 0 must remain exactly 32 KiB")
@@ -384,11 +465,29 @@ def validate_layout(layout: dict[str, Any]) -> None:
         raise ValueError("Slot A and Slot B payload capacities must be equal")
     if layout["slot_a_signed_image_base"] != 0x08020000:
         raise ValueError("Slot A base changed")
-    if layout["slot_b_signed_image_base"] != 0x08100000:
+    if layout["profile"] == "stm32f429_1m":
+        if layout["slot_a_signed_image_base"] != 0x08020000:
+            raise ValueError("Slot A base changed")
+        if layout["slot_b_signed_image_base"] != 0x08080000:
+            raise ValueError("Slot B base changed")
+        if layout["slot_a_end"] != 0x08080000:
+            raise ValueError("Slot A end changed")
+        if layout["slot_b_end"] != 0x080E0000:
+            raise ValueError("Slot B end changed")
+        if layout["slot_a_first_sector"] != 5 or layout["slot_a_last_sector"] != 7:
+            raise ValueError("Slot A sector assignment changed")
+        if layout["slot_b_first_sector"] != 8 or layout["slot_b_last_sector"] != 10:
+            raise ValueError("Slot B sector assignment changed")
+        if max(sector["id"] for sector in sectors) > 11:
+            raise ValueError("1 MiB profile cannot contain sectors above 11")
+    elif layout["slot_b_signed_image_base"] != 0x08100000:
         raise ValueError("Slot B base changed")
     if layout["slot_a_payload_base"] != 0x08020200:
         raise ValueError("Slot A vector address changed")
-    if layout["slot_b_payload_base"] != 0x08100200:
+    expected_slot_b_payload = (
+        0x08080200 if layout["profile"] == "stm32f429_1m" else 0x08100200
+    )
+    if layout["slot_b_payload_base"] != expected_slot_b_payload:
         raise ValueError("Slot B vector address changed")
 
     named_ranges = [
@@ -427,3 +526,7 @@ def validate_layout(layout: dict[str, Any]) -> None:
 
 
 LAYOUT = load_layout()
+LAYOUT_PROFILES = {
+    profile: load_layout(profile=profile)
+    for profile in PROFILE_IDS
+}

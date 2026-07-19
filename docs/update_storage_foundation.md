@@ -15,21 +15,23 @@ in `docs/stage0_slot_selection.md`.
 The update-storage foundation uses the authoritative dual-slot layout in
 `config/stm32f429_memory_layout.json`. Stage 0 is confined to S0-S1. Metadata
 copy A and copy B use separate 16 KiB sectors. Slot A and Slot B are equal
-896 KiB signed-image regions, each with a 512-byte canonical signed-image
-header followed by the application payload. The recovery region is outside both
-slots.
+384 KiB signed-image regions in the default `stm32f429_1m` hardware-validation
+profile, each with a 512-byte canonical signed-image header followed by the
+application payload. The recovery region is outside both slots and ends exactly
+at the 1 MiB flash boundary `0x08100000`. The previous 2 MiB map is retained
+only as the explicit `stm32f429_2m` legacy/reference profile.
 
 The current application and signer compatibility constants still alias Slot A:
 
 - signed-image base: `0x08020000`
 - application vector base: `0x08020200`
-- maximum payload: `0x000dfe00` bytes
+- maximum payload: `0x0005fe00` bytes
 
 Slot B constants are generated now for later update policy:
 
-- signed-image base: `0x08100000`
-- application vector base: `0x08100200`
-- maximum payload: `0x000dfe00` bytes
+- signed-image base: `0x08080000`
+- application vector base: `0x08080200`
+- maximum payload: `0x0005fe00` bytes
 
 ## Slot Descriptors
 
@@ -141,9 +143,10 @@ selected.
 ## Host Simulation And Tests
 
 `tests/update_storage` builds the storage layer against a deterministic host
-flash simulator. The simulator models the full 2 MiB STM32F429 flash array,
-sector erase, 1-to-0 programming, read-back corruption, and operation-count
-failure injection.
+flash simulator. The simulator models the generated 1 MiB STM32F429IGT6 flash
+array, sector erase, 1-to-0 programming, read-back corruption, and
+operation-count failure injection. Sector IDs 12 through 23 are invalid in this
+profile and are rejected before target backend entry.
 
 The host tests cover:
 

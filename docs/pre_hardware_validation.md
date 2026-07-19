@@ -21,7 +21,8 @@ explicit laboratory region allowlist; normal firmware does not write canaries.
 
 ## Integrity Reference Workflow
 
-Create a reference manifest from a complete 2 MiB flash image:
+Create a reference manifest from a complete 1 MiB flash image for the generated
+`stm32f429_1m` STM32F429IGT6 hardware-validation profile:
 
 ```sh
 python3 tools/memory_integrity.py create-reference \
@@ -65,8 +66,8 @@ allowlisted laboratory region:
 
 ```sh
 python3 tools/memory_integrity.py canary-provision \
-  --region lab:0x08100200:0x08100600:address \
-  --allow-lab-region lab:0x08100200:0x08100600 \
+  --region lab:0x08080200:0x08080600:address \
+  --allow-lab-region lab:0x08080200:0x08080600 \
   --active-slot a \
   --output canary.bin
 ```
@@ -121,10 +122,14 @@ limited to:
   `BOOT_ENABLE_LAB_CANARY_WRITES` is enabled
 
 The backend unlocks the flash controller, clears status flags, uses bounded busy
-polling, erases complete generated-layout sectors, programs bytes using the
+polling, erases complete generated-layout sectors 0 through 11, programs bytes using the
 conservative voltage-compatible programming width, checks error flags, relies on
 the flash abstraction for read-back verification, and re-locks on every exit.
 Zero-length programming is a no-op before backend entry.
+
+The backend and generated sector table are compiled for `stm32f429_1m`; sector
+IDs 12 through 23 are invalid for STM32F429IGT6 hardware validation and are
+rejected before unlock.
 
 STM32F429 flash operations cannot safely call flash-resident helper code while
 the controller is busy. The erase/program critical routines and busy wait are
@@ -162,6 +167,7 @@ Build and verify both application slots without hardware:
 
 ```sh
 make -C firmware/exp066_research_platform_core slot-releases \
+  LAYOUT_PROFILE=stm32f429_1m \
   SIGNING_SEED=/path/to/development_or_release_seed.bin \
   PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```

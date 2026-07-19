@@ -4,6 +4,10 @@ SRC := src
 COMMON := ../common
 BOOTLOADER := ../exp045_bootloader_v2
 include $(COMMON)/stm32f429_memory_layout.mk
+LAYOUT_PROFILE ?= stm32f429_1m
+ifneq ($(LAYOUT_PROFILE),$(STM32F429_LAYOUT_PROFILE))
+$(error generated layout profile $(STM32F429_LAYOUT_PROFILE) does not match requested $(LAYOUT_PROFILE))
+endif
 CC := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
 OBJDUMP := arm-none-eabi-objdump
@@ -11,9 +15,13 @@ SIZE := arm-none-eabi-size
 SLOT ?= a
 ifeq ($(SLOT),a)
 SLOT_APPLICATION_BASE_HEX := $(STM32F429_SLOT_A_APPLICATION_BASE_HEX)
+SLOT_SIGNED_IMAGE_BASE_HEX := $(STM32F429_SLOT_A_SIGNED_IMAGE_BASE_HEX)
+SLOT_END_HEX := $(STM32F429_SLOT_A_END_HEX)
 SLOT_PAYLOAD_MAX_SIZE_BYTES := $(STM32F429_SLOT_A_PAYLOAD_MAX_SIZE_BYTES)
 else ifeq ($(SLOT),b)
 SLOT_APPLICATION_BASE_HEX := $(STM32F429_SLOT_B_APPLICATION_BASE_HEX)
+SLOT_SIGNED_IMAGE_BASE_HEX := $(STM32F429_SLOT_B_SIGNED_IMAGE_BASE_HEX)
+SLOT_END_HEX := $(STM32F429_SLOT_B_END_HEX)
 SLOT_PAYLOAD_MAX_SIZE_BYTES := $(STM32F429_SLOT_B_PAYLOAD_MAX_SIZE_BYTES)
 else
 $(error SLOT must be a or b)
@@ -59,6 +67,10 @@ PUBLIC_KEY_HEADER ?=
 
 .PHONY: all clean report signed verify-signed update-package inspect-update-package verify-update-package verify-layout require-signing-seed require-public-key slot-a slot-b slot-releases
 all: $(BIN) $(HEX) verify-layout
+	@echo "MCU: $(STM32F429_MCU)"
+	@echo "Layout profile: $(STM32F429_LAYOUT_PROFILE)"
+	@echo "Flash: 0x$(STM32F429_FLASH_BASE_HEX)-0x$(STM32F429_FLASH_END_HEX) ($(STM32F429_FLASH_SIZE_KIB) KiB)"
+	@echo "Slot $(SLOT): signed image 0x$(SLOT_SIGNED_IMAGE_BASE_HEX), payload 0x$(SLOT_APPLICATION_BASE_HEX), end 0x$(SLOT_END_HEX)"
 	$(SIZE) $(ELF)
 $(BUILD):
 	mkdir -p $@

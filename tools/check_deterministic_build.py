@@ -125,14 +125,35 @@ def build_checkout(checkout: Path) -> dict[str, str]:
     seed.write_bytes(TEST_SEED)
     git_commit = head_commit()
 
-    run(["make", "-C", "firmware/exp045_bootloader_v2", "clean", "all"], checkout)
-    run(["make", "-C", "firmware/exp065_signed_app", "clean", "all"], checkout)
+    run(
+        [
+            "make",
+            "-C",
+            "firmware/exp045_bootloader_v2",
+            "clean",
+            "all",
+            "LAYOUT_PROFILE=stm32f429_1m",
+        ],
+        checkout,
+    )
+    run(
+        [
+            "make",
+            "-C",
+            "firmware/exp065_signed_app",
+            "clean",
+            "all",
+            "LAYOUT_PROFILE=stm32f429_1m",
+        ],
+        checkout,
+    )
     run(
         [
             "make",
             "-C",
             "firmware/exp065_signed_app",
             "signed",
+            "LAYOUT_PROFILE=stm32f429_1m",
             f"SIGNING_SEED={seed}",
         ],
         checkout,
@@ -145,13 +166,24 @@ def build_checkout(checkout: Path) -> dict[str, str]:
         manifest_output="firmware/exp065_signed_app/build/exp065_release_manifest.json",
         report_output="firmware/exp065_signed_app/build/exp065_release_verification.json",
     )
-    run(["make", "-C", "firmware/exp066_research_platform_core", "clean", "all"], checkout)
+    run(
+        [
+            "make",
+            "-C",
+            "firmware/exp066_research_platform_core",
+            "clean",
+            "all",
+            "LAYOUT_PROFILE=stm32f429_1m",
+        ],
+        checkout,
+    )
     run(
         [
             "make",
             "-C",
             "firmware/exp066_research_platform_core",
             "signed",
+            "LAYOUT_PROFILE=stm32f429_1m",
             f"SIGNING_SEED={seed}",
         ],
         checkout,
@@ -179,6 +211,7 @@ def build_checkout(checkout: Path) -> dict[str, str]:
             "-C",
             "firmware/exp066_research_platform_core",
             "slot-releases",
+            "LAYOUT_PROFILE=stm32f429_1m",
             f"SIGNING_SEED={seed}",
             f"PUBLIC_KEY_HEX={TEST_PUBLIC_KEY_HEX}",
         ],

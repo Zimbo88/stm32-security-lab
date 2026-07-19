@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 ROOT = Path(__file__).parents[1]
 PROJECT = ROOT / "firmware" / "exp066_research_platform_core"
 COMMON = ROOT / "firmware" / "common"
+BOOTLOADER = ROOT / "firmware" / "exp045_bootloader_v2"
 APPLICATION_BASE = int(
     next(
         line.split()[2][:-2]
@@ -37,6 +38,7 @@ def _build_project_copy(tmpdir: Path) -> Path:
     work = tmpdir / "exp066_research_platform_core"
     shutil.copytree(PROJECT, work)
     shutil.copytree(COMMON, tmpdir / "common")
+    shutil.copytree(BOOTLOADER, tmpdir / "exp045_bootloader_v2")
     _run(["make", "-C", str(work), "all"])
     return work / "build" / "exp066_research_platform_core.elf"
 

@@ -1,10 +1,15 @@
 # EXP066 Research Platform Core
 
 EXP066 is a bounded Stage-1 application that can be linked for Slot A
-(`0x08020200`) or Slot B (`0x08100200`) and signed either as a legacy signed
+(`0x08020200`) or Slot B (`0x08080200`) and signed either as a legacy signed
 image or as an authenticated update package. It uses direct STM32F429 register
 access, static buffers, and no heap. It is intended to be launched by verified
 Stage 0.
+
+The hardware-validation build uses the generated `stm32f429_1m` profile for the
+STM32F429IGT6: 1 MiB internal flash, sectors 0-11 only, Slot A
+`0x08020000-0x08080000`, Slot B `0x08080000-0x080e0000`, and recovery
+`0x080e0000-0x08100000`.
 
 Build:
 
@@ -13,6 +18,7 @@ make -C firmware/exp066_research_platform_core clean all
 make -C firmware/exp066_research_platform_core signed \
   SIGNING_SEED=/path/to/development_or_release_seed.bin
 make -C firmware/exp066_research_platform_core slot-releases \
+  LAYOUT_PROFILE=stm32f429_1m \
   SIGNING_SEED=/path/to/development_or_release_seed.bin \
   PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
@@ -50,7 +56,7 @@ once and reports the result through `confirmation status` and `telemetry show`.
 ## Cortex-M4 Vector Table
 
 EXP066 is linked so `.isr_vector` starts at the selected slot payload base:
-`0x08020200` for Slot A and `0x08100200` for Slot B. The core exception vectors
+`0x08020200` for Slot A and `0x08080200` for Slot B. The core exception vectors
 are ordered as:
 
 | Index | Handler |

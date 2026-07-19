@@ -112,7 +112,7 @@ static uint8_t mandatory_self_tests_pass(void)
     if (VTOR != PLATFORM_APP_BASE) {
         return 0U;
     }
-    if ((uint32_t)FLASH_SIZE_KB == 0U) {
+    if ((uint32_t)FLASH_SIZE_KB != STM32F429_FLASH_SIZE_KIB) {
         return 0U;
     }
     return 1U;

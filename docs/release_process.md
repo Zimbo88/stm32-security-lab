@@ -41,6 +41,11 @@ make -C firmware/exp045_bootloader_v2 clean all
 make -C firmware/exp066_research_platform_core clean all
 ```
 
+The hardware-validation build uses the generated `stm32f429_1m` profile:
+STM32F429IGT6, 1 MiB internal flash, sectors 0-11 only, Slot A
+`0x08020000-0x08080000`, Slot B `0x08080000-0x080e0000`, and recovery
+`0x080e0000-0x08100000`.
+
 Expected bootloader artifacts:
 
 - `firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf`
@@ -57,6 +62,7 @@ Build both slot-linked update releases:
 
 ```sh
 make -C firmware/exp066_research_platform_core slot-releases \
+  LAYOUT_PROFILE=stm32f429_1m \
   SIGNING_SEED=/path/to/release_signing_seed.bin \
   PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
@@ -139,6 +145,8 @@ The release manifest includes:
 - Git commit and exact tag when available
 - compiler identity
 - raw Makefile build options
+- MCU, selected layout profile, flash size, sector count, and Slot A/Slot B
+  base/end addresses
 - bootloader version
 - application image version
 - signed-manifest version

@@ -71,6 +71,38 @@ def artifact_record(path: Path) -> dict[str, Any]:
     }
 
 
+def layout_report() -> dict[str, Any]:
+    return {
+        "mcu": LAYOUT["mcu"],
+        "target": LAYOUT["target"],
+        "layout_profile": LAYOUT["profile"],
+        "flash_base": LAYOUT["flash_base"],
+        "flash_end": LAYOUT["flash_end"],
+        "flash_size": LAYOUT["flash_total_size"],
+        "flash_size_kib": LAYOUT["flash_total_size"] // 1024,
+        "sector_count": len(LAYOUT["flash_sectors"]),
+        "signed_image_header_size": LAYOUT["signed_image_header_size"],
+        "slots": {
+            "a": {
+                "signed_image_base": LAYOUT["slot_a_signed_image_base"],
+                "payload_base": LAYOUT["slot_a_payload_base"],
+                "end": LAYOUT["slot_a_end"],
+                "payload_max_size": LAYOUT["slot_a_payload_max_size"],
+                "first_sector": LAYOUT["slot_a_first_sector"],
+                "last_sector": LAYOUT["slot_a_last_sector"],
+            },
+            "b": {
+                "signed_image_base": LAYOUT["slot_b_signed_image_base"],
+                "payload_base": LAYOUT["slot_b_payload_base"],
+                "end": LAYOUT["slot_b_end"],
+                "payload_max_size": LAYOUT["slot_b_payload_max_size"],
+                "first_sector": LAYOUT["slot_b_first_sector"],
+                "last_sector": LAYOUT["slot_b_last_sector"],
+            },
+        },
+    }
+
+
 def require_elf(path: Path) -> None:
     data = read_file(path, "ELF")
     if len(data) < 4 or data[:4] != b"\x7fELF":
@@ -417,6 +449,7 @@ def build_release_manifest(
             "bootloader": read_make_assignments(bootloader_dir / "Makefile"),
             "application": read_make_assignments(application_dir / "Makefile"),
         },
+        "target_layout": layout_report(),
         "versions": {
             "bootloader": args.bootloader_version,
             "application": signed_info["manifest"]["image_version"],
@@ -501,6 +534,7 @@ def run_verify_signed(args: argparse.Namespace) -> int:
         )
         report = success_report({
             "public_key": {"fingerprint_sha256": sha256_hex(public_key)},
+            "target_layout": layout_report(),
             "signed_image": {
                 "path": repo_path(args.signed_image),
                 "size": args.signed_image.stat().st_size,

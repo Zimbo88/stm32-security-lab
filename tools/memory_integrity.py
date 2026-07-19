@@ -334,13 +334,28 @@ def create_reference(args: argparse.Namespace) -> int:
         manifest = {
             "schema_version": SCHEMA_VERSION,
             "tool_version": TOOL_VERSION,
+            "mcu": LAYOUT["mcu"],
             "target": args.target,
+            "layout_profile": LAYOUT["profile"],
             "git_commit": args.git_commit or git_commit(),
             "build_identity": args.build_identity,
             "expected_slot": args.expected_slot,
             "flash_base": LAYOUT["flash_base"],
+            "flash_end": LAYOUT["flash_end"],
             "flash_size": LAYOUT["flash_total_size"],
             "memory_layout_digest": layout_digest(),
+            "slot_layout": {
+                "a": {
+                    "signed_image_base": LAYOUT["slot_a_signed_image_base"],
+                    "payload_base": LAYOUT["slot_a_payload_base"],
+                    "end": LAYOUT["slot_a_end"],
+                },
+                "b": {
+                    "signed_image_base": LAYOUT["slot_b_signed_image_base"],
+                    "payload_base": LAYOUT["slot_b_payload_base"],
+                    "end": LAYOUT["slot_b_end"],
+                },
+            },
             "block_size": block_size,
             "reference_flash_sha512": hashlib.sha512(dump).hexdigest(),
             "option_byte_snapshot": option_snapshot,
@@ -390,6 +405,10 @@ def validate_reference(data: dict[str, Any]) -> None:
         raise IntegrityError("unsupported schema")
     if data.get("target") != LAYOUT["target"]:
         raise IntegrityError("wrong target")
+    if data.get("mcu") != LAYOUT["mcu"]:
+        raise IntegrityError("wrong MCU")
+    if data.get("layout_profile") != LAYOUT["profile"]:
+        raise IntegrityError("wrong layout profile")
     if data.get("memory_layout_digest") != layout_digest():
         raise IntegrityError("wrong memory-layout digest")
     validate_snapshot_map(data.get("option_byte_snapshot", {}), "option-byte snapshot")

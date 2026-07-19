@@ -43,6 +43,27 @@
 
 #define RAMFUNC __attribute__((section(".ramfunc"), noinline))
 
+_Static_assert(
+    STM32F429_LAYOUT_PROFILE_ID == STM32F429_LAYOUT_PROFILE_STM32F429_1M,
+    "target flash backend must be built with the STM32F429IGT6 1 MiB profile"
+);
+_Static_assert(
+    STM32F429_FLASH_TOTAL_SIZE == 0x00100000UL,
+    "target flash backend must not address beyond the STM32F429IGT6 1 MiB flash"
+);
+_Static_assert(
+    STM32F429_FLASH_END == 0x08100000UL,
+    "target flash backend must reject addresses at or above 0x08100000"
+);
+_Static_assert(
+    STM32F429_FLASH_SECTOR_COUNT == 12UL,
+    "target flash backend must expose sectors 0 through 11 only"
+);
+_Static_assert(
+    STM32F429_RECOVERY_LAST_SECTOR <= 11UL,
+    "target flash backend must not reference non-existent sectors 12 through 23"
+);
+
 #ifndef BOOT_FLASH_TARGET_HOST_TEST
 extern uint8_t _sramfunc;
 extern uint8_t _eramfunc;
@@ -534,12 +555,17 @@ static void target_clear_status_flags(void *context)
 
 static boot_flash_status_t target_erase_sector(void *context, uint32_t sector_id)
 {
-    boot_flash_status_t status = target_unlock(context);
+    boot_flash_status_t status;
     boot_flash_status_t lock_status = BOOT_FLASH_OK;
     uint32_t saved_acr = 0U;
     uint32_t primask = 0U;
     uint8_t ok = 0U;
 
+    if (sector_id >= STM32F429_FLASH_SECTOR_COUNT) {
+        return BOOT_FLASH_ERR_BACKEND;
+    }
+
+    status = target_unlock(context);
     if (status != BOOT_FLASH_OK) {
         return status;
     }

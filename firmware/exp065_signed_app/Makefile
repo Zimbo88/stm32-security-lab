@@ -3,6 +3,10 @@ BUILD   := build
 SRC     := src
 COMMON  := ../common
 include $(COMMON)/stm32f429_memory_layout.mk
+LAYOUT_PROFILE ?= stm32f429_1m
+ifneq ($(LAYOUT_PROFILE),$(STM32F429_LAYOUT_PROFILE))
+$(error generated layout profile $(STM32F429_LAYOUT_PROFILE) does not match requested $(LAYOUT_PROFILE))
+endif
 
 CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -36,6 +40,10 @@ PUBLIC_KEY_HEADER ?=
 .PHONY: all clean signed verify-signed report require-signing-seed require-public-key
 
 all: $(APPLICATION_ELF) $(APPLICATION_BIN) $(APPLICATION_HEX)
+	@echo "MCU: $(STM32F429_MCU)"
+	@echo "Layout profile: $(STM32F429_LAYOUT_PROFILE)"
+	@echo "Flash: 0x$(STM32F429_FLASH_BASE_HEX)-0x$(STM32F429_FLASH_END_HEX) ($(STM32F429_FLASH_SIZE_KIB) KiB)"
+	@echo "Application: 0x$(STM32F429_APPLICATION_BASE_HEX), payload max $(STM32F429_APPLICATION_PAYLOAD_MAX_SIZE_BYTES) bytes"
 	$(SIZE) $(APPLICATION_ELF)
 
 $(BUILD):

@@ -32,6 +32,14 @@ SECTIONS
     _flash_image_end = LOADADDR(.data) + SIZEOF(.data);
     ASSERT(ADDR(.isr_vector) == STM32F429_SELECTED_APPLICATION_BASE, "vector table address changed")
     ASSERT(_flash_image_end <= ORIGIN(FLASH) + LENGTH(FLASH), "platform exceeds Flash")
+    ASSERT(STM32F429_LAYOUT_PROFILE_ID == STM32F429_LAYOUT_PROFILE_STM32F429_1M, "platform must use stm32f429_1m for hardware validation")
+    ASSERT(STM32F429_FLASH_END == 0x08100000, "STM32F429IGT6 flash must end at 0x08100000")
+    ASSERT(ORIGIN(FLASH) >= STM32F429_FLASH_BASE, "platform flash origin below internal flash")
+    ASSERT(ORIGIN(FLASH) < STM32F429_FLASH_END, "platform flash origin outside 1 MiB flash")
+    ASSERT(ORIGIN(FLASH) + LENGTH(FLASH) <= STM32F429_FLASH_END, "platform slot exceeds 1 MiB flash")
+    ASSERT(STM32F429_SLOT_A_END <= STM32F429_SLOT_B_SIGNED_IMAGE_BASE, "Slot A and Slot B overlap")
+    ASSERT(STM32F429_SLOT_B_END <= STM32F429_RECOVERY_BASE, "Slot B and recovery overlap")
+    ASSERT(STM32F429_RECOVERY_END == STM32F429_FLASH_END, "recovery must end at 1 MiB flash end")
     ASSERT(_enoinit <= ORIGIN(RAM) + LENGTH(RAM), "platform exceeds SRAM")
     ASSERT((_estack & 7) == 0, "stack must be 8-byte aligned")
 }

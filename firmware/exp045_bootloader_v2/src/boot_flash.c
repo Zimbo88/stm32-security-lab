@@ -19,6 +19,7 @@ static const boot_flash_sector_t boot_flash_sectors[] = {
     {9U, 1U, STM32F429_FLASH_SECTOR_9_BASE, STM32F429_FLASH_SECTOR_9_SIZE, STM32F429_FLASH_SECTOR_9_END},
     {10U, 1U, STM32F429_FLASH_SECTOR_10_BASE, STM32F429_FLASH_SECTOR_10_SIZE, STM32F429_FLASH_SECTOR_10_END},
     {11U, 1U, STM32F429_FLASH_SECTOR_11_BASE, STM32F429_FLASH_SECTOR_11_SIZE, STM32F429_FLASH_SECTOR_11_END},
+#if STM32F429_FLASH_SECTOR_COUNT > 12UL
     {12U, 2U, STM32F429_FLASH_SECTOR_12_BASE, STM32F429_FLASH_SECTOR_12_SIZE, STM32F429_FLASH_SECTOR_12_END},
     {13U, 2U, STM32F429_FLASH_SECTOR_13_BASE, STM32F429_FLASH_SECTOR_13_SIZE, STM32F429_FLASH_SECTOR_13_END},
     {14U, 2U, STM32F429_FLASH_SECTOR_14_BASE, STM32F429_FLASH_SECTOR_14_SIZE, STM32F429_FLASH_SECTOR_14_END},
@@ -31,12 +32,45 @@ static const boot_flash_sector_t boot_flash_sectors[] = {
     {21U, 2U, STM32F429_FLASH_SECTOR_21_BASE, STM32F429_FLASH_SECTOR_21_SIZE, STM32F429_FLASH_SECTOR_21_END},
     {22U, 2U, STM32F429_FLASH_SECTOR_22_BASE, STM32F429_FLASH_SECTOR_22_SIZE, STM32F429_FLASH_SECTOR_22_END},
     {23U, 2U, STM32F429_FLASH_SECTOR_23_BASE, STM32F429_FLASH_SECTOR_23_SIZE, STM32F429_FLASH_SECTOR_23_END},
+#endif
 };
 
+_Static_assert(
+    STM32F429_LAYOUT_PROFILE_ID == STM32F429_LAYOUT_PROFILE_STM32F429_1M,
+    "hardware-validation builds must use the STM32F429IGT6 1 MiB profile"
+);
+_Static_assert(
+    STM32F429_FLASH_TOTAL_SIZE == 0x00100000UL,
+    "STM32F429IGT6 target profile must expose exactly 1 MiB internal flash"
+);
+_Static_assert(
+    STM32F429_FLASH_END == 0x08100000UL,
+    "STM32F429IGT6 target profile must end at 0x08100000"
+);
+_Static_assert(
+    STM32F429_FLASH_SECTOR_COUNT == 12UL,
+    "STM32F429IGT6 target profile must enumerate sectors 0 through 11"
+);
 _Static_assert(
     sizeof(boot_flash_sectors) / sizeof(boot_flash_sectors[0]) ==
         STM32F429_FLASH_SECTOR_COUNT,
     "flash sector table must match generated layout"
+);
+_Static_assert(
+    STM32F429_SLOT_A_END <= STM32F429_SLOT_B_SIGNED_IMAGE_BASE,
+    "Slot A and Slot B must not overlap"
+);
+_Static_assert(
+    STM32F429_SLOT_B_END <= STM32F429_RECOVERY_BASE,
+    "Slot B and recovery must not overlap"
+);
+_Static_assert(
+    STM32F429_RECOVERY_END == STM32F429_FLASH_END,
+    "recovery region must end at physical flash end"
+);
+_Static_assert(
+    STM32F429_SLOT_B_LAST_SECTOR <= 11UL,
+    "STM32F429IGT6 target profile cannot reference sectors above 11"
 );
 
 static uint8_t checked_range_end(

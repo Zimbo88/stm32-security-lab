@@ -79,6 +79,12 @@ def test_valid_unchanged_reference(tmp_path: Path) -> None:
     data = load(report)
     assert data["result"] == "ok"
     assert data["changed_region_count"] == 0
+    reference_data = load(reference)
+    assert reference_data["mcu"] == "STM32F429IGT6"
+    assert reference_data["layout_profile"] == "stm32f429_1m"
+    assert reference_data["flash_size"] == 0x00100000
+    assert reference_data["flash_end"] == 0x08100000
+    assert reference_data["slot_layout"]["b"]["payload_base"] == 0x08080200
 
 
 def test_reference_snapshots_match_and_detect_changes(tmp_path: Path) -> None:
@@ -262,6 +268,21 @@ def test_truncated_oversized_wrong_target_and_layout_digest(tmp_path: Path) -> N
     assert "wrong target" in load(report)["error"]
 
     reference = make_reference(tmp_path, reference_dump)
+    data = load(reference)
+    data["layout_profile"] = "stm32f429_2m"
+    bad_profile = tmp_path / "bad-profile.json"
+    bad_profile.write_text(json.dumps(data), encoding="ascii")
+    assert run_tool(
+        "compare",
+        "--reference",
+        str(bad_profile),
+        "--flash-dump",
+        str(reference_dump),
+        "--json-output",
+        str(report),
+    ).returncode == 2
+    assert "wrong layout profile" in load(report)["error"]
+
     data = load(reference)
     data["memory_layout_digest"] = "0" * 64
     bad_reference = tmp_path / "bad-layout.json"

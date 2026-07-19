@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stm32f429_layout import LAYOUT, ROOT
+from stm32f429_layout import LAYOUT, LAYOUT_PROFILES, PROFILE_IDS, ROOT
 
 
 HEADER_PATH = ROOT / "firmware" / "common" / "stm32f429_memory_layout.h"
@@ -136,14 +136,28 @@ def _slot_ld(name: str, l: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def render_header() -> str:
-    l = LAYOUT
-    return f"""/* Generated from config/stm32f429_memory_layout.json. */
+def _profile_macro(profile: str) -> str:
+    return profile.upper().replace("-", "_")
+
+
+def render_header(layout: dict[str, object] | None = None) -> str:
+    l = LAYOUT if layout is None else layout
+    profile_defines = "\n".join(
+        f"#define STM32F429_LAYOUT_PROFILE_{_profile_macro(profile)} {profile_id}UL"
+        for profile, profile_id in sorted(PROFILE_IDS.items())
+    )
+    return f"""/* Generated from config/stm32f429_memory_layout.json profile {l["profile"]}. */
 #ifndef STM32F429_MEMORY_LAYOUT_H
 #define STM32F429_MEMORY_LAYOUT_H
 
+{profile_defines}
+#define STM32F429_LAYOUT_PROFILE_ID {l["layout_profile_id"]}UL
+#define STM32F429_LAYOUT_PROFILE_NAME "{l["profile"]}"
+#define STM32F429_MCU_NAME "{l["mcu"]}"
+
 #define STM32F429_FLASH_BASE {_hex(l["flash_base"])}UL
 #define STM32F429_FLASH_TOTAL_SIZE {_hex(l["flash_total_size"])}UL
+#define STM32F429_FLASH_SIZE_KIB {l["flash_total_size"] // 1024}UL
 #define STM32F429_FLASH_END {_hex(l["flash_end"])}UL
 #define STM32F429_FLASH_BANK1_BASE {_hex(l["flash_bank1_base"])}UL
 #define STM32F429_FLASH_BANK1_SIZE {_hex(l["flash_bank1_size"])}UL
@@ -208,11 +222,16 @@ def render_header() -> str:
 """
 
 
-def render_ld() -> str:
-    l = LAYOUT
-    return f"""/* Generated from config/stm32f429_memory_layout.json. */
+def render_ld(layout: dict[str, object] | None = None) -> str:
+    l = LAYOUT if layout is None else layout
+    return f"""/* Generated from config/stm32f429_memory_layout.json profile {l["profile"]}. */
+STM32F429_LAYOUT_PROFILE_ID = {l["layout_profile_id"]};
+STM32F429_LAYOUT_PROFILE_STM32F429_1M = {PROFILE_IDS["stm32f429_1m"]};
+STM32F429_LAYOUT_PROFILE_STM32F429_2M = {PROFILE_IDS["stm32f429_2m"]};
+
 STM32F429_FLASH_BASE = {_hex(l["flash_base"])};
 STM32F429_FLASH_TOTAL_SIZE = {_hex(l["flash_total_size"])};
+STM32F429_FLASH_SIZE_KIB = {l["flash_total_size"] // 1024};
 STM32F429_FLASH_END = {_hex(l["flash_end"])};
 STM32F429_FLASH_BANK1_BASE = {_hex(l["flash_bank1_base"])};
 STM32F429_FLASH_BANK1_SIZE = {_hex(l["flash_bank1_size"])};
@@ -261,12 +280,16 @@ STM32F429_MAIN_SRAM_SUPPORTED_END = {_hex(l["main_sram_supported_end"])};
 """
 
 
-def render_make() -> str:
-    l = LAYOUT
-    return f"""# Generated from config/stm32f429_memory_layout.json.
+def render_make(layout: dict[str, object] | None = None) -> str:
+    l = LAYOUT if layout is None else layout
+    return f"""# Generated from config/stm32f429_memory_layout.json profile {l["profile"]}.
+STM32F429_LAYOUT_PROFILE := {l["profile"]}
+STM32F429_LAYOUT_PROFILE_ID := {l["layout_profile_id"]}
+STM32F429_MCU := {l["mcu"]}
 STM32F429_FLASH_BASE_HEX := {l["flash_base"]:08x}
 STM32F429_FLASH_END_HEX := {l["flash_end"]:08x}
 STM32F429_FLASH_TOTAL_SIZE_BYTES := {l["flash_total_size"]}
+STM32F429_FLASH_SIZE_KIB := {l["flash_total_size"] // 1024}
 STM32F429_BOOTLOADER_BASE_HEX := {l["bootloader_base"]:08x}
 STM32F429_BOOTLOADER_SIZE_BYTES := {l["bootloader_size"]}
 STM32F429_BOOT_METADATA_A_BASE_HEX := {l["boot_metadata_a_base"]:08x}
@@ -313,12 +336,19 @@ def _check(path: Path, expected: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
+    parser.add_argument(
+        "--profile",
+        choices=sorted(LAYOUT_PROFILES),
+        default=LAYOUT["profile"],
+        help="layout profile to render; the repository generated files track the default profile",
+    )
     args = parser.parse_args()
+    layout = LAYOUT_PROFILES[args.profile]
 
     outputs = (
-        (HEADER_PATH, render_header()),
-        (LD_PATH, render_ld()),
-        (MK_PATH, render_make()),
+        (HEADER_PATH, render_header(layout)),
+        (LD_PATH, render_ld(layout)),
+        (MK_PATH, render_make(layout)),
     )
     if args.check:
         stale = [str(path) for path, expected in outputs if not _check(path, expected)]

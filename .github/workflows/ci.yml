@@ -55,9 +55,9 @@ jobs:
 
       - name: Build firmware projects
         run: |
-          make -C firmware/exp045_bootloader_v2 clean all report
-          make -C firmware/exp065_signed_app clean all
-          make -C firmware/exp066_research_platform_core clean all
+          make -C firmware/exp045_bootloader_v2 clean all report LAYOUT_PROFILE=stm32f429_1m
+          make -C firmware/exp065_signed_app clean all LAYOUT_PROFILE=stm32f429_1m
+          make -C firmware/exp066_research_platform_core clean all LAYOUT_PROFILE=stm32f429_1m
 
       - name: Verify signed release artifacts
         run: |
@@ -74,12 +74,15 @@ jobs:
           PY
           PUBLIC_KEY_HEX="$(cat /tmp/ci_public_key_hex.txt)"
           make -C firmware/exp065_signed_app verify-signed \
+            LAYOUT_PROFILE=stm32f429_1m \
             SIGNING_SEED=/tmp/ci_signing_seed.bin \
             PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
           make -C firmware/exp066_research_platform_core verify-signed \
+            LAYOUT_PROFILE=stm32f429_1m \
             SIGNING_SEED=/tmp/ci_signing_seed.bin \
             PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
           make -C firmware/exp066_research_platform_core slot-releases \
+            LAYOUT_PROFILE=stm32f429_1m \
             SIGNING_SEED=/tmp/ci_signing_seed.bin \
             PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
           python tools/release_artifacts.py verify-release \

@@ -3,6 +3,10 @@ BUILD   := build
 SRC     := src
 COMMON  := ../common
 include $(COMMON)/stm32f429_memory_layout.mk
+LAYOUT_PROFILE ?= stm32f429_1m
+ifneq ($(LAYOUT_PROFILE),$(STM32F429_LAYOUT_PROFILE))
+$(error generated layout profile $(STM32F429_LAYOUT_PROFILE) does not match requested $(LAYOUT_PROFILE))
+endif
 
 CC      := arm-none-eabi-gcc
 OBJCOPY := arm-none-eabi-objcopy
@@ -86,6 +90,10 @@ report: all
 	@echo
 	@echo "=== Bootloader build report ==="
 	@echo "Project          : $(PROJECT)"
+	@echo "MCU              : $(STM32F429_MCU)"
+	@echo "Layout profile   : $(STM32F429_LAYOUT_PROFILE)"
+	@echo "Flash size       : $(STM32F429_FLASH_SIZE_KIB) KiB"
+	@echo "Flash range      : 0x$(STM32F429_FLASH_BASE_HEX)-0x$(STM32F429_FLASH_END_HEX)"
 	@echo "Binary           : $(BOOTLOADER_BINARY)"
 	@actual_size=$$(wc -c < "$(BOOTLOADER_BINARY)"); \
 	remaining=$$(( $(BOOTLOADER_MAX_SIZE_BYTES) - actual_size )); \

@@ -262,6 +262,7 @@ def install_simulated(
         "inactive_slot": inactive_slot,
         "active_version": active_version,
         "candidate_version": image_version,
+        "target_layout": release_artifacts.layout_report(),
         "metadata_states": ["CONFIRMED", "WRITING", "CANDIDATE_READY"],
         "installed_address": slot_base,
         "installed_size": len(package),
@@ -290,6 +291,7 @@ def run_build(args: argparse.Namespace) -> int:
         )
         signer.write_output_atomically(args.output, package)
         report = success_report({
+            "target_layout": release_artifacts.layout_report(),
             "output": str(args.output),
             "slot": args.slot,
             "image_version": args.image_version,
@@ -309,6 +311,7 @@ def run_build(args: argparse.Namespace) -> int:
 def run_inspect(args: argparse.Namespace) -> int:
     try:
         report = success_report({
+            "target_layout": release_artifacts.layout_report(),
             "package": inspect_package_bytes(read_file(args.package, "package")),
         })
         write_json(args.json_output, report)
@@ -322,12 +325,15 @@ def run_verify(args: argparse.Namespace) -> int:
     try:
         application = read_file(args.application, "application") if args.application else None
         report = success_report(
-            verify_package_bytes(
-                read_file(args.package, "package"),
-                public_key_from_args(args),
-                slot=args.slot,
-                application=application,
-            )
+            {
+                "target_layout": release_artifacts.layout_report(),
+                **verify_package_bytes(
+                    read_file(args.package, "package"),
+                    public_key_from_args(args),
+                    slot=args.slot,
+                    application=application,
+                ),
+            }
         )
         write_json(args.json_output, report)
         return EXIT_OK

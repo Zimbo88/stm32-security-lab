@@ -69,7 +69,12 @@ def test_build_inspect_verify_and_install_sim(tmp_path: Path) -> None:
         str(build_report),
     )
     assert result.returncode == 0, result.stdout + result.stderr
-    assert json.loads(build_report.read_text(encoding="ascii"))["result"] == "ok"
+    built = json.loads(build_report.read_text(encoding="ascii"))
+    assert built["result"] == "ok"
+    assert built["target_layout"]["mcu"] == "STM32F429IGT6"
+    assert built["target_layout"]["layout_profile"] == "stm32f429_1m"
+    assert built["target_layout"]["flash_size"] == 0x00100000
+    assert built["target_layout"]["slots"]["b"]["payload_base"] == 0x08080200
 
     result = run_tool(
         "inspect",
@@ -80,6 +85,7 @@ def test_build_inspect_verify_and_install_sim(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     inspected = json.loads(inspect_report.read_text(encoding="ascii"))
+    assert inspected["target_layout"]["sector_count"] == 12
     assert inspected["package"]["slot"] == "b"
     assert inspected["package"]["format_version"] == 2
     assert inspected["package"]["image_version"] == 3
@@ -100,6 +106,7 @@ def test_build_inspect_verify_and_install_sim(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     verified = json.loads(verify_report.read_text(encoding="ascii"))
     assert verified["result"] == "ok"
+    assert verified["target_layout"]["layout_profile"] == "stm32f429_1m"
     assert verified["verification"]["signature_valid"] is True
 
     result = run_tool(
@@ -120,6 +127,7 @@ def test_build_inspect_verify_and_install_sim(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
     installed = json.loads(install_report.read_text(encoding="ascii"))
     assert installed["result"] == "ok"
+    assert installed["target_layout"]["flash_size"] == 0x00100000
     assert installed["inactive_slot"] == "b"
     assert installed["metadata_states"][-1] == "CANDIDATE_READY"
     assert flash.stat().st_size == LAYOUT["flash_total_size"]

@@ -433,19 +433,26 @@ static void test_sector_lookup_and_bounds(void)
     expect_u32("sector 5 base", STM32F429_SLOT_A_SIGNED_IMAGE_BASE, sector.base);
     expect_u32("sector 5 size", 0x00020000UL, sector.size);
 
-    expect_status("sector 12", BOOT_FLASH_OK, boot_flash_sector_by_id(12U, &sector));
-    expect_u32("sector 12 base", STM32F429_SLOT_B_SIGNED_IMAGE_BASE, sector.base);
-    expect_u32("sector 12 size", 0x00004000UL, sector.size);
+    expect_status("sector 8", BOOT_FLASH_OK, boot_flash_sector_by_id(8U, &sector));
+    expect_u32("sector 8 base", STM32F429_SLOT_B_SIGNED_IMAGE_BASE, sector.base);
+    expect_u32("sector 8 size", 0x00020000UL, sector.size);
 
-    expect_status("sector 23", BOOT_FLASH_OK, boot_flash_sector_by_id(23U, &sector));
-    expect_u32("sector 23 base", STM32F429_RECOVERY_BASE, sector.base);
-    expect_u32("sector 23 end", STM32F429_FLASH_END, sector.end);
+    expect_status("sector 11", BOOT_FLASH_OK, boot_flash_sector_by_id(11U, &sector));
+    expect_u32("sector 11 base", STM32F429_RECOVERY_BASE, sector.base);
+    expect_u32("sector 11 end", STM32F429_FLASH_END, sector.end);
 
     expect_status(
         "invalid sector",
         BOOT_FLASH_ERR_INVALID_ARGUMENT,
-        boot_flash_sector_by_id(24U, &sector)
+        boot_flash_sector_by_id(12U, &sector)
     );
+    for (uint32_t invalid_sector = 12U; invalid_sector <= 23U; ++invalid_sector) {
+        expect_status(
+            "non-existent 1 MiB sector rejected",
+            BOOT_FLASH_ERR_INVALID_ARGUMENT,
+            boot_flash_sector_by_id(invalid_sector, &sector)
+        );
+    }
 }
 
 static void test_allowed_erase_policy(void)
@@ -654,6 +661,17 @@ static void test_target_flash_backend_error_mapping(void)
     boot_flash_target_host_context_t target;
     boot_flash_t flash;
     uint8_t data[4] = {0xAAU, 0x55U, 0x11U, 0x22U};
+
+    make_target_host_flash(&target, &flash, only_slot_b, 1U);
+    for (uint32_t invalid_sector = 12U; invalid_sector <= 23U; ++invalid_sector) {
+        expect_status(
+            "target non-existent sector rejected",
+            BOOT_FLASH_ERR_INVALID_ARGUMENT,
+            boot_flash_erase_sector(&flash, invalid_sector)
+        );
+    }
+    expect_u32("invalid sectors did not unlock", (1UL << 31), target.cr & (1UL << 31));
+    expect_u32("invalid sectors no critical enter", 0U, target.critical_enter_count);
 
     make_target_host_flash(&target, &flash, only_slot_b, 1U);
     target.unlock_failure = 1U;
