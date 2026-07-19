@@ -41,6 +41,12 @@ jobs:
       - name: Run Python and host tests
         run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests
 
+      - name: Run memory-integrity tooling tests
+        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_memory_integrity_tool.py
+
+      - name: Run pre-hardware EXP066 tests
+        run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_exp066_prehardware.py
+
       - name: Run authenticated update package tool tests
         run: PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider tests/test_update_package_tool.py
 
@@ -49,7 +55,7 @@ jobs:
 
       - name: Build firmware projects
         run: |
-          make -C firmware/exp045_bootloader_v2 clean all
+          make -C firmware/exp045_bootloader_v2 clean all report
           make -C firmware/exp065_signed_app clean all
           make -C firmware/exp066_research_platform_core clean all
 
@@ -71,6 +77,9 @@ jobs:
             SIGNING_SEED=/tmp/ci_signing_seed.bin \
             PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
           make -C firmware/exp066_research_platform_core verify-signed \
+            SIGNING_SEED=/tmp/ci_signing_seed.bin \
+            PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
+          make -C firmware/exp066_research_platform_core slot-releases \
             SIGNING_SEED=/tmp/ci_signing_seed.bin \
             PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
           python tools/release_artifacts.py verify-release \
