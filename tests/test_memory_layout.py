@@ -111,9 +111,26 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("LENGTH = STM32F429_BOOTLOADER_SIZE", bootloader)
         self.assertIn("ORIGIN = STM32F429_APPLICATION_BASE", app)
         self.assertIn("LENGTH = STM32F429_APPLICATION_PAYLOAD_MAX_SIZE", app)
-        self.assertIn("ORIGIN = STM32F429_APPLICATION_BASE", platform)
-        self.assertIn("LENGTH = STM32F429_APPLICATION_PAYLOAD_MAX_SIZE", platform)
-        self.assertIn("ADDR(.isr_vector) == STM32F429_APPLICATION_BASE", platform)
+        self.assertIn(
+            "STM32F429_SELECTED_APPLICATION_BASE : STM32F429_APPLICATION_BASE",
+            platform,
+        )
+        self.assertIn(
+            "STM32F429_SELECTED_APPLICATION_PAYLOAD_MAX_SIZE :",
+            platform,
+        )
+        self.assertIn(
+            "ORIGIN = STM32F429_SELECTED_APPLICATION_BASE",
+            platform,
+        )
+        self.assertIn(
+            "LENGTH = STM32F429_SELECTED_APPLICATION_PAYLOAD_MAX_SIZE",
+            platform,
+        )
+        self.assertIn(
+            "ADDR(.isr_vector) == STM32F429_SELECTED_APPLICATION_BASE",
+            platform,
+        )
 
     def test_verifier_and_signer_use_supported_application_sram_bounds(self) -> None:
         board = _read("firmware/exp045_bootloader_v2/include/board.h")
@@ -145,7 +162,11 @@ class MemoryLayoutTests(unittest.TestCase):
         self.assertIn("#define STM32F429_SLOT_A_PAYLOAD_BASE 0x08020200UL", _read("firmware/common/stm32f429_memory_layout.h"))
         self.assertIn("#define STM32F429_SLOT_B_PAYLOAD_BASE 0x08100200UL", _read("firmware/common/stm32f429_memory_layout.h"))
         self.assertIn(
-            "STM32F429_APPLICATION_BASE_HEX",
+            "STM32F429_SLOT_A_APPLICATION_BASE_HEX",
+            makefile,
+        )
+        self.assertIn(
+            "STM32F429_SLOT_B_APPLICATION_BASE_HEX",
             makefile,
         )
 
