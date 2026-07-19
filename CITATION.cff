@@ -5,3 +5,17 @@ type: software
 authors:
   - family-names: Zimmermann
     given-names: Mathias
+license: "BSD-3-Clause"
+version: "1.0.0"
+abstract: >-
+  A reproducible STM32F429 secure-boot and embedded-security research platform
+  with authenticated firmware, rollback-aware slot selection, controlled
+  recovery, and automated hardware-in-the-loop validation.
+keywords:
+  - STM32
+  - STM32F429
+  - secure boot
+  - embedded security
+  - hardware-in-the-loop
+  - Ed25519
+  - SHA-512
