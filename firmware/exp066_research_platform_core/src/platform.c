@@ -1,6 +1,8 @@
 #include "platform.h"
 
+#include "experiment_telemetry.h"
 #include "log.h"
+#include "platform_confirmation.h"
 #include "platform_audio.h"
 #include "platform_health.h"
 #include "uart.h"
@@ -39,6 +41,14 @@
 #define RCC_CR REG32(0x40023800UL)
 #define RCC_CFGR REG32(0x40023808UL)
 #define RCC_CSR REG32(0x40023874UL)
+#define RCC_CSR_RMVF (1UL << 24)
+#define RCC_CSR_BORRSTF (1UL << 25)
+#define RCC_CSR_PINRSTF (1UL << 26)
+#define RCC_CSR_PORRSTF (1UL << 27)
+#define RCC_CSR_SFTRSTF (1UL << 28)
+#define RCC_CSR_IWDGRSTF (1UL << 29)
+#define RCC_CSR_WWDGRSTF (1UL << 30)
+#define RCC_CSR_LPWRRSTF (1UL << 31)
 
 #define UID0 REG32(0x1FFF7A10UL)
 #define UID1 REG32(0x1FFF7A14UL)
@@ -53,12 +63,21 @@
 #define LOG_EVENT_HEALTH_ACK 4U
 #define LOG_EVENT_LED_TEST 5U
 #define LOG_EVENT_EASTER_EGG 6U
+#define LOG_EVENT_CONFIRMATION 7U
+
+#ifndef PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS
+#define PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS 0UL
+#endif
 
 static volatile uint32_t ticks;
 static char line[80];
 static uint32_t line_length;
 static uint32_t boot_reset_csr;
 static uint8_t mandatory_self_tests_passed;
+static uint8_t early_platform_init_done;
+static uint8_t critical_initialization_failure;
+static uint8_t stable_execution_point_reached;
+static uint8_t confirmation_terminal;
 
 static void newline(void)
 {
@@ -120,6 +139,12 @@ static void print_address_range(const char *name, uint32_t start, uint32_t end)
 static void print_unavailable(void)
 {
     uart_puts("unavailable: group intentionally not sampled in EXP066\n");
+}
+
+static void print_reset_flag(const char *name, uint32_t mask)
+{
+    uart_puts(name);
+    uart_puts((boot_reset_csr & mask) != 0UL ? "YES\n" : "NO\n");
 }
 
 static void print_device_info(void)
@@ -194,6 +219,40 @@ static void print_boot_status(void)
     newline();
 }
 
+static void print_confirmation_status(void)
+{
+    platform_confirmation_snapshot_t snapshot;
+
+    platform_confirmation_snapshot(&snapshot);
+    uart_puts("confirmation ");
+    uart_puts(platform_confirmation_status_text(snapshot.last_status));
+    uart_puts(" running ");
+    uart_put_hex32(snapshot.running_slot);
+    uart_puts(" confirmed ");
+    uart_put_hex32(snapshot.confirmed_slot);
+    uart_puts(" candidate ");
+    uart_put_hex32(snapshot.candidate_slot);
+    uart_puts(" metadata_state ");
+    uart_put_hex32(snapshot.metadata_state);
+    uart_puts(" attempts ");
+    uart_put_u32(snapshot.remaining_trial_attempts);
+    uart_puts(" already ");
+    uart_puts(snapshot.already_confirmed != 0U ? "yes" : "no");
+    newline();
+}
+
+static void print_reset_decoded(void)
+{
+    print_snapshot("RCC_CSR_BOOT", boot_reset_csr);
+    print_reset_flag("brownout_reset=", RCC_CSR_BORRSTF);
+    print_reset_flag("pin_reset=", RCC_CSR_PINRSTF);
+    print_reset_flag("power_on_reset=", RCC_CSR_PORRSTF);
+    print_reset_flag("software_reset=", RCC_CSR_SFTRSTF);
+    print_reset_flag("independent_watchdog_reset=", RCC_CSR_IWDGRSTF);
+    print_reset_flag("window_watchdog_reset=", RCC_CSR_WWDGRSTF);
+    print_reset_flag("low_power_reset=", RCC_CSR_LPWRRSTF);
+}
+
 static void print_help(void)
 {
     uart_puts(
@@ -201,7 +260,8 @@ static void print_help(void)
         "device option-bytes reset cause clock show registers "
         "{rcc|gpio|nvic|scb|systick|mpu|flash|pwr|syscfg|dbgmcu} "
         "memory regions log {show|clear} fault {show|clear} "
-        "health {status|acknowledge} led {status|test healthy|test degraded|"
+        "health {status|acknowledge} confirmation status telemetry show "
+        "reset decoded led {status|test healthy|test degraded|"
         "test update|test recovery|test fault|test security|test stop} "
         "easteregg {knightrider|retro|stop} "
         "test {list|run gpio|run button|run clock|run ram} "
@@ -299,6 +359,8 @@ static void dispatch_command(const char *command)
     } else if (eq(command, "reset cause")) {
         print_snapshot("RCC_CSR_BOOT", boot_reset_csr);
         print_snapshot("RCC_CSR_NOW", RCC_CSR);
+    } else if (eq(command, "reset decoded")) {
+        print_reset_decoded();
     } else if (eq(command, "clock show")) {
         print_snapshot("RCC_CFGR", RCC_CFGR);
     } else if (eq(command, "registers rcc")) {
@@ -374,6 +436,10 @@ static void dispatch_command(const char *command)
         uart_puts("ok\n");
     } else if (eq(command, "health status")) {
         print_health_status();
+    } else if (eq(command, "confirmation status")) {
+        print_confirmation_status();
+    } else if (eq(command, "telemetry show")) {
+        experiment_telemetry_print();
     } else if (eq(command, "health acknowledge")) {
         platform_health_acknowledge();
         log_write(LOG_INFO, LOG_SRC_PLATFORM, LOG_EVENT_HEALTH_ACK, 0, 0U);
@@ -406,6 +472,7 @@ void platform_init(void)
     platform_health_init();
 
     boot_reset_csr = RCC_CSR;
+    experiment_telemetry_init(boot_reset_csr);
     log_write(
         LOG_INFO,
         LOG_SRC_PLATFORM,
@@ -413,6 +480,7 @@ void platform_init(void)
         &boot_reset_csr,
         (uint8_t)sizeof(boot_reset_csr)
     );
+    RCC_CSR |= RCC_CSR_RMVF;
 
     if (fault_valid()) {
         log_write(LOG_ERROR, LOG_SRC_PLATFORM, LOG_EVENT_BOOT_FAULT_RECORD, 0, 0U);
@@ -420,14 +488,19 @@ void platform_init(void)
 
     mandatory_self_tests_passed = mandatory_self_tests_pass();
     if (mandatory_self_tests_passed == 0U) {
+        critical_initialization_failure = 1U;
         log_write(LOG_ERROR, LOG_SRC_PLATFORM, LOG_EVENT_SELFTEST_FAILED, 0, 0U);
     }
+    early_platform_init_done = 1U;
 
     platform_health_apply_boot_policy(
         boot_reset_csr,
         fault_valid() ? 1U : 0U,
         mandatory_self_tests_passed,
         0U
+    );
+    experiment_telemetry_set_boot_policy_result(
+        (uint32_t)platform_health_get_automatic_state()
     );
 }
 
@@ -468,9 +541,46 @@ void platform_cli_poll(void)
 
 void platform_idle(void)
 {
+    platform_confirmation_health_t health;
+    platform_confirmation_status_t confirmation;
+
     platform_tick();
     platform_health_service_tick();
     platform_cli_poll();
+
+#if PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS == 0UL
+    stable_execution_point_reached = 1U;
+#else
+    if (ticks >= PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS) {
+        stable_execution_point_reached = 1U;
+    }
+#endif
+
+    if (confirmation_terminal == 0U) {
+        health.early_platform_init_done = early_platform_init_done;
+        health.running_slot_identified = 0U;
+        health.core_self_checks_passed = mandatory_self_tests_passed;
+        health.critical_initialization_failure =
+            critical_initialization_failure;
+        health.stable_execution_point_reached =
+            stable_execution_point_reached;
+        health.metadata_allows_confirmation = 0U;
+
+        confirmation = platform_confirmation_service(VTOR, &health);
+        if (confirmation != PLATFORM_CONFIRMATION_NOT_HEALTHY) {
+            confirmation_terminal = 1U;
+            log_write(
+                confirmation == PLATFORM_CONFIRMATION_OK
+                    ? LOG_INFO
+                    : LOG_ERROR,
+                LOG_SRC_PLATFORM,
+                LOG_EVENT_CONFIRMATION,
+                &confirmation,
+                (uint8_t)sizeof(confirmation)
+            );
+            experiment_telemetry_set_confirmation_result((uint32_t)confirmation);
+        }
+    }
 }
 
 int main(void)

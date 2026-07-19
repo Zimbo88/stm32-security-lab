@@ -31,6 +31,18 @@ BUILD_OUTPUTS = (
     "firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin",
     "firmware/exp066_research_platform_core/build/exp066_release_manifest.json",
     "firmware/exp066_research_platform_core/build/exp066_release_verification.json",
+    "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.elf",
+    "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.bin",
+    "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.hex",
+    "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_update_v2.bin",
+    "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_release_manifest.json",
+    "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_package_verify.json",
+    "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.elf",
+    "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin",
+    "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.hex",
+    "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin",
+    "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_release_manifest.json",
+    "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_package_verify.json",
 )
 
 
@@ -160,6 +172,17 @@ def build_checkout(checkout: Path) -> dict[str, str]:
             "firmware/exp066_research_platform_core/build/"
             "exp066_release_verification.json"
         ),
+    )
+    run(
+        [
+            "make",
+            "-C",
+            "firmware/exp066_research_platform_core",
+            "slot-releases",
+            f"SIGNING_SEED={seed}",
+            f"PUBLIC_KEY_HEX={TEST_PUBLIC_KEY_HEX}",
+        ],
+        checkout,
     )
 
     return {
