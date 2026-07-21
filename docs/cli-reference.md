@@ -8,7 +8,8 @@ Commands: `help`, `version`, `boot status`, `device info`, `device uid`,
 `device flash-size`, `device option-bytes`, `reset cause`, `clock show`, all
 required `registers` groups, `memory regions`, `log show`, `log clear`,
 `fault show`, `fault clear`, `health status`, `health acknowledge`,
-`confirmation status`, `telemetry show`, `reset decoded`,
+`confirmation status`, `telemetry show`, `rsm status`,
+`rsm status public`, `rsm status restricted`, `reset decoded`,
 `led status`, `led test healthy|degraded|update|recovery|fault|security`,
 `led test stop`, `easteregg knightrider`, `easteregg retro`, `easteregg stop`,
 `test list`, `test run gpio|button|clock|ram`, `security status`, and
@@ -16,10 +17,22 @@ required `registers` groups, `memory regions`, `log show`, `log clear`,
 
 Only the exact `test run gpio`, `test run button`, `test run clock`, and
 `test run ram` commands return PASS. Other `test ...` strings are rejected.
-The `registers nvic`, `registers systick`, `registers mpu`, and
-`registers flash` commands now print curated read-only snapshots. The
+The `rsm status` and `rsm status public` commands print the phase-1 Runtime
+Security Monitor key-value status. `rsm status restricted` only emits
+restricted values when the firmware is built with
+`RSM_RESTRICTED_DIAGNOSTICS=1`; the default build denies restricted output.
+
+Raw UID, exact option bytes, exact memory-region addresses, detailed log
+history, retained fault details, raw register snapshots, and the full
+telemetry report are restricted diagnostics. Default builds either print a
+public summary or return `denied: restricted diagnostic disabled`. The
 `registers pwr` and `registers syscfg` commands return an explicit unavailable
 message in EXP066 instead of changing peripheral clocks.
+
+`log clear` and `fault clear` are restricted because they remove volatile
+forensic evidence for the current boot. `clock show` remains public, but it
+prints only decoded clock source and HCLK when the value can be derived without
+guessing an external oscillator frequency.
 
 EXP071 health and Easter egg commands:
 
@@ -40,12 +53,13 @@ EXP071 health and Easter egg commands:
 Pre-hardware diagnostic commands:
 
 - `confirmation status` prints the last health-gated application confirmation
-  result, running slot, confirmed slot, candidate slot, metadata state, and
-  remaining trial attempts.
-- `telemetry show` prints the bounded RAM experiment report. The report is
-  diagnostic only and does not change boot trust decisions.
-- `reset decoded` prints decoded `RCC_CSR` reset flags captured before the
-  firmware clears them for the current boot.
+  result and a public running-slot summary by default. Metadata-copy details
+  are restricted diagnostics.
+- `telemetry show` prints the bounded RAM experiment report only in restricted
+  diagnostic builds. The report is diagnostic only and does not change boot
+  trust decisions.
+- `reset decoded` prints the public reset-cause name and decoded `RCC_CSR`
+  reset flags captured before the firmware clears them for the current boot.
 
 How to trigger the Easter egg at the `rp> ` prompt:
 

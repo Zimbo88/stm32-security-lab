@@ -41,10 +41,10 @@ Status values are intentionally limited to:
 | interrupt tests | NOT_IMPLEMENTED | none | none | No interrupt self-test harness. | Add after NVIC/ISR inventory. |
 | watchdog tests | NOT_IMPLEMENTED | none | none | Watchdog is not enabled by EXP066. | Add on expendable board with recovery plan. |
 | clock tests | DOCUMENTED_DESIGN | `platform.c` | source allowlist tests | CLI placeholder only; no clock switching. | Add read-only clock consistency checks. |
-| device information | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Raw CPUID/DBGMCU/UID output. | Validate values on board. |
-| UID | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Raw UID words only. | Hardware output capture. |
+| device information | TARGET_IMPLEMENTED | `platform.c`, `runtime_monitor.c` | EXP066 build | Public ID/revision/UID fingerprint; raw UID is restricted. | Validate values on board. |
+| UID | TARGET_IMPLEMENTED | `platform.c`, `runtime_monitor_core.c` | RSM host tests, EXP066 build | Public CRC32 fingerprint only; raw UID restricted. | Hardware output capture. |
 | Flash size | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Raw factory flash-size register. | Hardware output capture. |
-| read-only option-byte reporting | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Raw `FLASH_OPTCR`; no writes or full decode. | Decode safely after review. |
+| read-only option-byte reporting | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Raw `FLASH_OPTCR` is restricted; no writes or full decode. | Decode safely after review. |
 | boot configuration | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Reports Stage-0 launch assumption, no boot mailbox. | Add authenticated boot-result mailbox if needed. |
 | runtime information | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Version, health, LED mask, reset, and self-test state only. | Add uptime units after real tick source. |
 | UART CLI | TARGET_IMPLEMENTED | `platform.c`, `uart.c` | `tests/test_exp066_pure.py` | Blocking TX remains; RX is bounded. | Hardware CLI soak test. |
