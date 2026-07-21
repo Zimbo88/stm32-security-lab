@@ -154,7 +154,9 @@ def public_key_from_args(args: argparse.Namespace) -> bytes:
             raise VerificationError(f"public key must be 32 bytes, got {len(key)}")
         return key
 
-    return parse_public_key_header(public_key_header)
+    if public_key_header is None:
+        raise VerificationError("public key header path is unavailable")
+    return parse_public_key_header(Path(public_key_header))
 
 
 def load_le32(data: bytes, offset: int) -> int:

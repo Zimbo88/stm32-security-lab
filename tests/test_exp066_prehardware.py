@@ -6,6 +6,7 @@ import struct
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 from nacl.signing import SigningKey
 
@@ -18,6 +19,19 @@ UPDATE_PACKAGE_IMAGE_TYPE_APPLICATION = 1
 sys.path.insert(0, str(ROOT / "tools"))
 import memory_integrity  # noqa: E402
 from stm32f429_layout import LAYOUT  # noqa: E402
+
+
+class SignedManifest(TypedDict):
+    magic: int
+    header_version: int
+    image_version: int
+    vector_address: int
+    image_size: int
+    flags: int
+    reserved0: int
+    reserved1: int
+    payload_sha512: bytes
+    total_size: int
 
 
 def readelf_load_segments(elf: Path) -> list[dict[str, int]]:
@@ -61,7 +75,7 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def decode_signed_manifest(path: Path) -> dict[str, object]:
+def decode_signed_manifest(path: Path) -> SignedManifest:
     data = path.read_bytes()
     (
         magic,

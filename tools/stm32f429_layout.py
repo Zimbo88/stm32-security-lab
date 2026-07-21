@@ -33,7 +33,6 @@ def _read_region(raw: dict[str, Any], name: str) -> dict[str, int]:
     base = _int(raw["base"])
     size = _int(raw["size"])
     return {
-        "name": name,
         "base": base,
         "size": size,
         "end": _checked_add(base, size, f"{name} end"),

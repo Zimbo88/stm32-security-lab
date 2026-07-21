@@ -7,6 +7,7 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
 
@@ -64,7 +65,7 @@ def _native_package(
     return key, package, payload
 
 
-def _replace_native_header(payload: bytes, **changes: object) -> bytes:
+def _replace_native_header(payload: bytes, **changes: Any) -> bytes:
     header = replace(unpack_native_header(payload), **changes)
     return pack_native_header(header) + payload[header.header_size:]
 

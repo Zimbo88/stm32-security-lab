@@ -430,8 +430,29 @@ class NativeModuleManager:
         self.failure_threshold = failure_threshold
         self.loaded: LoadedModule | None = None
 
-    def verify(self, package: bytes, public_key: bytes, **kwargs: object) -> NativePackage:
-        return load_native_package(package, public_key, api=self.api, **kwargs)
+    def verify(
+        self,
+        package: bytes,
+        public_key: bytes,
+        *,
+        expected_signer_key_id: bytes | None = None,
+        expected_module_id: int | None = None,
+        min_platform: int = PLATFORM_VERSION,
+        abi_version: int = PLATFORM_ABI_VERSION,
+        min_module_version: int = 0,
+        allowed_capabilities: Container[int] = SUPPORTED_NATIVE_CAPABILITIES,
+    ) -> NativePackage:
+        return load_native_package(
+            package,
+            public_key,
+            expected_signer_key_id=expected_signer_key_id,
+            expected_module_id=expected_module_id,
+            min_platform=min_platform,
+            abi_version=abi_version,
+            min_module_version=min_module_version,
+            allowed_capabilities=allowed_capabilities,
+            api=self.api,
+        )
 
     def load(self, native_package: NativePackage) -> LoadedModule:
         self.api.validate()

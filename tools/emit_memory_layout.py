@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Any
 
 from stm32f429_layout import LAYOUT, LAYOUT_PROFILES, PROFILE_IDS, ROOT
 
@@ -23,7 +24,7 @@ def _macro_name(prefix: str, name: str) -> str:
     return f"{prefix}_{name.upper()}"
 
 
-def _render_sector_header(l: dict[str, object]) -> str:
+def _render_sector_header(l: dict[str, Any]) -> str:
     lines = [
         f"#define STM32F429_FLASH_SECTOR_COUNT {len(l['flash_sectors'])}UL",
         "",
@@ -42,7 +43,7 @@ def _render_sector_header(l: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _render_sector_ld(l: dict[str, object]) -> str:
+def _render_sector_ld(l: dict[str, Any]) -> str:
     lines = [f"STM32F429_FLASH_SECTOR_COUNT = {len(l['flash_sectors'])};", ""]
     for sector in l["flash_sectors"]:
         sid = sector["id"]
@@ -58,7 +59,7 @@ def _render_sector_ld(l: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _region_header(prefix: str, l: dict[str, object]) -> str:
+def _region_header(prefix: str, l: dict[str, Any]) -> str:
     keys = ("BASE", "SIZE", "END", "FIRST_SECTOR", "LAST_SECTOR")
     values = (
         l[f"{prefix.lower()}_base"],
@@ -75,7 +76,7 @@ def _region_header(prefix: str, l: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _region_ld(prefix: str, l: dict[str, object]) -> str:
+def _region_ld(prefix: str, l: dict[str, Any]) -> str:
     keys = ("BASE", "SIZE", "END", "FIRST_SECTOR", "LAST_SECTOR")
     values = (
         l[f"{prefix.lower()}_base"],
@@ -91,7 +92,7 @@ def _region_ld(prefix: str, l: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _slot_header(name: str, l: dict[str, object]) -> str:
+def _slot_header(name: str, l: dict[str, Any]) -> str:
     prefix = f"STM32F429_SLOT_{name.upper()}"
     lower = f"slot_{name.lower()}"
     fields = (
@@ -113,7 +114,7 @@ def _slot_header(name: str, l: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
-def _slot_ld(name: str, l: dict[str, object]) -> str:
+def _slot_ld(name: str, l: dict[str, Any]) -> str:
     prefix = f"STM32F429_SLOT_{name.upper()}"
     lower = f"slot_{name.lower()}"
     fields = (
@@ -139,7 +140,7 @@ def _profile_macro(profile: str) -> str:
     return profile.upper().replace("-", "_")
 
 
-def render_header(layout: dict[str, object] | None = None) -> str:
+def render_header(layout: dict[str, Any] | None = None) -> str:
     l = LAYOUT if layout is None else layout
     profile_defines = "\n".join(
         f"#define STM32F429_LAYOUT_PROFILE_{_profile_macro(profile)} {profile_id}UL"
@@ -221,7 +222,7 @@ def render_header(layout: dict[str, object] | None = None) -> str:
 """
 
 
-def render_ld(layout: dict[str, object] | None = None) -> str:
+def render_ld(layout: dict[str, Any] | None = None) -> str:
     l = LAYOUT if layout is None else layout
     return f"""/* Generated from config/stm32f429_memory_layout.json profile {l["profile"]}. */
 STM32F429_LAYOUT_PROFILE_ID = {l["layout_profile_id"]};
@@ -279,7 +280,7 @@ STM32F429_MAIN_SRAM_SUPPORTED_END = {_hex(l["main_sram_supported_end"])};
 """
 
 
-def render_make(layout: dict[str, object] | None = None) -> str:
+def render_make(layout: dict[str, Any] | None = None) -> str:
     l = LAYOUT if layout is None else layout
     return f"""# Generated from config/stm32f429_memory_layout.json profile {l["profile"]}.
 STM32F429_LAYOUT_PROFILE := {l["profile"]}
@@ -350,16 +351,16 @@ def main() -> int:
         (MK_PATH, render_make(layout)),
     )
     if args.check:
-        stale = [str(path) for path, expected in outputs if not _check(path, expected)]
+        stale = [str(output_path) for output_path, expected in outputs if not _check(output_path, expected)]
         if stale:
-            for path in stale:
-                print(f"stale generated memory layout: {path}")
+            for stale_path in stale:
+                print(f"stale generated memory layout: {stale_path}")
             return 1
         return 0
 
-    for path, text in outputs:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="ascii")
+    for output_path, text in outputs:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(text, encoding="ascii")
     return 0
 
 

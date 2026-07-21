@@ -691,8 +691,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         for record in installer.list():
             print(f"0x{record.module_id:08X} {record.state.name} v{record.module_version}")
     elif args.command == "inspect":
-        record = installer.inspect(args.module_id)
-        print("none" if record is None else f"0x{record.module_id:08X} {record.state.name} v{record.module_version}")
+        inspected = installer.inspect(args.module_id)
+        print(
+            "none"
+            if inspected is None
+            else f"0x{inspected.module_id:08X} {inspected.state.name} v{inspected.module_version}"
+        )
     elif args.command == "install":
         verified = installer.install(args.package.read_bytes())
         print(f"installed candidate 0x{verified.module_id:08X} v{verified.module_version}")
