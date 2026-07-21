@@ -5,6 +5,8 @@ COMMON := ../common
 BOOTLOADER := ../exp045_bootloader_v2
 include $(COMMON)/stm32f429_memory_layout.mk
 LAYOUT_PROFILE ?= stm32f429_1m
+RSM_ENABLE ?= 1
+RSM_RESTRICTED_DIAGNOSTICS ?= 0
 ifneq ($(LAYOUT_PROFILE),$(STM32F429_LAYOUT_PROFILE))
 $(error generated layout profile $(STM32F429_LAYOUT_PROFILE) does not match requested $(LAYOUT_PROFILE))
 endif
@@ -33,6 +35,7 @@ REPRO_FLAGS := -ffile-prefix-map=$(CURDIR)=. \
 CFLAGS := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding -fno-builtin \
  -ffunction-sections -fdata-sections -Wall -Wextra -Werror -fstack-usage \
  $(REPRO_FLAGS) -DPLATFORM_APP_BASE_OVERRIDE=0x$(SLOT_APPLICATION_BASE_HEX)UL \
+ -DRSM_ENABLE=$(RSM_ENABLE) -DRSM_RESTRICTED_DIAGNOSTICS=$(RSM_RESTRICTED_DIAGNOSTICS) \
  -I$(SRC) -I$(COMMON) -I$(BOOTLOADER)/src -I$(BOOTLOADER)/include
 ASFLAGS := $(CPUFLAGS) -x assembler-with-cpp -g3 $(REPRO_FLAGS)
 LDFLAGS := $(CPUFLAGS) -T linker.ld -nostdlib -Wl,--gc-sections \

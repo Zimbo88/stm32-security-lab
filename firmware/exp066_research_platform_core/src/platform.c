@@ -5,6 +5,7 @@
 #include "platform_confirmation.h"
 #include "platform_audio.h"
 #include "platform_health.h"
+#include "runtime_monitor.h"
 #include "uart.h"
 
 #define REG32(a) (*(volatile uint32_t *)(a))
@@ -141,6 +142,26 @@ static void print_unavailable(void)
     uart_puts("unavailable: group intentionally not sampled in EXP066\n");
 }
 
+static uint8_t restricted_diagnostics_allowed(void)
+{
+    return runtime_monitor_diagnostic_allowed(RSM_INFO_RESTRICTED);
+}
+
+static void print_restricted_denied(void)
+{
+    runtime_monitor_record_diagnostic_denial(RSM_INFO_RESTRICTED);
+    uart_puts("denied: restricted diagnostic disabled\n");
+}
+
+static uint8_t require_restricted_diagnostics(void)
+{
+    if (restricted_diagnostics_allowed() != 0U) {
+        return 1U;
+    }
+    print_restricted_denied();
+    return 0U;
+}
+
 static void print_reset_flag(const char *name, uint32_t mask)
 {
     uart_puts(name);
@@ -149,31 +170,26 @@ static void print_reset_flag(const char *name, uint32_t mask)
 
 static void print_device_info(void)
 {
-    uint32_t msp;
+    const uint32_t dbgmcu = DBGMCU_ID;
+    const uint32_t fingerprint =
+        rsm_uid_fingerprint_words(UID0, UID1, UID2);
+
+    uart_puts("family STM32F429 device_id ");
+    uart_put_hex32(dbgmcu & 0x0FFFUL);
+    uart_puts(" revision ");
+    uart_put_hex32((dbgmcu >> 16U) & 0xFFFFUL);
+    newline();
 
     uart_puts("CPUID ");
     uart_put_hex32(CPUID);
-    uart_puts(" DBGMCU ");
-    uart_put_hex32(DBGMCU_ID);
     newline();
 
-    uart_puts("UID ");
-    uart_put_hex32(UID0);
-    uart_putc(' ');
-    uart_put_hex32(UID1);
-    uart_putc(' ');
-    uart_put_hex32(UID2);
+    uart_puts("uid_fingerprint ");
+    uart_put_hex32(fingerprint);
     newline();
 
     uart_puts("flash_kb ");
     uart_put_u32((uint32_t)FLASH_SIZE_KB);
-    newline();
-
-    uart_puts("VTOR ");
-    uart_put_hex32(VTOR);
-    uart_puts(" MSP ");
-    __asm volatile("mrs %0,msp" : "=r"(msp));
-    uart_put_hex32(msp);
     newline();
 }
 
@@ -219,6 +235,42 @@ static void print_boot_status(void)
     newline();
 }
 
+static void print_fault_public_summary(void)
+{
+    uart_puts("fault: ");
+    uart_puts(fault_valid() ? "valid restricted_details=denied" : "none");
+    newline();
+}
+
+static void print_log_public_summary(void)
+{
+    uart_puts("records=");
+    uart_put_u32(log_count());
+    uart_puts(" dropped=");
+    uart_put_u32(log_dropped());
+    uart_puts(" last_sequence=");
+    uart_put_u32(log_last_sequence());
+    uart_puts(" restricted_details=denied\n");
+}
+
+static void print_confirmation_public_status(void)
+{
+    platform_confirmation_snapshot_t snapshot;
+
+    platform_confirmation_snapshot(&snapshot);
+    uart_puts("confirmation ");
+    uart_puts(platform_confirmation_status_text(snapshot.last_status));
+    uart_puts(" running ");
+    uart_puts(rsm_slot_name(snapshot.running_slot));
+    uart_puts(" firmware_version ");
+    if (snapshot.image_version == 0UL) {
+        uart_puts("unavailable");
+    } else {
+        uart_put_u32(snapshot.image_version);
+    }
+    newline();
+}
+
 static void print_confirmation_status(void)
 {
     platform_confirmation_snapshot_t snapshot;
@@ -243,7 +295,9 @@ static void print_confirmation_status(void)
 
 static void print_reset_decoded(void)
 {
-    print_snapshot("RCC_CSR_BOOT", boot_reset_csr);
+    uart_puts("reset_cause=");
+    uart_puts(rsm_reset_cause_name(boot_reset_csr));
+    newline();
     print_reset_flag("brownout_reset=", RCC_CSR_BORRSTF);
     print_reset_flag("pin_reset=", RCC_CSR_PINRSTF);
     print_reset_flag("power_on_reset=", RCC_CSR_PORRSTF);
@@ -251,6 +305,22 @@ static void print_reset_decoded(void)
     print_reset_flag("independent_watchdog_reset=", RCC_CSR_IWDGRSTF);
     print_reset_flag("window_watchdog_reset=", RCC_CSR_WWDGRSTF);
     print_reset_flag("low_power_reset=", RCC_CSR_LPWRRSTF);
+}
+
+static void print_clock_public_summary(void)
+{
+    uint32_t hclk = 0UL;
+
+    uart_puts("clock_source=");
+    uart_puts(rsm_clock_source_name_from_cfgr(RCC_CFGR));
+    newline();
+    uart_puts("hclk_hz=");
+    if (rsm_hclk_hz_from_cfgr(RCC_CFGR, &hclk) != 0U) {
+        uart_put_u32(hclk);
+    } else {
+        uart_puts("unavailable");
+    }
+    newline();
 }
 
 static void print_help(void)
@@ -261,6 +331,7 @@ static void print_help(void)
         "{rcc|gpio|nvic|scb|systick|mpu|flash|pwr|syscfg|dbgmcu} "
         "memory regions log {show|clear} fault {show|clear} "
         "health {status|acknowledge} confirmation status telemetry show "
+        "rsm status rsm status public rsm status restricted "
         "reset decoded led {status|test healthy|test degraded|"
         "test update|test recovery|test fault|test security|test stop} "
         "easteregg {knightrider|retro|stop} "
@@ -345,101 +416,153 @@ static void dispatch_command(const char *command)
     } else if (eq(command, "device info")) {
         print_device_info();
     } else if (eq(command, "device uid")) {
-        uart_put_hex32(UID0);
-        uart_putc(' ');
-        uart_put_hex32(UID1);
-        uart_putc(' ');
-        uart_put_hex32(UID2);
-        newline();
+        if (restricted_diagnostics_allowed() != 0U) {
+            uart_put_hex32(UID0);
+            uart_putc(' ');
+            uart_put_hex32(UID1);
+            uart_putc(' ');
+            uart_put_hex32(UID2);
+            newline();
+        } else {
+            uart_puts("uid_fingerprint ");
+            uart_put_hex32(rsm_uid_fingerprint_words(UID0, UID1, UID2));
+            uart_puts(" full_uid=restricted\n");
+        }
     } else if (eq(command, "device flash-size")) {
         uart_put_u32((uint32_t)FLASH_SIZE_KB);
         uart_puts(" KiB\n");
     } else if (eq(command, "device option-bytes")) {
-        print_snapshot("FLASH_OPTCR", FLASH_OPTCR);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("FLASH_OPTCR", FLASH_OPTCR);
+        }
     } else if (eq(command, "reset cause")) {
-        print_snapshot("RCC_CSR_BOOT", boot_reset_csr);
-        print_snapshot("RCC_CSR_NOW", RCC_CSR);
+        uart_puts("reset_cause ");
+        uart_puts(rsm_reset_cause_name(boot_reset_csr));
+        newline();
     } else if (eq(command, "reset decoded")) {
         print_reset_decoded();
     } else if (eq(command, "clock show")) {
-        print_snapshot("RCC_CFGR", RCC_CFGR);
+        print_clock_public_summary();
     } else if (eq(command, "registers rcc")) {
-        print_snapshot("RCC_CR", RCC_CR);
-        print_snapshot("RCC_CFGR", RCC_CFGR);
-        print_snapshot("RCC_CSR", RCC_CSR);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("RCC_CR", RCC_CR);
+            print_snapshot("RCC_CFGR", RCC_CFGR);
+            print_snapshot("RCC_CSR", RCC_CSR);
+        }
     } else if (eq(command, "registers gpio")) {
-        print_snapshot("GPIOA_MODER", GPIOA_MODER);
-        print_snapshot("GPIOA_IDR", GPIOA_IDR);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("GPIOA_MODER", GPIOA_MODER);
+            print_snapshot("GPIOA_IDR", GPIOA_IDR);
+        }
     } else if (eq(command, "registers dbgmcu")) {
-        print_snapshot("DBGMCU_IDCODE", DBGMCU_ID);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("DBGMCU_IDCODE", DBGMCU_ID);
+        }
     } else if (eq(command, "registers scb")) {
-        print_snapshot("SCB_CFSR", SCB_CFSR);
-        print_snapshot("SCB_HFSR", SCB_HFSR);
-        print_snapshot("SCB_DFSR", SCB_DFSR);
-        print_snapshot("SCB_AFSR", SCB_AFSR);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("SCB_CFSR", SCB_CFSR);
+            print_snapshot("SCB_HFSR", SCB_HFSR);
+            print_snapshot("SCB_DFSR", SCB_DFSR);
+            print_snapshot("SCB_AFSR", SCB_AFSR);
+        }
     } else if (eq(command, "registers systick")) {
-        print_snapshot("SYST_CSR", SYST_CSR);
-        print_snapshot("SYST_RVR", SYST_RVR);
-        print_snapshot("SYST_CVR", SYST_CVR);
-        print_snapshot("SYST_CALIB", SYST_CALIB);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("SYST_CSR", SYST_CSR);
+            print_snapshot("SYST_RVR", SYST_RVR);
+            print_snapshot("SYST_CVR", SYST_CVR);
+            print_snapshot("SYST_CALIB", SYST_CALIB);
+        }
     } else if (eq(command, "registers nvic")) {
-        print_snapshot("NVIC_ISER0", NVIC_ISER0);
-        print_snapshot("NVIC_ISPR0", NVIC_ISPR0);
-        print_snapshot("NVIC_IABR0", NVIC_IABR0);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("NVIC_ISER0", NVIC_ISER0);
+            print_snapshot("NVIC_ISPR0", NVIC_ISPR0);
+            print_snapshot("NVIC_IABR0", NVIC_IABR0);
+        }
     } else if (eq(command, "registers mpu")) {
-        print_snapshot("MPU_TYPE", MPU_TYPE);
-        print_snapshot("MPU_CTRL", MPU_CTRL);
-        print_snapshot("MPU_RNR", MPU_RNR);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("MPU_TYPE", MPU_TYPE);
+            print_snapshot("MPU_CTRL", MPU_CTRL);
+            print_snapshot("MPU_RNR", MPU_RNR);
+        }
     } else if (eq(command, "registers flash")) {
-        print_snapshot("FLASH_ACR", FLASH_ACR);
-        print_snapshot("FLASH_SR", FLASH_SR);
-        print_snapshot("FLASH_CR", FLASH_CR);
-        print_snapshot("FLASH_OPTCR", FLASH_OPTCR);
+        if (require_restricted_diagnostics() != 0U) {
+            print_snapshot("FLASH_ACR", FLASH_ACR);
+            print_snapshot("FLASH_SR", FLASH_SR);
+            print_snapshot("FLASH_CR", FLASH_CR);
+            print_snapshot("FLASH_OPTCR", FLASH_OPTCR);
+        }
     } else if (is_unavailable_register_group(command)) {
         print_unavailable();
     } else if (eq(command, "memory regions")) {
-        print_address_range(
-            "bootloader",
-            STM32F429_BOOTLOADER_BASE,
-            STM32F429_BOOTLOADER_END
-        );
-        print_address_range(
-            "manifest",
-            STM32F429_SIGNED_IMAGE_BASE,
-            STM32F429_SIGNATURE_BASE
-        );
-        print_address_range(
-            "signature",
-            STM32F429_SIGNATURE_BASE,
-            STM32F429_SIGNATURE_BASE + STM32F429_SIGNED_SIGNATURE_SIZE
-        );
-        print_address_range(
-            "application",
-            STM32F429_APPLICATION_BASE,
-            STM32F429_APPLICATION_FLASH_END
-        );
-        print_address_range(
-            "SRAM",
-            STM32F429_MAIN_SRAM_BASE,
-            STM32F429_MAIN_SRAM_SUPPORTED_END
-        );
+        if (require_restricted_diagnostics() != 0U) {
+            print_address_range(
+                "bootloader",
+                STM32F429_BOOTLOADER_BASE,
+                STM32F429_BOOTLOADER_END
+            );
+            print_address_range(
+                "manifest",
+                STM32F429_SIGNED_IMAGE_BASE,
+                STM32F429_SIGNATURE_BASE
+            );
+            print_address_range(
+                "signature",
+                STM32F429_SIGNATURE_BASE,
+                STM32F429_SIGNATURE_BASE + STM32F429_SIGNED_SIGNATURE_SIZE
+            );
+            print_address_range(
+                "application",
+                STM32F429_APPLICATION_BASE,
+                STM32F429_APPLICATION_FLASH_END
+            );
+            print_address_range(
+                "SRAM",
+                STM32F429_MAIN_SRAM_BASE,
+                STM32F429_MAIN_SRAM_SUPPORTED_END
+            );
+        }
     } else if (eq(command, "log show")) {
-        log_show();
+        if (restricted_diagnostics_allowed() != 0U) {
+            log_show();
+        } else {
+            runtime_monitor_record_diagnostic_denial(RSM_INFO_RESTRICTED);
+            print_log_public_summary();
+        }
     } else if (eq(command, "log clear")) {
-        log_clear();
-        uart_puts("ok\n");
+        if (require_restricted_diagnostics() != 0U) {
+            log_clear();
+            uart_puts("ok\n");
+        }
     } else if (eq(command, "fault show")) {
-        fault_show();
+        if (restricted_diagnostics_allowed() != 0U) {
+            fault_show();
+        } else {
+            runtime_monitor_record_diagnostic_denial(RSM_INFO_RESTRICTED);
+            print_fault_public_summary();
+        }
     } else if (eq(command, "fault clear")) {
-        fault_clear();
-        platform_health_acknowledge();
-        uart_puts("ok\n");
+        if (require_restricted_diagnostics() != 0U) {
+            fault_clear();
+            platform_health_acknowledge();
+            uart_puts("ok\n");
+        }
     } else if (eq(command, "health status")) {
         print_health_status();
     } else if (eq(command, "confirmation status")) {
-        print_confirmation_status();
+        if (restricted_diagnostics_allowed() != 0U) {
+            print_confirmation_status();
+        } else {
+            print_confirmation_public_status();
+        }
     } else if (eq(command, "telemetry show")) {
-        experiment_telemetry_print();
+        if (require_restricted_diagnostics() != 0U) {
+            experiment_telemetry_print();
+        }
+    } else if (eq(command, "rsm status") ||
+               eq(command, "rsm status public")) {
+        runtime_monitor_print_public_status();
+    } else if (eq(command, "rsm status restricted")) {
+        (void)runtime_monitor_print_restricted_status();
     } else if (eq(command, "health acknowledge")) {
         platform_health_acknowledge();
         log_write(LOG_INFO, LOG_SRC_PLATFORM, LOG_EVENT_HEALTH_ACK, 0, 0U);
@@ -456,7 +579,8 @@ static void dispatch_command(const char *command)
     } else if (eq(command, "security status")) {
         uart_puts(
             "designed for verified Stage-0; arbitrary memory disabled; "
-            "module execution disabled; option-byte and RDP activation unavailable\n"
+            "module execution disabled; option-byte and RDP activation unavailable; "
+            "restricted diagnostics disabled by default; secret diagnostics never available\n"
         );
     } else if (eq(command, "module list")) {
         uart_puts("no signed modules installed; execution disabled\n");
@@ -467,6 +591,8 @@ static void dispatch_command(const char *command)
 
 void platform_init(void)
 {
+    rsm_config_t rsm_config;
+
     uart_init();
     log_init();
     platform_health_init();
@@ -502,6 +628,10 @@ void platform_init(void)
     experiment_telemetry_set_boot_policy_result(
         (uint32_t)platform_health_get_automatic_state()
     );
+
+    rsm_config.reset_csr = boot_reset_csr;
+    rsm_config.boot_self_tests_passed = mandatory_self_tests_passed;
+    (void)runtime_monitor_init(&rsm_config);
 }
 
 uint32_t platform_millis(void)
@@ -546,6 +676,7 @@ void platform_idle(void)
 
     platform_tick();
     platform_health_service_tick();
+    runtime_monitor_periodic();
     platform_cli_poll();
 
 #if PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS == 0UL
