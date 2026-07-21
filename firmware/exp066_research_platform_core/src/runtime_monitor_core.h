@@ -56,6 +56,24 @@ enum {
 enum {
     RSM_EVENT_EVIDENCE_RUNTIME_READY =
         RSM_EVENT_DOMAIN_EVIDENCE_CHAIN | 0x0001U,
+    RSM_EVENT_VECTOR_MONITOR_INITIALIZED =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0001U,
+    RSM_EVENT_VECTOR_FULL_CYCLE_PASSED =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0002U,
+    RSM_EVENT_VECTOR_VTOR_MISMATCH =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0003U,
+    RSM_EVENT_VECTOR_INITIAL_MSP_INVALID =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0004U,
+    RSM_EVENT_VECTOR_HANDLER_RANGE_FAILURE =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0005U,
+    RSM_EVENT_VECTOR_THUMB_BIT_FAILURE =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0006U,
+    RSM_EVENT_VECTOR_ENTRY_CHANGED =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0007U,
+    RSM_EVENT_VECTOR_BASELINE_UNAVAILABLE =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0008U,
+    RSM_EVENT_VECTOR_ALIGNMENT_FAILURE =
+        RSM_EVENT_DOMAIN_VECTOR_TABLE | 0x0009U,
     RSM_EVENT_DIAG_RESTRICTED_DENIED =
         RSM_EVENT_DOMAIN_DIAGNOSTIC_POLICY | 0x0001U,
     RSM_EVENT_DIAG_SECRET_DENIED =
@@ -121,6 +139,11 @@ typedef struct {
     const char *security_vectors;
     const char *security_stack;
     const char *security_option_policy;
+    const char *vector_status;
+    const char *vector_failure_class;
+    uint32_t vector_check_count;
+    uint32_t vector_failure_count;
+    const char *vector_latched_failure;
     const char *health_state;
     uint32_t last_event_sequence;
     const char *last_fault;

@@ -318,6 +318,15 @@ void rsm_format_public_status(
         "rsm.security.option_policy",
         status->security_option_policy
     );
+    kv_str(output, "rsm.vector.status", status->vector_status);
+    kv_str(output, "rsm.vector.failure_class", status->vector_failure_class);
+    kv_u32(output, "rsm.vector.checks", status->vector_check_count);
+    kv_u32(output, "rsm.vector.failures", status->vector_failure_count);
+    kv_str(
+        output,
+        "rsm.vector.latched_failure",
+        status->vector_latched_failure
+    );
     kv_str(output, "rsm.health.state", status->health_state);
     kv_u32(
         output,
