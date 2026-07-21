@@ -80,7 +80,7 @@ HardFault context still captures only bounded CPU/fault state in `.noinit` RAM
 and then stops. It does not perform Flash writes.
 
 `fault clear` invalidates retained fault evidence and is therefore a restricted
-diagnostic command in the Runtime Security Monitor phase-1 policy.
+diagnostic command in the Runtime Security Monitor policy.
 
 ## CLI commands
 

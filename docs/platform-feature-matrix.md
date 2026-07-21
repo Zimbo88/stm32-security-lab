@@ -47,6 +47,7 @@ Status values are intentionally limited to:
 | read-only option-byte reporting | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Raw `FLASH_OPTCR` is restricted; no writes or full decode. | Decode safely after review. |
 | boot configuration | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Reports Stage-0 launch assumption, no boot mailbox. | Add authenticated boot-result mailbox if needed. |
 | runtime information | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Version, health, LED mask, reset, and self-test state only. | Add uptime units after real tick source. |
+| runtime vector-table monitor | TARGET_IMPLEMENTED | `runtime_monitor_vector.c`, `runtime_monitor.c` | RSM host tests, EXP066 build | Checks VTOR, MSP, core handlers, reserved entries, Thumb bits, and active-slot Flash range; no reset or recovery action. | Hardware UART capture and controlled vector test hook. |
 | UART CLI | TARGET_IMPLEMENTED | `platform.c`, `uart.c` | `tests/test_exp066_pure.py` | Blocking TX remains; RX is bounded. | Hardware CLI soak test. |
 | binary protocol | NOT_IMPLEMENTED | none | none | Text CLI only. | Design framed protocol separately. |
 | optional USB CDC | OPTIONAL_NOT_SELECTED | none | none | USB not selected. | Add only after USB hardware/clock plan. |

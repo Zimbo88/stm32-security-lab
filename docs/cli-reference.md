@@ -17,14 +17,18 @@ required `registers` groups, `memory regions`, `log show`, `log clear`,
 
 Only the exact `test run gpio`, `test run button`, `test run clock`, and
 `test run ram` commands return PASS. Other `test ...` strings are rejected.
-The `rsm status` and `rsm status public` commands print the phase-1 Runtime
-Security Monitor key-value status. `rsm status restricted` only emits
+The `rsm status` and `rsm status public` commands print the Runtime Security
+Monitor key-value status. Vector-table Phase 2A fields include
+`rsm.security.vectors`, `rsm.vector.status`, `rsm.vector.failure_class`,
+`rsm.vector.checks`, `rsm.vector.failures`, and
+`rsm.vector.latched_failure`. `rsm status restricted` only emits
 restricted values when the firmware is built with
 `RSM_RESTRICTED_DIAGNOSTICS=1`; the default build denies restricted output.
 
 Raw UID, exact option bytes, exact memory-region addresses, detailed log
-history, retained fault details, raw register snapshots, and the full
-telemetry report are restricted diagnostics. Default builds either print a
+history, retained fault details, raw register snapshots, exact vector-table
+failure addresses, and the full telemetry report are restricted diagnostics.
+Default builds either print a
 public summary or return `denied: restricted diagnostic disabled`. The
 `registers pwr` and `registers syscfg` commands return an explicit unavailable
 message in EXP066 instead of changing peripheral clocks.

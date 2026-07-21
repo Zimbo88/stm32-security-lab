@@ -33,8 +33,9 @@ The repository combines:
 - automated hardware-in-the-loop testing;
 - documented security experiments and observations.
 
-EXP066 also includes a phase-1 Runtime Security Monitor foundation for a
-machine-parsable boot-to-runtime evidence summary. See
+EXP066 also includes a Runtime Security Monitor foundation for a
+machine-parsable boot-to-runtime evidence summary and bounded vector-table
+monitoring. See
 [`docs/runtime-monitor.md`](docs/runtime-monitor.md).
 
 The project is designed as a reproducible laboratory environment rather than
