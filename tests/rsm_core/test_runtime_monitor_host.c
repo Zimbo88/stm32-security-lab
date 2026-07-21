@@ -123,10 +123,25 @@ int main(void)
     assert(hardware.hclk_available == 0U);
     assert(evidence.schema_version == RSM_SCHEMA_VERSION);
     assert(evidence.active_slot == RSM_SLOT_NONE);
+    assert(evidence.vector_monitor_available == 0U);
     reset_output();
     runtime_monitor_print_public_status();
     assert(strstr(uart_output, "rsm.schema=1\n") != 0);
     assert(strstr(uart_output, "rsm.status=disabled\n") != 0);
+#elif RSM_VECTOR_MONITOR_ENABLE == 0U
+    rsm_status_snapshot_t status;
+    rsm_evidence_snapshot_t evidence;
+
+    runtime_monitor_get_status(&status);
+    runtime_monitor_get_evidence(&evidence);
+    assert(status.vector_monitor_available == 0U);
+    assert(status.vector_monitor_status == RSM_VECTOR_BASELINE_UNAVAILABLE);
+    assert(status.latched_vector_failure == 0U);
+    assert(evidence.vector_monitor_available == 0U);
+    assert(evidence.vector_monitor_status == RSM_VECTOR_BASELINE_UNAVAILABLE);
+    assert(evidence.vector_check_count == 0UL);
+    assert(evidence.vector_failure_count == 0UL);
+    assert(evidence.latched_vector_failure == 0U);
 #elif RSM_RESTRICTED_DIAGNOSTICS != 0U
     assert(runtime_monitor_diagnostic_allowed(RSM_INFO_RESTRICTED) == 1U);
 #else

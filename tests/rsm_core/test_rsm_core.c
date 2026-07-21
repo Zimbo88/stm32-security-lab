@@ -160,6 +160,11 @@ static void test_public_formatter(void)
         .security_vectors = "pass",
         .security_stack = "unavailable",
         .security_option_policy = "unavailable",
+        .vector_status = "pass",
+        .vector_failure_class = "none",
+        .vector_check_count = 4UL,
+        .vector_failure_count = 0UL,
+        .vector_latched_failure = "no",
         .health_state = "healthy",
         .last_event_sequence = 9UL,
         .last_fault = "none",
@@ -182,12 +187,21 @@ static void test_public_formatter(void)
     assert_key_once(buffer.data, "rsm.cpu.hclk_hz");
     assert_key_once(buffer.data, "rsm.boot.firmware_version");
     assert_key_once(buffer.data, "rsm.evidence.boot_context");
+    assert_key_once(buffer.data, "rsm.vector.status");
+    assert_key_once(buffer.data, "rsm.vector.failure_class");
+    assert_key_once(buffer.data, "rsm.vector.checks");
+    assert_key_once(buffer.data, "rsm.vector.failures");
+    assert_key_once(buffer.data, "rsm.vector.latched_failure");
     assert(strstr(buffer.data, "rsm.cpu.hclk_hz=unavailable\n") != 0);
     assert(strstr(buffer.data, "rsm.boot.firmware_version=unavailable\n") != 0);
+    assert(strstr(buffer.data, "rsm.vector.status=pass\n") != 0);
+    assert(strstr(buffer.data, "rsm.vector.checks=4\n") != 0);
     assert(strstr(buffer.data, "rsm.device.uid=") == 0);
     assert(strstr(buffer.data, "FLASH_OPTCR") == 0);
     assert(strstr(buffer.data, "rsm.register.") == 0);
     assert(strstr(buffer.data, "rsm.telemetry.msp") == 0);
+    assert(strstr(buffer.data, "rsm.vector.expected") == 0);
+    assert(strstr(buffer.data, "rsm.vector.observed") == 0);
 }
 
 int main(void)
@@ -210,6 +224,14 @@ int main(void)
     assert(
         rsm_event_domain(RSM_EVENT_DIAG_RESTRICTED_DENIED) ==
         RSM_EVENT_DOMAIN_DIAGNOSTIC_POLICY
+    );
+    assert(
+        rsm_event_domain(RSM_EVENT_VECTOR_ENTRY_CHANGED) ==
+        RSM_EVENT_DOMAIN_VECTOR_TABLE
+    );
+    assert(
+        rsm_event_domain(RSM_EVENT_VECTOR_FULL_CYCLE_PASSED) ==
+        RSM_EVENT_DOMAIN_VECTOR_TABLE
     );
 
     assert(
