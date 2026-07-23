@@ -219,7 +219,7 @@ static void print_u32_field(const char *name, uint32_t value)
     uart_puts(name);
     uart_putc('=');
     uart_put_hex32(value);
-    uart_putc('\n');
+    uart_puts("\n");
 }
 
 void experiment_telemetry_print(void)

@@ -94,7 +94,7 @@ static void kv_str(const char *key, const char *value)
     uart_puts(key);
     uart_putc('=');
     uart_puts(value);
-    uart_putc('\n');
+    uart_puts("\n");
 }
 
 static void kv_u32(const char *key, uint32_t value)
@@ -102,7 +102,7 @@ static void kv_u32(const char *key, uint32_t value)
     uart_puts(key);
     uart_putc('=');
     uart_put_u32(value);
-    uart_putc('\n');
+    uart_puts("\n");
 }
 
 #if RSM_ENABLE != 0U
@@ -111,12 +111,17 @@ static void kv_hex32(const char *key, uint32_t value)
     uart_puts(key);
     uart_putc('=');
     uart_put_hex32(value);
-    uart_putc('\n');
+    uart_puts("\n");
 }
 
 static void output_putc(void *context, char value)
 {
     (void)context;
+
+    if (value == '\n') {
+        uart_putc('\r');
+    }
+
     uart_putc(value);
 }
 
@@ -785,7 +790,7 @@ rsm_status_t runtime_monitor_print_restricted_status(void)
     uart_put_hex32(UID1);
     uart_putc(',');
     uart_put_hex32(UID2);
-    uart_putc('\n');
+    uart_puts("\n");
     kv_hex32("rsm.register.vtor", VTOR);
     kv_hex32("rsm.register.flash_acr", FLASH_ACR);
     kv_hex32("rsm.register.flash_optcr", FLASH_OPTCR);
