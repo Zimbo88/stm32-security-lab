@@ -1,6 +1,71 @@
 #include "simulated_flash.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+
+static uint8_t *mapped_flash;
+
+static uint8_t range_to_offset(
+    uint32_t address,
+    size_t length,
+    size_t *offset
+);
+
+static uint8_t *ensure_mapped_flash(void)
+{
+    if (mapped_flash != NULL) {
+        return mapped_flash;
+    }
+
+    void *const target = (void *)(uintptr_t)STM32F429_FLASH_BASE;
+    const int flags =
+        MAP_PRIVATE |
+        MAP_ANONYMOUS |
+#ifdef MAP_FIXED_NOREPLACE
+        MAP_FIXED_NOREPLACE;
+#else
+        MAP_FIXED;
+#endif
+
+    void *const mapped = mmap(
+        target,
+        (size_t)STM32F429_FLASH_TOTAL_SIZE,
+        PROT_READ | PROT_WRITE,
+        flags,
+        -1,
+        0
+    );
+    if (mapped != target) {
+        perror("mmap simulated STM32 flash");
+        abort();
+    }
+
+    mapped_flash = (uint8_t *)mapped;
+    return mapped_flash;
+}
+
+static void sync_mapped_range(
+    const simulated_flash_t *sim,
+    uint32_t address,
+    size_t length
+)
+{
+    size_t offset = 0U;
+
+    if ((sim == NULL) ||
+        (length == 0U) ||
+        (range_to_offset(address, length, &offset) == 0U)) {
+        return;
+    }
+
+    memcpy(&ensure_mapped_flash()[offset], &sim->storage[offset], length);
+}
 
 static uint8_t range_to_offset(
     uint32_t address,
@@ -79,6 +144,7 @@ void simulated_flash_init(simulated_flash_t *sim)
     sim->corrupt_after_program = 0U;
     sim->write_log_count = 0U;
     sim->write_log_overflow = 0U;
+    simulated_flash_sync_mapped(sim);
 }
 
 void simulated_flash_fail_after(simulated_flash_t *sim, uint32_t operation)
@@ -121,6 +187,17 @@ void simulated_flash_corrupt_after_program(simulated_flash_t *sim, uint8_t enabl
 {
     if (sim != NULL) {
         sim->corrupt_after_program = enable;
+    }
+}
+
+void simulated_flash_sync_mapped(const simulated_flash_t *sim)
+{
+    if (sim != NULL) {
+        memcpy(
+            ensure_mapped_flash(),
+            sim->storage,
+            (size_t)STM32F429_FLASH_TOTAL_SIZE
+        );
     }
 }
 
@@ -206,6 +283,7 @@ static boot_flash_status_t sim_erase_sector(void *context, uint32_t sector_id)
         sector.size
     );
     memset(&sim->storage[offset], 0xFF, sector.size);
+    sync_mapped_range(sim, sector.base, sector.size);
     sim->erase_count += 1U;
     sim->last_erase_sector = sector_id;
     return maybe_fail(sim);
@@ -252,6 +330,7 @@ static boot_flash_status_t sim_program(
     if (sim->corrupt_after_program != 0U) {
         sim->storage[offset] ^= 0x01U;
     }
+    sync_mapped_range(sim, address, length);
 
     sim->program_count += 1U;
     sim->last_program_address = address;

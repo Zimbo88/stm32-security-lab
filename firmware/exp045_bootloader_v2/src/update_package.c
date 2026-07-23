@@ -1,9 +1,11 @@
 #include "update_package.h"
 
 #include <stdint.h>
+#include <string.h>
 
 #include "flash_layout.h"
 #include "image_policy.h"
+#include "monocypher-ed25519.h"
 #include "stm32f429_memory_layout.h"
 
 static uint8_t checked_size_add(size_t left, size_t right, size_t *out)
@@ -37,31 +39,41 @@ static uint8_t padding_is_canonical(const uint8_t *package_bytes)
     return 1U;
 }
 
-update_package_status_t update_package_parse(
-    const uint8_t *package_bytes,
-    size_t package_size,
-    update_package_t *package
-)
+static void clear_package(update_package_t *package)
 {
-    signed_manifest_t manifest;
-    size_t expected_size = 0U;
-
-    if ((package_bytes == NULL) || (package == NULL)) {
-        return UPDATE_PACKAGE_ERR_INVALID_ARGUMENT;
-    }
-
     package->package_bytes = NULL;
     package->package_size = 0U;
     package->manifest_bytes = NULL;
     package->signature_bytes = NULL;
     package->payload = NULL;
     package->payload_size = 0U;
+}
 
-    if (package_size < (size_t)SIGNED_IMAGE_HEADER_SIZE) {
+static void clear_header(update_package_header_t *header)
+{
+    memset(header, 0, sizeof(*header));
+}
+
+static update_package_status_t parse_header_common(
+    const uint8_t *header_bytes,
+    size_t available_size,
+    update_package_header_t *header
+)
+{
+    signed_manifest_t manifest;
+    size_t expected_size = 0U;
+
+    if ((header_bytes == NULL) || (header == NULL)) {
+        return UPDATE_PACKAGE_ERR_INVALID_ARGUMENT;
+    }
+
+    clear_header(header);
+
+    if (available_size < (size_t)SIGNED_IMAGE_HEADER_SIZE) {
         return UPDATE_PACKAGE_ERR_TRUNCATED;
     }
 
-    if (signed_image_decode_manifest(package_bytes, &manifest) != VERIFY_OK) {
+    if (signed_image_decode_manifest(header_bytes, &manifest) != VERIFY_OK) {
         return UPDATE_PACKAGE_ERR_INVALID_ARGUMENT;
     }
 
@@ -101,16 +113,48 @@ update_package_status_t update_package_parse(
         return UPDATE_PACKAGE_ERR_OVERSIZED;
     }
 
-    if (package_size < expected_size) {
+    if (padding_is_canonical(header_bytes) == 0U) {
+        return UPDATE_PACKAGE_ERR_BAD_PADDING;
+    }
+
+    header->manifest = manifest;
+    memcpy(header->manifest_bytes, header_bytes, (size_t)SIGNED_MANIFEST_SIZE);
+    memcpy(
+        header->signature_bytes,
+        &header_bytes[SIGNED_MANIFEST_SIZE],
+        (size_t)SIGNED_SIGNATURE_SIZE
+    );
+    header->payload_size = (size_t)manifest.image_size;
+    header->package_size = expected_size;
+    return UPDATE_PACKAGE_OK;
+}
+
+update_package_status_t update_package_parse(
+    const uint8_t *package_bytes,
+    size_t package_size,
+    update_package_t *package
+)
+{
+    update_package_header_t header;
+    update_package_status_t status;
+
+    if (package == NULL) {
+        return UPDATE_PACKAGE_ERR_INVALID_ARGUMENT;
+    }
+
+    clear_package(package);
+
+    status = parse_header_common(package_bytes, package_size, &header);
+    if (status != UPDATE_PACKAGE_OK) {
+        return status;
+    }
+
+    if (package_size < header.package_size) {
         return UPDATE_PACKAGE_ERR_TRUNCATED;
     }
 
-    if (package_size > expected_size) {
+    if (package_size > header.package_size) {
         return UPDATE_PACKAGE_ERR_TRAILING_DATA;
-    }
-
-    if (padding_is_canonical(package_bytes) == 0U) {
-        return UPDATE_PACKAGE_ERR_BAD_PADDING;
     }
 
     package->package_bytes = package_bytes;
@@ -118,8 +162,78 @@ update_package_status_t update_package_parse(
     package->manifest_bytes = package_bytes;
     package->signature_bytes = &package_bytes[SIGNED_MANIFEST_SIZE];
     package->payload = &package_bytes[SIGNED_IMAGE_HEADER_SIZE];
-    package->payload_size = (size_t)manifest.image_size;
-    package->manifest = manifest;
+    package->payload_size = header.payload_size;
+    package->manifest = header.manifest;
+    return UPDATE_PACKAGE_OK;
+}
+
+update_package_status_t update_package_verify_header_for_slot(
+    const uint8_t *header_bytes,
+    size_t header_size,
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
+    const boot_slot_descriptor_t *slot,
+    update_package_header_t *header,
+    verify_status_t *verify_status
+)
+{
+    update_package_header_t parsed;
+    update_package_status_t status;
+
+    if (verify_status != NULL) {
+        *verify_status = VERIFY_BAD_PAYLOAD_RANGE;
+    }
+
+    if ((public_key == NULL) || (slot == NULL)) {
+        return UPDATE_PACKAGE_ERR_INVALID_ARGUMENT;
+    }
+
+    if (header_size < (size_t)SIGNED_IMAGE_HEADER_SIZE) {
+        return UPDATE_PACKAGE_ERR_TRUNCATED;
+    }
+
+    if (header_size > (size_t)SIGNED_IMAGE_HEADER_SIZE) {
+        return UPDATE_PACKAGE_ERR_TRAILING_DATA;
+    }
+
+    status = parse_header_common(header_bytes, header_size, &parsed);
+    if (status != UPDATE_PACKAGE_OK) {
+        return status;
+    }
+
+    if (parsed.manifest.vector_address != slot->payload_base) {
+        if (verify_status != NULL) {
+            *verify_status = VERIFY_BAD_VECTOR_ADDRESS;
+        }
+        return UPDATE_PACKAGE_ERR_INCOMPATIBLE_SLOT;
+    }
+
+    if (parsed.manifest.image_size > slot->maximum_payload_size) {
+        if (verify_status != NULL) {
+            *verify_status = VERIFY_BAD_SIZE;
+        }
+        return UPDATE_PACKAGE_ERR_INCOMPATIBLE_SLOT;
+    }
+
+    if (crypto_ed25519_check(
+            parsed.signature_bytes,
+            public_key,
+            parsed.manifest_bytes,
+            (size_t)SIGNED_MANIFEST_SIZE
+        ) != 0) {
+        if (verify_status != NULL) {
+            *verify_status = VERIFY_BAD_SIGNATURE;
+        }
+        return UPDATE_PACKAGE_ERR_VERIFY;
+    }
+
+    if (verify_status != NULL) {
+        *verify_status = VERIFY_OK;
+    }
+
+    if (header != NULL) {
+        *header = parsed;
+    }
+
     return UPDATE_PACKAGE_OK;
 }
 

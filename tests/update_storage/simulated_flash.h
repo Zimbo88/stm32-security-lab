@@ -48,6 +48,7 @@ void simulated_flash_fail_before_program_address(simulated_flash_t *sim, uint32_
 void simulated_flash_fail_before_read_address(simulated_flash_t *sim, uint32_t address);
 void simulated_flash_corrupt_read_address(simulated_flash_t *sim, uint32_t address);
 void simulated_flash_corrupt_after_program(simulated_flash_t *sim, uint8_t enable);
+void simulated_flash_sync_mapped(const simulated_flash_t *sim);
 const boot_flash_ops_t *simulated_flash_ops(void);
 uint8_t simulated_flash_peek(
     const simulated_flash_t *sim,

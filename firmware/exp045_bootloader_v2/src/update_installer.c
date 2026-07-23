@@ -60,7 +60,6 @@ static uint8_t options_are_valid(
         (options == NULL) ||
         (options->program_buffer == NULL) ||
         (options->readback_buffer == NULL) ||
-        (options->installed_image_buffer == NULL) ||
         (options->program_buffer_size == 0U) ||
         (options->readback_buffer_size < options->program_buffer_size) ||
         (options->program_buffer_size > UINT32_MAX) ||
@@ -231,114 +230,278 @@ static update_install_status_t erase_candidate_slot(
     return UPDATE_INSTALL_OK;
 }
 
-static update_install_status_t program_candidate_slot(
-    const boot_flash_t *flash,
-    const boot_slot_descriptor_t *candidate,
-    const update_package_t *package,
-    const update_install_options_t *options,
-    update_install_result_t *result
+static update_install_status_t fail_session(
+    update_installer_session_t *session,
+    update_install_status_t status
 )
 {
-    size_t aligned_size = 0U;
-    size_t offset = 0U;
-    uint32_t slot_program_end = 0U;
-    uint32_t block_index = 0U;
-
-    if (checked_round_up(
-            package->package_size,
-            (size_t)flash->program_alignment,
-            &aligned_size
-        ) == 0U) {
-        return UPDATE_INSTALL_ERR_CAPACITY;
+    if ((session != NULL) && (status != UPDATE_INSTALL_OK)) {
+        session->state = UPDATE_INSTALL_SESSION_FAILED;
     }
 
-    if ((aligned_size > UINT32_MAX) ||
+    return status;
+}
+
+static uint8_t metadata_matches_start(
+    const boot_metadata_record_t *actual,
+    const boot_metadata_record_t *expected
+)
+{
+    if ((actual == NULL) || (expected == NULL)) {
+        return 0U;
+    }
+
+    return ((actual->sequence == expected->sequence) &&
+            (actual->state == expected->state) &&
+            (actual->active_slot == expected->active_slot) &&
+            (actual->candidate_slot == expected->candidate_slot) &&
+            (actual->candidate_image_version ==
+                expected->candidate_image_version) &&
+            (actual->boot_attempt_count == expected->boot_attempt_count) &&
+            (actual->confirmation_state == expected->confirmation_state) &&
+            (actual->result == expected->result))
+        ? 1U
+        : 0U;
+}
+
+static update_install_status_t candidate_package_fits(
+    const boot_flash_t *flash,
+    const boot_slot_descriptor_t *candidate,
+    const update_package_header_t *header,
+    size_t *payload_program_size
+)
+{
+    size_t aligned_package_size = 0U;
+    size_t aligned_payload_size = 0U;
+    uint32_t slot_program_end = 0U;
+
+    if ((flash == NULL) ||
+        (candidate == NULL) ||
+        (header == NULL) ||
+        (payload_program_size == NULL)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if ((checked_round_up(
+            header->package_size,
+            (size_t)flash->program_alignment,
+            &aligned_package_size
+        ) == 0U) ||
+        (checked_round_up(
+            header->payload_size,
+            (size_t)flash->program_alignment,
+            &aligned_payload_size
+        ) == 0U) ||
+        (aligned_package_size > UINT32_MAX) ||
         (checked_u32_add(
             candidate->signed_image_base,
-            (uint32_t)aligned_size,
+            (uint32_t)aligned_package_size,
             &slot_program_end
         ) == 0U) ||
         (slot_program_end > candidate->slot_end)) {
         return UPDATE_INSTALL_ERR_CAPACITY;
     }
 
-    while (offset < aligned_size) {
-        size_t chunk = aligned_size - offset;
+    *payload_program_size = aligned_payload_size;
+    return UPDATE_INSTALL_OK;
+}
+
+static update_install_status_t program_aligned_block(
+    const boot_flash_t *flash,
+    uint32_t address,
+    const uint8_t *data,
+    size_t length,
+    const update_install_options_t *options,
+    update_install_result_t *result,
+    uint32_t *block_index
+)
+{
+    uint32_t detail = 0U;
+    update_install_status_t fault_status;
+
+    if ((flash == NULL) ||
+        (data == NULL) ||
+        (options == NULL) ||
+        (block_index == NULL)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    detail = *block_index;
+    fault_status =
+        maybe_fault(options, UPDATE_INSTALL_FAULT_PROGRAM_BLOCK, detail);
+    if (fault_status != UPDATE_INSTALL_OK) {
+        return fault_status;
+    }
+
+    if (boot_flash_program_aligned(flash, address, data, length) !=
+        BOOT_FLASH_OK) {
+        return UPDATE_INSTALL_ERR_PROGRAM;
+    }
+
+    fault_status = maybe_fault(options, UPDATE_INSTALL_FAULT_READBACK, detail);
+    if (fault_status != UPDATE_INSTALL_OK) {
+        return fault_status;
+    }
+
+    if (boot_flash_read(
+            flash,
+            address,
+            options->readback_buffer,
+            length
+        ) != BOOT_FLASH_OK) {
+        return UPDATE_INSTALL_ERR_READBACK;
+    }
+
+    if (memcmp(options->readback_buffer, data, length) != 0) {
+        return UPDATE_INSTALL_ERR_READBACK;
+    }
+
+    if (*block_index == UINT32_MAX) {
+        return UPDATE_INSTALL_ERR_CAPACITY;
+    }
+
+    *block_index += 1UL;
+    if (result != NULL) {
+        result->programmed_block_count += 1UL;
+    }
+
+    return UPDATE_INSTALL_OK;
+}
+
+static update_install_status_t program_source_range(
+    const boot_flash_t *flash,
+    uint32_t base_address,
+    const uint8_t *source,
+    size_t data_size,
+    size_t padded_size,
+    const update_install_options_t *options,
+    update_install_result_t *result,
+    uint32_t *block_index
+)
+{
+    size_t offset = 0U;
+
+    if ((flash == NULL) ||
+        (source == NULL) ||
+        (options == NULL) ||
+        (block_index == NULL) ||
+        (data_size > padded_size) ||
+        (padded_size > UINT32_MAX)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    while (offset < padded_size) {
+        size_t chunk = padded_size - offset;
         uint32_t address = 0U;
+        update_install_status_t program_status;
 
         if (chunk > options->program_buffer_size) {
             chunk = options->program_buffer_size;
         }
 
         memset(options->program_buffer, 0xFF, chunk);
-        if (offset < package->package_size) {
-            size_t available = package->package_size - offset;
+        if (offset < data_size) {
+            size_t available = data_size - offset;
             if (available > chunk) {
                 available = chunk;
             }
-            memcpy(
-                options->program_buffer,
-                &package->package_bytes[offset],
-                available
-            );
+            memcpy(options->program_buffer, &source[offset], available);
         }
 
-        if (checked_u32_add(candidate->signed_image_base, (uint32_t)offset, &address) ==
-            0U) {
+        if (checked_u32_add(base_address, (uint32_t)offset, &address) == 0U) {
             return UPDATE_INSTALL_ERR_CAPACITY;
         }
 
-        update_install_status_t fault =
-            maybe_fault(options, UPDATE_INSTALL_FAULT_PROGRAM_BLOCK, block_index);
-        if (fault != UPDATE_INSTALL_OK) {
-            return fault;
-        }
-
-        if (boot_flash_program_aligned(
-                flash,
-                address,
-                options->program_buffer,
-                chunk
-            ) != BOOT_FLASH_OK) {
-            return UPDATE_INSTALL_ERR_PROGRAM;
-        }
-
-        fault = maybe_fault(options, UPDATE_INSTALL_FAULT_READBACK, block_index);
-        if (fault != UPDATE_INSTALL_OK) {
-            return fault;
-        }
-
-        if (boot_flash_read(
-                flash,
-                address,
-                options->readback_buffer,
-                chunk
-            ) != BOOT_FLASH_OK) {
-            return UPDATE_INSTALL_ERR_READBACK;
-        }
-
-        if (memcmp(
-                options->readback_buffer,
-                options->program_buffer,
-                chunk
-            ) != 0) {
-            return UPDATE_INSTALL_ERR_READBACK;
+        program_status = program_aligned_block(
+            flash,
+            address,
+            options->program_buffer,
+            chunk,
+            options,
+            result,
+            block_index
+        );
+        if (program_status != UPDATE_INSTALL_OK) {
+            return program_status;
         }
 
         offset += chunk;
-        block_index += 1UL;
-        if (result != NULL) {
-            result->programmed_block_count += 1UL;
-        }
     }
 
+    return UPDATE_INSTALL_OK;
+}
+
+static update_install_status_t flush_payload_program_buffer(
+    update_installer_session_t *session,
+    uint8_t final_flush
+)
+{
+    size_t program_length = 0U;
+    uint32_t address = 0U;
+    update_install_status_t program_status;
+
+    if (session == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if (session->program_fill == 0U) {
+        return UPDATE_INSTALL_OK;
+    }
+
+    program_length = session->program_fill;
+    if (final_flush != 0U) {
+        if (checked_round_up(
+                program_length,
+                (size_t)session->restricted_flash.program_alignment,
+                &program_length
+            ) == 0U) {
+            return UPDATE_INSTALL_ERR_CAPACITY;
+        }
+        memset(
+            &session->options.program_buffer[session->program_fill],
+            0xFF,
+            program_length - session->program_fill
+        );
+    } else if (program_length != session->options.program_buffer_size) {
+        return UPDATE_INSTALL_ERR_STATE;
+    }
+
+    if ((session->payload_programmed > session->payload_program_size) ||
+        (program_length >
+        (session->payload_program_size - session->payload_programmed))) {
+        return UPDATE_INSTALL_ERR_CAPACITY;
+    }
+
+    if (checked_u32_add(
+            session->candidate->payload_base,
+            (uint32_t)session->payload_programmed,
+            &address
+        ) == 0U) {
+        return UPDATE_INSTALL_ERR_CAPACITY;
+    }
+
+    program_status = program_aligned_block(
+        &session->restricted_flash,
+        address,
+        session->options.program_buffer,
+        program_length,
+        &session->options,
+        session->result,
+        &session->programmed_block_count
+    );
+    if (program_status != UPDATE_INSTALL_OK) {
+        return program_status;
+    }
+
+    session->payload_programmed += program_length;
+    session->program_fill = 0U;
     return UPDATE_INSTALL_OK;
 }
 
 static update_install_status_t hash_installed_payload(
     const boot_flash_t *flash,
     const boot_slot_descriptor_t *candidate,
-    const update_package_t *package,
+    const update_package_header_t *header,
     const update_install_options_t *options
 )
 {
@@ -347,15 +510,15 @@ static update_install_status_t hash_installed_payload(
     size_t offset = 0U;
 
     update_install_status_t fault =
-        maybe_fault(options, UPDATE_INSTALL_FAULT_HASH_BEGIN, package->manifest.image_version);
+        maybe_fault(options, UPDATE_INSTALL_FAULT_HASH_BEGIN, header->manifest.image_version);
     if (fault != UPDATE_INSTALL_OK) {
         return fault;
     }
 
     crypto_sha512_init(&ctx);
 
-    while (offset < package->payload_size) {
-        size_t chunk = package->payload_size - offset;
+    while (offset < header->payload_size) {
+        size_t chunk = header->payload_size - offset;
         uint32_t address = 0U;
 
         if (chunk > options->readback_buffer_size) {
@@ -383,13 +546,17 @@ static update_install_status_t hash_installed_payload(
     crypto_sha512_final(&ctx, computed);
 
     fault =
-        maybe_fault(options, UPDATE_INSTALL_FAULT_HASH_COMPLETE, package->manifest.image_version);
+        maybe_fault(
+            options,
+            UPDATE_INSTALL_FAULT_HASH_COMPLETE,
+            header->manifest.image_version
+        );
     if (fault != UPDATE_INSTALL_OK) {
         crypto_wipe(computed, sizeof(computed));
         return fault;
     }
 
-    if (crypto_verify64(computed, package->manifest.payload_sha512) != 0) {
+    if (crypto_verify64(computed, header->manifest.payload_sha512) != 0) {
         crypto_wipe(computed, sizeof(computed));
         return UPDATE_INSTALL_ERR_HASH;
     }
@@ -398,75 +565,199 @@ static update_install_status_t hash_installed_payload(
     return UPDATE_INSTALL_OK;
 }
 
-static update_install_status_t verify_installed_package(
-    const boot_flash_t *flash,
+static uint8_t manifest_matches_header(
+    const signed_manifest_t *installed,
+    const update_package_header_t *header
+)
+{
+    const signed_manifest_t *expected = NULL;
+
+    if ((installed == NULL) || (header == NULL)) {
+        return 0U;
+    }
+
+    expected = &header->manifest;
+    if ((installed->magic != expected->magic) ||
+        (installed->header_version != expected->header_version) ||
+        (installed->image_version != expected->image_version) ||
+        (installed->vector_address != expected->vector_address) ||
+        (installed->image_size != expected->image_size) ||
+        (installed->flags != expected->flags) ||
+        (installed->reserved0 != expected->reserved0) ||
+        (installed->reserved1 != expected->reserved1) ||
+        (crypto_verify64(
+            installed->payload_sha512,
+            expected->payload_sha512
+        ) != 0)) {
+        return 0U;
+    }
+
+    return 1U;
+}
+
+static uint8_t installed_header_matches_expected(
     const boot_slot_descriptor_t *candidate,
-    const update_package_t *package,
+    const update_package_header_t *header
+)
+{
+    const uint8_t *installed_manifest_bytes = NULL;
+    const uint8_t *installed_signature_bytes = NULL;
+    const uint8_t *installed_padding = NULL;
+    size_t padding_size = 0U;
+
+    if ((candidate == NULL) || (header == NULL)) {
+        return 0U;
+    }
+
+    installed_manifest_bytes =
+        (const uint8_t *)(uintptr_t)candidate->manifest_address;
+    installed_signature_bytes =
+        (const uint8_t *)(uintptr_t)candidate->signature_address;
+    installed_padding =
+        (const uint8_t *)(uintptr_t)(
+            candidate->signature_address + SIGNED_SIGNATURE_SIZE
+        );
+    padding_size =
+        (size_t)SIGNED_IMAGE_HEADER_SIZE -
+        ((size_t)SIGNED_MANIFEST_SIZE + (size_t)SIGNED_SIGNATURE_SIZE);
+
+    if (memcmp(
+            installed_manifest_bytes,
+            header->manifest_bytes,
+            (size_t)SIGNED_MANIFEST_SIZE
+        ) != 0) {
+        return 0U;
+    }
+
+    if (memcmp(
+            installed_signature_bytes,
+            header->signature_bytes,
+            (size_t)SIGNED_SIGNATURE_SIZE
+        ) != 0) {
+        return 0U;
+    }
+
+    for (size_t i = 0U; i < padding_size; ++i) {
+        if (installed_padding[i] != 0xFFU) {
+            return 0U;
+        }
+    }
+
+    return 1U;
+}
+
+static update_install_status_t verify_installed_package(
+    const boot_slot_descriptor_t *candidate,
+    const update_package_header_t *header,
     const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
     const update_install_options_t *options,
     update_install_result_t *result
 )
 {
-    if (options->installed_image_buffer_size < package->package_size) {
-        return UPDATE_INSTALL_ERR_CAPACITY;
-    }
-
-    if (boot_flash_read(
-            flash,
-            candidate->signed_image_base,
-            options->installed_image_buffer,
-            package->package_size
-        ) != BOOT_FLASH_OK) {
-        return UPDATE_INSTALL_ERR_READBACK;
-    }
-
-    update_install_status_t fault =
-        maybe_fault(options, UPDATE_INSTALL_FAULT_VERIFY_INSTALLED, package->manifest.image_version);
-    if (fault != UPDATE_INSTALL_OK) {
-        return fault;
-    }
-
-    update_package_t installed;
+    const uint8_t *installed_manifest_bytes = NULL;
+    const uint8_t *installed_signature_bytes = NULL;
+    const uint8_t *installed_payload = NULL;
+    signed_manifest_t installed_manifest;
     verify_status_t verify_status = VERIFY_BAD_PAYLOAD_RANGE;
-    update_package_status_t package_status = update_package_verify_for_slot(
-        options->installed_image_buffer,
-        package->package_size,
+
+    if ((candidate == NULL) || (header == NULL) || (public_key == NULL)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    update_install_status_t fault_status =
+        maybe_fault(
+            options,
+            UPDATE_INSTALL_FAULT_VERIFY_INSTALLED,
+            header->manifest.image_version
+        );
+    if (fault_status != UPDATE_INSTALL_OK) {
+        return fault_status;
+    }
+
+    installed_manifest_bytes =
+        (const uint8_t *)(uintptr_t)candidate->manifest_address;
+    installed_signature_bytes =
+        (const uint8_t *)(uintptr_t)candidate->signature_address;
+    installed_payload = (const uint8_t *)(uintptr_t)candidate->payload_base;
+
+    verify_status = signed_image_verify_update_slot_buffer(
+        installed_manifest_bytes,
+        installed_signature_bytes,
+        installed_payload,
+        (size_t)candidate->maximum_payload_size,
         public_key,
-        candidate,
-        &installed,
-        &verify_status
+        candidate
     );
+    if (verify_status == VERIFY_OK) {
+        verify_status = signed_image_decode_manifest(
+            installed_manifest_bytes,
+            &installed_manifest
+        );
+        if ((verify_status == VERIFY_OK) &&
+            (manifest_matches_header(&installed_manifest, header) == 0U)) {
+            verify_status = VERIFY_BAD_SIGNATURE;
+        }
+        if ((verify_status == VERIFY_OK) &&
+            (installed_header_matches_expected(candidate, header) == 0U)) {
+            verify_status = VERIFY_BAD_SIGNATURE;
+        }
+    }
 
     if (result != NULL) {
         result->installed_verify_status = verify_status;
     }
 
-    return (package_status == UPDATE_PACKAGE_OK)
+    return (verify_status == VERIFY_OK)
         ? UPDATE_INSTALL_OK
         : UPDATE_INSTALL_ERR_INSTALLED_VERIFY;
 }
 
-update_install_status_t update_installer_install(
+static update_install_status_t verify_streaming_payload_hash(
+    update_installer_session_t *session
+)
+{
+    uint8_t computed[SIGNED_PAYLOAD_HASH_SIZE];
+
+    if (session == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    crypto_sha512_final(&session->payload_hash_ctx, computed);
+    session->payload_hash_finalized = 1U;
+
+    if (crypto_verify64(computed, session->header.manifest.payload_sha512) !=
+        0) {
+        crypto_wipe(computed, sizeof(computed));
+        return UPDATE_INSTALL_ERR_HASH;
+    }
+
+    crypto_wipe(computed, sizeof(computed));
+    return UPDATE_INSTALL_OK;
+}
+
+update_install_status_t update_installer_session_init(
+    update_installer_session_t *session,
     const boot_flash_t *flash,
-    const uint8_t *package_bytes,
-    size_t package_size,
     const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
     const update_install_options_t *options,
     update_install_result_t *result
 )
 {
     boot_metadata_record_t current;
-    boot_metadata_record_t writing;
     boot_metadata_recovery_t recovery;
     const boot_slot_descriptor_t *active = NULL;
     const boot_slot_descriptor_t *candidate = NULL;
-    boot_flash_t restricted;
-    boot_flash_region_t write_regions[3];
-    update_package_t package;
-    verify_status_t package_verify_status = VERIFY_BAD_PAYLOAD_RANGE;
+    update_install_status_t install_status;
+    boot_metadata_status_t metadata_status;
+
+    if (session == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    memset(session, 0, sizeof(*session));
+    session->state = UPDATE_INSTALL_SESSION_EMPTY;
 
     if ((flash == NULL) ||
-        (package_bytes == NULL) ||
         (public_key == NULL) ||
         (options_are_valid(flash, options) == 0U)) {
         return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
@@ -480,17 +771,36 @@ update_install_status_t update_installer_install(
         result->installed_verify_status = VERIFY_BAD_PAYLOAD_RANGE;
     }
 
-    boot_metadata_status_t metadata_status =
+    metadata_status =
         boot_metadata_recover_from_flash(flash, &current, &recovery);
     if (metadata_status != BOOT_METADATA_OK) {
-        return UPDATE_INSTALL_ERR_METADATA;
+        return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
     }
 
-    update_install_status_t status =
-        select_inactive_slot(&current, &active, &candidate);
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    install_status = select_inactive_slot(&current, &active, &candidate);
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
     }
+
+    install_status = init_restricted_flash(
+        flash,
+        candidate,
+        &session->restricted_flash,
+        session->write_regions
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    session->flash = flash;
+    session->public_key = public_key;
+    session->options = *options;
+    session->result = result;
+    session->metadata_before = current;
+    session->metadata_recovery = recovery;
+    session->active = active;
+    session->candidate = candidate;
+    session->state = UPDATE_INSTALL_SESSION_INITIALIZED;
 
     if (result != NULL) {
         result->active_slot = (uint32_t)active->id;
@@ -498,95 +808,429 @@ update_install_status_t update_installer_install(
         result->metadata_recovery = recovery;
     }
 
-    update_package_status_t package_status = update_package_verify_for_slot(
-        package_bytes,
-        package_size,
-        public_key,
-        candidate,
-        &package,
-        &package_verify_status
+    return UPDATE_INSTALL_OK;
+}
+
+update_install_status_t update_installer_begin(
+    update_installer_session_t *session,
+    const uint8_t *header_bytes,
+    size_t header_size
+)
+{
+    boot_metadata_record_t recovered_metadata;
+    verify_status_t verify_status = VERIFY_BAD_PAYLOAD_RANGE;
+    update_package_status_t package_status;
+    update_install_status_t install_status;
+    boot_metadata_status_t metadata_status;
+
+    if ((session == NULL) || (header_bytes == NULL)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if (session->state != UPDATE_INSTALL_SESSION_INITIALIZED) {
+        return UPDATE_INSTALL_ERR_STATE;
+    }
+
+    metadata_status = boot_metadata_recover_from_flash(
+        &session->restricted_flash,
+        &recovered_metadata,
+        NULL
     );
-
-    if (result != NULL) {
-        result->package_verify_status = package_verify_status;
+    if (metadata_status != BOOT_METADATA_OK) {
+        return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
     }
 
+    if (metadata_matches_start(
+            &recovered_metadata,
+            &session->metadata_before
+        ) == 0U) {
+        return fail_session(session, UPDATE_INSTALL_ERR_ACTIVE_STATE);
+    }
+
+    package_status = update_package_verify_header_for_slot(
+        header_bytes,
+        header_size,
+        session->public_key,
+        session->candidate,
+        &session->header,
+        &verify_status
+    );
+    if (session->result != NULL) {
+        session->result->package_verify_status = verify_status;
+    }
     if (package_status != UPDATE_PACKAGE_OK) {
-        return UPDATE_INSTALL_ERR_PACKAGE;
+        return fail_session(session, UPDATE_INSTALL_ERR_PACKAGE);
     }
 
-    if (package.manifest.image_version <= current.candidate_image_version) {
-        return UPDATE_INSTALL_ERR_ROLLBACK;
+    if (session->header.manifest.image_version <=
+        session->metadata_before.candidate_image_version) {
+        return fail_session(session, UPDATE_INSTALL_ERR_ROLLBACK);
     }
 
-    if (result != NULL) {
-        result->image_version = package.manifest.image_version;
+    install_status = candidate_package_fits(
+        &session->restricted_flash,
+        session->candidate,
+        &session->header,
+        &session->payload_program_size
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
     }
 
-    status = init_restricted_flash(flash, candidate, &restricted, write_regions);
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    if (session->result != NULL) {
+        session->result->image_version = session->header.manifest.image_version;
     }
 
-    status = commit_metadata_state(
-        &restricted,
-        &current,
+    install_status = commit_metadata_state(
+        &session->restricted_flash,
+        &session->metadata_before,
         BOOT_METADATA_STATE_WRITING,
-        (uint32_t)active->id,
-        (uint32_t)candidate->id,
-        package.manifest.image_version,
-        options,
+        (uint32_t)session->active->id,
+        (uint32_t)session->candidate->id,
+        session->header.manifest.image_version,
+        &session->options,
         UPDATE_INSTALL_FAULT_METADATA_WRITING
     );
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+    session->metadata_writing_committed = 1U;
+
+    metadata_status = boot_metadata_recover_from_flash(
+        &session->restricted_flash,
+        &session->writing_metadata,
+        NULL
+    );
+    if ((metadata_status != BOOT_METADATA_OK) ||
+        (session->writing_metadata.state != BOOT_METADATA_STATE_WRITING) ||
+        (session->writing_metadata.active_slot !=
+            (uint32_t)session->active->id) ||
+        (session->writing_metadata.candidate_slot !=
+            (uint32_t)session->candidate->id)) {
+        return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
     }
 
-    metadata_status = boot_metadata_recover_from_flash(&restricted, &writing, NULL);
-    if (metadata_status != BOOT_METADATA_OK ||
-        writing.state != BOOT_METADATA_STATE_WRITING ||
-        writing.active_slot != (uint32_t)active->id ||
-        writing.candidate_slot != (uint32_t)candidate->id) {
-        return UPDATE_INSTALL_ERR_METADATA;
+    install_status = erase_candidate_slot(
+        &session->restricted_flash,
+        session->candidate,
+        &session->options,
+        session->result
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+    session->candidate_erased = 1U;
+
+    install_status = program_source_range(
+        &session->restricted_flash,
+        session->candidate->signed_image_base,
+        header_bytes,
+        (size_t)SIGNED_IMAGE_HEADER_SIZE,
+        (size_t)SIGNED_IMAGE_HEADER_SIZE,
+        &session->options,
+        session->result,
+        &session->programmed_block_count
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
     }
 
-    status = erase_candidate_slot(&restricted, candidate, options, result);
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    crypto_sha512_init(&session->payload_hash_ctx);
+    session->state = UPDATE_INSTALL_SESSION_WRITING;
+    return UPDATE_INSTALL_OK;
+}
+
+update_install_status_t update_installer_write(
+    update_installer_session_t *session,
+    size_t payload_offset,
+    const uint8_t *data,
+    size_t length
+)
+{
+    const uint8_t *input = data;
+    size_t remaining = length;
+
+    if (session == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
     }
 
-    status = program_candidate_slot(&restricted, candidate, &package, options, result);
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    if (session->state == UPDATE_INSTALL_SESSION_PAYLOAD_COMPLETE) {
+        return fail_session(session, UPDATE_INSTALL_ERR_SEQUENCE);
     }
 
-    status = hash_installed_payload(&restricted, candidate, &package, options);
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    if (session->state != UPDATE_INSTALL_SESSION_WRITING) {
+        return UPDATE_INSTALL_ERR_STATE;
     }
 
-    status = verify_installed_package(
-        &restricted,
-        candidate,
-        &package,
+    if ((data == NULL) || (length == 0U)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if (payload_offset != session->payload_received) {
+        return fail_session(session, UPDATE_INSTALL_ERR_SEQUENCE);
+    }
+
+    if (length > (session->header.payload_size - session->payload_received)) {
+        return fail_session(session, UPDATE_INSTALL_ERR_SEQUENCE);
+    }
+
+    while (remaining > 0U) {
+        size_t buffer_space =
+            session->options.program_buffer_size - session->program_fill;
+        size_t consumed = remaining;
+        update_install_status_t install_status;
+
+        if (consumed > buffer_space) {
+            consumed = buffer_space;
+        }
+
+        memcpy(
+            &session->options.program_buffer[session->program_fill],
+            input,
+            consumed
+        );
+        crypto_sha512_update(&session->payload_hash_ctx, input, consumed);
+
+        session->program_fill += consumed;
+        session->payload_received += consumed;
+        input = &input[consumed];
+        remaining -= consumed;
+
+        if (session->program_fill == session->options.program_buffer_size) {
+            install_status = flush_payload_program_buffer(session, 0U);
+            if (install_status != UPDATE_INSTALL_OK) {
+                return fail_session(session, install_status);
+            }
+        }
+    }
+
+    if (session->payload_received == session->header.payload_size) {
+        session->state = UPDATE_INSTALL_SESSION_PAYLOAD_COMPLETE;
+    }
+
+    return UPDATE_INSTALL_OK;
+}
+
+update_install_status_t update_installer_finish(update_installer_session_t *session)
+{
+    update_install_status_t install_status;
+
+    if (session == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if (session->state == UPDATE_INSTALL_SESSION_WRITING) {
+        return fail_session(session, UPDATE_INSTALL_ERR_SEQUENCE);
+    }
+
+    if (session->state != UPDATE_INSTALL_SESSION_PAYLOAD_COMPLETE) {
+        return UPDATE_INSTALL_ERR_STATE;
+    }
+
+    install_status = flush_payload_program_buffer(session, 1U);
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    if (session->payload_programmed != session->payload_program_size) {
+        return fail_session(session, UPDATE_INSTALL_ERR_CAPACITY);
+    }
+
+    install_status = verify_streaming_payload_hash(session);
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    install_status = hash_installed_payload(
+        &session->restricted_flash,
+        session->candidate,
+        &session->header,
+        &session->options
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    install_status = verify_installed_package(
+        session->candidate,
+        &session->header,
+        session->public_key,
+        &session->options,
+        session->result
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    install_status = commit_metadata_state(
+        &session->restricted_flash,
+        &session->writing_metadata,
+        BOOT_METADATA_STATE_CANDIDATE_READY,
+        (uint32_t)session->active->id,
+        (uint32_t)session->candidate->id,
+        session->header.manifest.image_version,
+        &session->options,
+        UPDATE_INSTALL_FAULT_METADATA_CANDIDATE_READY
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    session->state = UPDATE_INSTALL_SESSION_FINISHED;
+    return UPDATE_INSTALL_OK;
+}
+
+update_install_status_t update_installer_abort(update_installer_session_t *session)
+{
+    boot_metadata_record_t current;
+    boot_metadata_record_t rejected;
+    boot_metadata_status_t metadata_status;
+
+    if (session == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if (session->state == UPDATE_INSTALL_SESSION_FINISHED) {
+        return UPDATE_INSTALL_ERR_STATE;
+    }
+
+    if (session->state == UPDATE_INSTALL_SESSION_ABORTED) {
+        return UPDATE_INSTALL_OK;
+    }
+
+    if (session->metadata_writing_committed != 0U) {
+        metadata_status = boot_metadata_recover_from_flash(
+            &session->restricted_flash,
+            &current,
+            NULL
+        );
+        if (metadata_status != BOOT_METADATA_OK) {
+            session->state = UPDATE_INSTALL_SESSION_FAILED;
+            return UPDATE_INSTALL_ERR_METADATA;
+        }
+
+        if ((current.state == BOOT_METADATA_STATE_WRITING) &&
+            (current.active_slot == (uint32_t)session->active->id) &&
+            (current.candidate_slot == (uint32_t)session->candidate->id) &&
+            (current.candidate_image_version ==
+                session->header.manifest.image_version)) {
+            metadata_status = boot_metadata_prepare_next(
+                &current,
+                BOOT_METADATA_STATE_REJECTED_INVALID,
+                (uint32_t)session->active->id,
+                (uint32_t)session->candidate->id,
+                session->header.manifest.image_version,
+                0U,
+                0U,
+                0U,
+                &rejected
+            );
+            if (metadata_status != BOOT_METADATA_OK) {
+                session->state = UPDATE_INSTALL_SESSION_FAILED;
+                return UPDATE_INSTALL_ERR_METADATA;
+            }
+
+            metadata_status = boot_metadata_commit(
+                &session->restricted_flash,
+                &rejected
+            );
+            if (metadata_status != BOOT_METADATA_OK) {
+                session->state = UPDATE_INSTALL_SESSION_FAILED;
+                return UPDATE_INSTALL_ERR_METADATA;
+            }
+        } else if (current.state == BOOT_METADATA_STATE_CANDIDATE_READY) {
+            session->state = UPDATE_INSTALL_SESSION_FAILED;
+            return UPDATE_INSTALL_ERR_STATE;
+        }
+    }
+
+    session->state = UPDATE_INSTALL_SESSION_ABORTED;
+    return UPDATE_INSTALL_OK;
+}
+
+update_install_status_t update_installer_install(
+    const boot_flash_t *flash,
+    const uint8_t *package_bytes,
+    size_t package_size,
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
+    const update_install_options_t *options,
+    update_install_result_t *result
+)
+{
+    update_installer_session_t session;
+    update_package_t package;
+    verify_status_t package_verify_status = VERIFY_BAD_PAYLOAD_RANGE;
+    update_package_status_t package_status;
+    update_install_status_t install_status;
+    size_t payload_offset = 0U;
+
+    if (package_bytes == NULL) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    install_status = update_installer_session_init(
+        &session,
+        flash,
         public_key,
         options,
         result
     );
-    if (status != UPDATE_INSTALL_OK) {
-        return status;
+    if (install_status != UPDATE_INSTALL_OK) {
+        return install_status;
     }
 
-    return commit_metadata_state(
-        &restricted,
-        &writing,
-        BOOT_METADATA_STATE_CANDIDATE_READY,
-        (uint32_t)active->id,
-        (uint32_t)candidate->id,
-        package.manifest.image_version,
-        options,
-        UPDATE_INSTALL_FAULT_METADATA_CANDIDATE_READY
+    package_status = update_package_verify_for_slot(
+        package_bytes,
+        package_size,
+        public_key,
+        session.candidate,
+        &package,
+        &package_verify_status
     );
+    if (result != NULL) {
+        result->package_verify_status = package_verify_status;
+    }
+    if (package_status != UPDATE_PACKAGE_OK) {
+        return UPDATE_INSTALL_ERR_PACKAGE;
+    }
+
+    install_status = update_installer_begin(
+        &session,
+        package_bytes,
+        (size_t)SIGNED_IMAGE_HEADER_SIZE
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return install_status;
+    }
+
+    while (payload_offset < package.payload_size) {
+        size_t chunk = package.payload_size - payload_offset;
+
+        if (chunk > options->program_buffer_size) {
+            chunk = options->program_buffer_size;
+        }
+
+        install_status = update_installer_write(
+            &session,
+            payload_offset,
+            &package.payload[payload_offset],
+            chunk
+        );
+        if (install_status != UPDATE_INSTALL_OK) {
+            (void)update_installer_abort(&session);
+            return install_status;
+        }
+
+        payload_offset += chunk;
+    }
+
+    install_status = update_installer_finish(&session);
+    if (install_status != UPDATE_INSTALL_OK) {
+        (void)update_installer_abort(&session);
+        return install_status;
+    }
+
+    return UPDATE_INSTALL_OK;
 }
 
 const char *update_install_status_text(update_install_status_t status)
@@ -606,6 +1250,8 @@ const char *update_install_status_text(update_install_status_t status)
     case UPDATE_INSTALL_ERR_HASH:                 return "HASH";
     case UPDATE_INSTALL_ERR_INSTALLED_VERIFY:     return "INSTALLED VERIFY";
     case UPDATE_INSTALL_ERR_INJECTED:             return "INJECTED";
+    case UPDATE_INSTALL_ERR_STATE:                return "STATE";
+    case UPDATE_INSTALL_ERR_SEQUENCE:             return "SEQUENCE";
     default:                                      return "UNKNOWN";
     }
 }

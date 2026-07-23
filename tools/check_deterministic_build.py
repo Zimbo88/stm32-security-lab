@@ -182,6 +182,17 @@ def build_checkout(checkout: Path) -> dict[str, str]:
             "make",
             "-C",
             "firmware/exp066_research_platform_core",
+            "inspect-update-package",
+            "LAYOUT_PROFILE=stm32f429_1m",
+            f"SIGNING_SEED={seed}",
+        ],
+        checkout,
+    )
+    run(
+        [
+            "make",
+            "-C",
+            "firmware/exp066_research_platform_core",
             "verify-signed",
             "LAYOUT_PROFILE=stm32f429_1m",
             f"SIGNING_SEED={seed}",

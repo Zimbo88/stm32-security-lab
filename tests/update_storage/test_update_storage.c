@@ -24,8 +24,12 @@ static int failures;
 #define TEST_METADATA_COMMIT_OFFSET (STM32F429_BOOT_METADATA_RECORD_SIZE - 8U)
 #define TEST_UPDATE_PAYLOAD_SIZE 256U
 #define TEST_INSTALL_PROGRAM_CHUNK 128U
+#define TEST_SMALL_INSTALL_CHUNK 512U
+#define TEST_LARGE_UPDATE_PAYLOAD_SIZE 2048U
 #define TEST_PACKAGE_BUFFER_SIZE \
     (STM32F429_SIGNED_IMAGE_HEADER_SIZE + TEST_UPDATE_PAYLOAD_SIZE + 32U)
+#define TEST_LARGE_PACKAGE_BUFFER_SIZE \
+    (STM32F429_SIGNED_IMAGE_HEADER_SIZE + TEST_LARGE_UPDATE_PAYLOAD_SIZE + 32U)
 
 static const boot_flash_region_t write_regions[] = {
     {STM32F429_BOOT_METADATA_A_BASE, STM32F429_BOOT_METADATA_A_END},
@@ -1083,9 +1087,10 @@ static void refresh_package_hash_and_signature(uint8_t *package)
     sign_package_manifest(package);
 }
 
-static size_t build_update_package_for_slot(
+static size_t build_update_package_for_slot_with_payload_size(
     uint32_t slot_id,
     uint32_t image_version,
+    size_t payload_size,
     uint8_t *package,
     size_t package_capacity
 )
@@ -1094,7 +1099,7 @@ static size_t build_update_package_for_slot(
     uint8_t *payload = NULL;
     uint8_t payload_hash[SIGNED_PAYLOAD_HASH_SIZE];
     const size_t package_size =
-        (size_t)SIGNED_IMAGE_HEADER_SIZE + TEST_UPDATE_PAYLOAD_SIZE;
+        (size_t)SIGNED_IMAGE_HEADER_SIZE + payload_size;
 
     expect_u32(
         "package buffer capacity",
@@ -1109,10 +1114,10 @@ static size_t build_update_package_for_slot(
 
     memset(package, 0xFF, package_size);
     payload = &package[SIGNED_IMAGE_HEADER_SIZE];
-    memset(payload, 0xA5, TEST_UPDATE_PAYLOAD_SIZE);
+    memset(payload, 0xA5, payload_size);
     test_store_le32(&payload[0], APPLICATION_MSP_END);
     test_store_le32(&payload[4], slot->payload_base | 1UL);
-    crypto_sha512(payload_hash, payload, TEST_UPDATE_PAYLOAD_SIZE);
+    crypto_sha512(payload_hash, payload, payload_size);
 
     test_store_le32(&package[offsetof(signed_manifest_t, magic)], SIGNED_IMAGE_MAGIC);
     test_store_le32(
@@ -1129,7 +1134,7 @@ static size_t build_update_package_for_slot(
     );
     test_store_le32(
         &package[offsetof(signed_manifest_t, image_size)],
-        TEST_UPDATE_PAYLOAD_SIZE
+        (uint32_t)payload_size
     );
     test_store_le32(&package[offsetof(signed_manifest_t, flags)], 0U);
     test_store_le32(
@@ -1150,6 +1155,22 @@ static size_t build_update_package_for_slot(
     return package_size;
 }
 
+static size_t build_update_package_for_slot(
+    uint32_t slot_id,
+    uint32_t image_version,
+    uint8_t *package,
+    size_t package_capacity
+)
+{
+    return build_update_package_for_slot_with_payload_size(
+        slot_id,
+        image_version,
+        TEST_UPDATE_PAYLOAD_SIZE,
+        package,
+        package_capacity
+    );
+}
+
 static void install_package_bytes_direct(
     simulated_flash_t *sim,
     const boot_slot_descriptor_t *slot,
@@ -1162,6 +1183,7 @@ static void install_package_bytes_direct(
         package,
         package_size
     );
+    simulated_flash_sync_mapped(sim);
 }
 
 typedef struct {
@@ -1272,10 +1294,11 @@ static void commit_confirmed_metadata(
     );
 }
 
-static update_install_options_t make_install_options(
+static update_install_options_t make_install_options_with_sizes(
     uint8_t *program_buffer,
+    size_t program_buffer_size,
     uint8_t *readback_buffer,
-    uint8_t *installed_buffer,
+    size_t readback_buffer_size,
     update_install_fault_hook_t hook,
     void *hook_context
 )
@@ -1283,14 +1306,29 @@ static update_install_options_t make_install_options(
     update_install_options_t options;
 
     options.program_buffer = program_buffer;
-    options.program_buffer_size = TEST_INSTALL_PROGRAM_CHUNK;
+    options.program_buffer_size = program_buffer_size;
     options.readback_buffer = readback_buffer;
-    options.readback_buffer_size = TEST_INSTALL_PROGRAM_CHUNK;
-    options.installed_image_buffer = installed_buffer;
-    options.installed_image_buffer_size = TEST_PACKAGE_BUFFER_SIZE;
+    options.readback_buffer_size = readback_buffer_size;
     options.fault_hook = hook;
     options.fault_context = hook_context;
     return options;
+}
+
+static update_install_options_t make_install_options(
+    uint8_t *program_buffer,
+    uint8_t *readback_buffer,
+    update_install_fault_hook_t hook,
+    void *hook_context
+)
+{
+    return make_install_options_with_sizes(
+        program_buffer,
+        TEST_INSTALL_PROGRAM_CHUNK,
+        readback_buffer,
+        TEST_INSTALL_PROGRAM_CHUNK,
+        hook,
+        hook_context
+    );
 }
 
 typedef struct {
@@ -1317,6 +1355,71 @@ static update_install_status_t install_fault_hook(
     return UPDATE_INSTALL_OK;
 }
 
+static update_install_status_t stream_package_with_block_size(
+    const boot_flash_t *flash,
+    const uint8_t *package,
+    size_t package_size,
+    size_t block_size,
+    const uint8_t public_key[FIRMWARE_PUBLIC_KEY_SIZE],
+    const update_install_options_t *options,
+    update_install_result_t *result
+)
+{
+    update_installer_session_t session;
+    update_install_status_t install_status;
+    size_t payload_offset = 0U;
+    size_t payload_size = 0U;
+
+    if ((package_size < (size_t)SIGNED_IMAGE_HEADER_SIZE) ||
+        (block_size == 0U)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    payload_size = package_size - (size_t)SIGNED_IMAGE_HEADER_SIZE;
+
+    install_status = update_installer_session_init(
+        &session,
+        flash,
+        public_key,
+        options,
+        result
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return install_status;
+    }
+
+    install_status = update_installer_begin(
+        &session,
+        package,
+        (size_t)SIGNED_IMAGE_HEADER_SIZE
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return install_status;
+    }
+
+    while (payload_offset < payload_size) {
+        size_t chunk = payload_size - payload_offset;
+
+        if (chunk > block_size) {
+            chunk = block_size;
+        }
+
+        install_status = update_installer_write(
+            &session,
+            payload_offset,
+            &package[SIGNED_IMAGE_HEADER_SIZE + payload_offset],
+            chunk
+        );
+        if (install_status != UPDATE_INSTALL_OK) {
+            return install_status;
+        }
+
+        payload_offset += chunk;
+    }
+
+    return update_installer_finish(&session);
+}
+
 typedef struct {
     boot_slot_selection_fault_point_t point;
     uint32_t detail;
@@ -1341,12 +1444,13 @@ static boot_slot_selection_status_t selection_fault_hook(
     return BOOT_SLOT_SELECTION_OK;
 }
 
-static size_t setup_standard_install(
+static size_t setup_install_with_payload_size(
     simulated_flash_t *sim,
     boot_flash_t *flash,
     uint32_t active_slot_id,
     uint32_t active_version,
     uint32_t package_version,
+    size_t payload_size,
     uint8_t *package,
     size_t package_capacity,
     const boot_slot_descriptor_t **active,
@@ -1372,9 +1476,113 @@ static size_t setup_standard_install(
     );
 
     prepare_protected_snapshots(sim, *active);
-    return build_update_package_for_slot(
+    return build_update_package_for_slot_with_payload_size(
         candidate_slot_id,
         package_version,
+        payload_size,
+        package,
+        package_capacity
+    );
+}
+
+static size_t setup_standard_install(
+    simulated_flash_t *sim,
+    boot_flash_t *flash,
+    uint32_t active_slot_id,
+    uint32_t active_version,
+    uint32_t package_version,
+    uint8_t *package,
+    size_t package_capacity,
+    const boot_slot_descriptor_t **active,
+    const boot_slot_descriptor_t **candidate
+)
+{
+    return setup_install_with_payload_size(
+        sim,
+        flash,
+        active_slot_id,
+        active_version,
+        package_version,
+        TEST_UPDATE_PAYLOAD_SIZE,
+        package,
+        package_capacity,
+        active,
+        candidate
+    );
+}
+
+static size_t setup_streaming_install_with_bootable_active(
+    simulated_flash_t *sim,
+    boot_flash_t *flash,
+    uint32_t active_slot_id,
+    uint32_t active_version,
+    uint32_t package_version,
+    size_t payload_size,
+    uint8_t *package,
+    size_t package_capacity,
+    const boot_slot_descriptor_t **active,
+    const boot_slot_descriptor_t **candidate
+)
+{
+    uint8_t active_package[TEST_PACKAGE_BUFFER_SIZE];
+    size_t active_package_size = 0U;
+    const uint32_t candidate_slot_id =
+        (active_slot_id == (uint32_t)BOOT_SLOT_A)
+            ? (uint32_t)BOOT_SLOT_B
+            : (uint32_t)BOOT_SLOT_A;
+
+    make_installer_flash(sim, flash);
+    expect_u32(
+        "lookup streaming active slot",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(active_slot_id, active)
+    );
+    expect_u32(
+        "lookup streaming candidate slot",
+        BOOT_SLOT_LOOKUP_OK,
+        boot_slot_lookup(candidate_slot_id, candidate)
+    );
+
+    fill_flash_region(
+        sim,
+        STM32F429_BOOTLOADER_BASE,
+        STM32F429_BOOTLOADER_SIZE,
+        0x10U
+    );
+    fill_flash_region(sim, (*active)->signed_image_base, STM32F429_SLOT_A_SIZE, 0x40U);
+    fill_flash_region(sim, STM32F429_RECOVERY_BASE, STM32F429_RECOVERY_SIZE, 0x80U);
+
+    active_package_size = build_update_package_for_slot(
+        active_slot_id,
+        active_version,
+        active_package,
+        sizeof(active_package)
+    );
+    install_package_bytes_direct(sim, *active, active_package, active_package_size);
+    commit_confirmed_metadata(flash, active_slot_id, active_version);
+    snapshot_flash_region(
+        sim,
+        STM32F429_BOOTLOADER_BASE,
+        protected_stage0_before,
+        sizeof(protected_stage0_before)
+    );
+    snapshot_flash_region(
+        sim,
+        (*active)->signed_image_base,
+        protected_slot_before,
+        sizeof(protected_slot_before)
+    );
+    snapshot_flash_region(
+        sim,
+        STM32F429_RECOVERY_BASE,
+        protected_recovery_before,
+        sizeof(protected_recovery_before)
+    );
+
+    return build_update_package_for_slot_with_payload_size(
+        candidate_slot_id,
+        package_version,
+        payload_size,
         package,
         package_capacity
     );
@@ -1512,6 +1720,35 @@ static boot_slot_selection_options_t make_selection_options(
     };
 
     return options;
+}
+
+static void expect_reset_selects_active(
+    const char *name,
+    const boot_flash_t *flash,
+    const boot_slot_descriptor_t *active
+)
+{
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_slot_selection_options_t options = make_selection_options(
+        flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+
+    expect_selection_status(
+        name,
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_u32("reset selected active slot", active->id, selection.selected_slot);
+    if (selection.decision == BOOT_SLOT_SELECTION_DECISION_TRIAL) {
+        printf("%s: reset selected trial candidate unexpectedly\n", name);
+        failures += 1;
+    }
 }
 
 static void expect_no_forbidden_writes(
@@ -2598,7 +2835,6 @@ static void test_update_installer_success_to_candidate_ready(void)
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
     update_install_result_t result;
     boot_metadata_record_t recovered;
     update_package_t installed;
@@ -2619,7 +2855,6 @@ static void test_update_installer_success_to_candidate_ready(void)
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         NULL,
         NULL
     );
@@ -2680,6 +2915,72 @@ static void test_update_installer_success_to_candidate_ready(void)
     expect_no_forbidden_writes(&sim, active);
 }
 
+static void test_update_installer_installs_package_larger_than_io_buffers(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_LARGE_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+    uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+    update_install_result_t result;
+
+    const size_t package_size = setup_install_with_payload_size(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        TEST_LARGE_UPDATE_PAYLOAD_SIZE,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+
+    update_install_options_t options = make_install_options_with_sizes(
+        program_buffer,
+        sizeof(program_buffer),
+        readback_buffer,
+        sizeof(readback_buffer),
+        NULL,
+        NULL
+    );
+
+    expect_u32(
+        "large package exceeds program buffer",
+        1U,
+        (package_size > sizeof(program_buffer)) ? 1U : 0U
+    );
+    expect_u32(
+        "large package exceeds readback buffer",
+        1U,
+        (package_size > sizeof(readback_buffer)) ? 1U : 0U
+    );
+    expect_install_status(
+        "install large package with small buffers",
+        UPDATE_INSTALL_OK,
+        update_installer_install(
+            &flash,
+            package,
+            package_size,
+            update_public_key,
+            &options,
+            &result
+        )
+    );
+    expect_u32("large install active slot", BOOT_SLOT_A, result.active_slot);
+    expect_u32("large install candidate slot", BOOT_SLOT_B, result.candidate_slot);
+    expect_u32("large install image version", 3U, result.image_version);
+    expect_u32("large install program blocks", 5U, result.programmed_block_count);
+    expect_verify_status("large package preverify", VERIFY_OK, result.package_verify_status);
+    expect_verify_status("large installed verify", VERIFY_OK, result.installed_verify_status);
+    expect_protected_regions_unchanged(&sim, active);
+    expect_no_forbidden_writes(&sim, active);
+    (void)candidate;
+}
+
 static void test_update_installer_uses_opposite_inactive_slot(void)
 {
     simulated_flash_t sim;
@@ -2689,7 +2990,6 @@ static void test_update_installer_uses_opposite_inactive_slot(void)
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
     update_install_result_t result;
 
     const size_t package_size = setup_standard_install(
@@ -2706,7 +3006,6 @@ static void test_update_installer_uses_opposite_inactive_slot(void)
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         NULL,
         NULL
     );
@@ -2738,7 +3037,6 @@ static void test_update_installer_rejects_rollback_and_active_slot_package(void)
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
     size_t package_size = setup_standard_install(
         &sim,
@@ -2754,7 +3052,6 @@ static void test_update_installer_rejects_rollback_and_active_slot_package(void)
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         NULL,
         NULL
     );
@@ -2815,7 +3112,6 @@ static void test_update_installer_rejects_bad_metadata_states(void)
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t copy_a[STM32F429_BOOT_METADATA_RECORD_SIZE];
     uint8_t copy_b[STM32F429_BOOT_METADATA_RECORD_SIZE];
 
@@ -2831,7 +3127,6 @@ static void test_update_installer_rejects_bad_metadata_states(void)
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         NULL,
         NULL
     );
@@ -2902,7 +3197,6 @@ static void run_install_with_hook_failure(
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
     install_fault_config_t fault = {point, detail, match_detail};
 
     const size_t package_size = setup_standard_install(
@@ -2920,7 +3214,6 @@ static void run_install_with_hook_failure(
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         install_fault_hook,
         &fault
     );
@@ -3004,7 +3297,6 @@ static void test_update_installer_flash_failure_injection(void)
         uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
         uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
         uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-        uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
         const size_t package_size = setup_standard_install(
             &sim,
@@ -3022,7 +3314,6 @@ static void test_update_installer_flash_failure_injection(void)
         update_install_options_t options = make_install_options(
             program_buffer,
             readback_buffer,
-            installed_buffer,
             NULL,
             NULL
         );
@@ -3049,7 +3340,6 @@ static void test_update_installer_flash_failure_injection(void)
         uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
         uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
         uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-        uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
         const size_t package_size = setup_standard_install(
             &sim,
@@ -3069,7 +3359,6 @@ static void test_update_installer_flash_failure_injection(void)
         update_install_options_t options = make_install_options(
             program_buffer,
             readback_buffer,
-            installed_buffer,
             NULL,
             NULL
         );
@@ -3096,7 +3385,6 @@ static void test_update_installer_flash_failure_injection(void)
         uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
         uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
         uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-        uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
         const size_t package_size = setup_standard_install(
             &sim,
@@ -3113,7 +3401,6 @@ static void test_update_installer_flash_failure_injection(void)
         update_install_options_t options = make_install_options(
             program_buffer,
             readback_buffer,
-            installed_buffer,
             NULL,
             NULL
         );
@@ -3140,7 +3427,6 @@ static void test_update_installer_flash_failure_injection(void)
         uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
         uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
         uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-        uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
         const size_t package_size = setup_standard_install(
             &sim,
@@ -3160,7 +3446,6 @@ static void test_update_installer_flash_failure_injection(void)
         update_install_options_t options = make_install_options(
             program_buffer,
             readback_buffer,
-            installed_buffer,
             NULL,
             NULL
         );
@@ -3195,7 +3480,6 @@ static void test_update_installer_detects_post_program_corruption(void)
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
     const size_t package_size = setup_standard_install(
         &sim,
@@ -3212,7 +3496,6 @@ static void test_update_installer_detects_post_program_corruption(void)
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         enable_corrupt_after_program_hook,
         &sim
     );
@@ -3271,18 +3554,68 @@ static update_install_status_t corrupt_hash_read_hook(
     return UPDATE_INSTALL_OK;
 }
 
+typedef struct {
+    uint32_t signature_address;
+} corrupt_installed_verify_context_t;
+
 static update_install_status_t corrupt_installed_verify_hook(
     void *context,
     update_install_fault_point_t point,
     uint32_t detail
 )
 {
-    uint8_t *installed_buffer = (uint8_t *)context;
+    const corrupt_installed_verify_context_t *config =
+        (const corrupt_installed_verify_context_t *)context;
     (void)detail;
 
-    if ((installed_buffer != NULL) &&
+    if ((config != NULL) &&
         (point == UPDATE_INSTALL_FAULT_VERIFY_INSTALLED)) {
-        installed_buffer[SIGNED_MANIFEST_SIZE] ^= 0x01U;
+        uint8_t *signature = (uint8_t *)(uintptr_t)config->signature_address;
+        signature[0] ^= 0x01U;
+    }
+
+    return UPDATE_INSTALL_OK;
+}
+
+typedef struct {
+    uint32_t manifest_address;
+    uint32_t signature_address;
+    uint32_t payload_base;
+    size_t payload_size;
+} rewrite_manifest_context_t;
+
+static update_install_status_t rewrite_installed_manifest_hook(
+    void *context,
+    update_install_fault_point_t point,
+    uint32_t detail
+)
+{
+    rewrite_manifest_context_t *config = (rewrite_manifest_context_t *)context;
+    (void)detail;
+
+    if ((config != NULL) &&
+        (point == UPDATE_INSTALL_FAULT_VERIFY_INSTALLED)) {
+        uint8_t *manifest = (uint8_t *)(uintptr_t)config->manifest_address;
+        uint8_t *signature = (uint8_t *)(uintptr_t)config->signature_address;
+        const uint8_t *payload = (const uint8_t *)(uintptr_t)config->payload_base;
+        uint8_t payload_hash[SIGNED_PAYLOAD_HASH_SIZE];
+
+        crypto_sha512(payload_hash, payload, config->payload_size);
+        test_store_le32(
+            &manifest[offsetof(signed_manifest_t, image_size)],
+            (uint32_t)config->payload_size
+        );
+        memcpy(
+            &manifest[offsetof(signed_manifest_t, payload_sha512)],
+            payload_hash,
+            sizeof(payload_hash)
+        );
+        crypto_ed25519_sign(
+            signature,
+            update_secret_key,
+            manifest,
+            SIGNED_MANIFEST_SIZE
+        );
     }
 
     return UPDATE_INSTALL_OK;
@@ -3297,7 +3630,6 @@ static void test_update_installer_detects_final_hash_mismatch(void)
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
 
     const size_t package_size = setup_standard_install(
         &sim,
@@ -3317,7 +3649,6 @@ static void test_update_installer_detects_final_hash_mismatch(void)
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
         corrupt_hash_read_hook,
         &context
     );
@@ -3336,7 +3667,7 @@ static void test_update_installer_detects_final_hash_mismatch(void)
     expect_install_failure_invariants(&sim, &flash, active);
 }
 
-static void test_update_installer_detects_verifier_failure_after_programming(void)
+static void test_update_installer_rejects_manifest_size_swap_after_hash(void)
 {
     simulated_flash_t sim;
     boot_flash_t flash;
@@ -3345,7 +3676,7 @@ static void test_update_installer_detects_verifier_failure_after_programming(voi
     uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
     uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
     uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
-    uint8_t installed_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    update_install_result_t result;
 
     const size_t package_size = setup_standard_install(
         &sim,
@@ -3358,13 +3689,68 @@ static void test_update_installer_detects_verifier_failure_after_programming(voi
         &active,
         &candidate
     );
-    (void)candidate;
+    rewrite_manifest_context_t context = {
+        .manifest_address = candidate->manifest_address,
+        .signature_address = candidate->signature_address,
+        .payload_base = candidate->payload_base,
+        .payload_size = APPLICATION_MIN_SIZE,
+    };
     update_install_options_t options = make_install_options(
         program_buffer,
         readback_buffer,
-        installed_buffer,
+        rewrite_installed_manifest_hook,
+        &context
+    );
+
+    expect_install_status(
+        "valid manifest size swap rejected",
+        UPDATE_INSTALL_ERR_INSTALLED_VERIFY,
+        update_installer_install(
+            &flash,
+            package,
+            package_size,
+            update_public_key,
+            &options,
+            &result
+        )
+    );
+    expect_verify_status(
+        "manifest size swap verify status",
+        VERIFY_BAD_SIGNATURE,
+        result.installed_verify_status
+    );
+    expect_install_failure_invariants(&sim, &flash, active);
+}
+
+static void test_update_installer_detects_verifier_failure_after_programming(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+
+    const size_t package_size = setup_standard_install(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    corrupt_installed_verify_context_t context = {
+        .signature_address = candidate->signature_address,
+    };
+    update_install_options_t options = make_install_options(
+        program_buffer,
+        readback_buffer,
         corrupt_installed_verify_hook,
-        installed_buffer
+        &context
     );
     expect_install_status(
         "verifier failure after programming",
@@ -3379,6 +3765,1154 @@ static void test_update_installer_detects_verifier_failure_after_programming(voi
         )
     );
     expect_install_failure_invariants(&sim, &flash, active);
+}
+
+static void test_update_installer_streaming_success_block_sizes(void)
+{
+    const size_t block_sizes[] = {1U, 64U, 512U, 1024U};
+
+    for (size_t i = 0U; i < sizeof(block_sizes) / sizeof(block_sizes[0]); ++i) {
+        static simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_LARGE_PACKAGE_BUFFER_SIZE];
+        uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+        uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+        update_install_result_t result;
+
+        const size_t package_size = setup_install_with_payload_size(
+            &sim,
+            &flash,
+            BOOT_SLOT_A,
+            2U,
+            3U,
+            TEST_LARGE_UPDATE_PAYLOAD_SIZE,
+            package,
+            sizeof(package),
+            &active,
+            &candidate
+        );
+        update_install_options_t options = make_install_options_with_sizes(
+            program_buffer,
+            sizeof(program_buffer),
+            readback_buffer,
+            sizeof(readback_buffer),
+            NULL,
+            NULL
+        );
+
+        expect_u32(
+            "stream package exceeds program buffer",
+            1U,
+            (package_size > sizeof(program_buffer)) ? 1U : 0U
+        );
+        expect_u32(
+            "stream package exceeds readback buffer",
+            1U,
+            (package_size > sizeof(readback_buffer)) ? 1U : 0U
+        );
+        expect_install_status(
+            "streaming valid package",
+            UPDATE_INSTALL_OK,
+            stream_package_with_block_size(
+                &flash,
+                package,
+                package_size,
+                block_sizes[i],
+                update_public_key,
+                &options,
+                &result
+            )
+        );
+        expect_u32("stream active slot", BOOT_SLOT_A, result.active_slot);
+        expect_u32("stream candidate slot", BOOT_SLOT_B, result.candidate_slot);
+        expect_u32("stream image version", 3U, result.image_version);
+        expect_u32("stream program blocks", 5U, result.programmed_block_count);
+        expect_verify_status("stream header verify", VERIFY_OK, result.package_verify_status);
+        expect_verify_status("stream installed verify", VERIFY_OK, result.installed_verify_status);
+        expect_protected_regions_unchanged(&sim, active);
+        expect_no_forbidden_writes(&sim, active);
+        (void)candidate;
+    }
+}
+
+static void test_update_installer_streaming_updates_b_to_a(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    update_install_result_t result;
+
+    const size_t package_size = setup_standard_install(
+        &sim,
+        &flash,
+        BOOT_SLOT_B,
+        2U,
+        3U,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        NULL,
+        NULL
+    );
+
+    expect_install_status(
+        "streaming update B to A",
+        UPDATE_INSTALL_OK,
+        stream_package_with_block_size(
+            &flash,
+            package,
+            package_size,
+            64U,
+            update_public_key,
+            &options,
+            &result
+        )
+    );
+    expect_u32("stream B active", BOOT_SLOT_B, result.active_slot);
+    expect_u32("stream A candidate", BOOT_SLOT_A, result.candidate_slot);
+    expect_protected_regions_unchanged(&sim, active);
+    expect_no_forbidden_writes(&sim, active);
+    (void)candidate;
+}
+
+static void test_update_installer_streaming_rejects_header_errors(void)
+{
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+        uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+        update_installer_session_t session;
+
+        const size_t package_size = setup_standard_install(
+            &sim,
+            &flash,
+            BOOT_SLOT_A,
+            2U,
+            3U,
+            package,
+            sizeof(package),
+            &active,
+            &candidate
+        );
+        const size_t writes_before = sim.write_log_count;
+        update_install_options_t options = make_install_options_with_sizes(
+            program_buffer,
+            sizeof(program_buffer),
+            readback_buffer,
+            sizeof(readback_buffer),
+            NULL,
+            NULL
+        );
+
+        expect_install_status(
+            "stream init for truncated header",
+            UPDATE_INSTALL_OK,
+            update_installer_session_init(
+                &session,
+                &flash,
+                update_public_key,
+                &options,
+                NULL
+            )
+        );
+        expect_install_status(
+            "stream truncated header rejected",
+            UPDATE_INSTALL_ERR_PACKAGE,
+            update_installer_begin(
+                &session,
+                package,
+                (size_t)SIGNED_IMAGE_HEADER_SIZE - 1U
+            )
+        );
+        expect_u32("truncated header caused no write", (uint32_t)writes_before, (uint32_t)sim.write_log_count);
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)package_size;
+        (void)candidate;
+    }
+
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+        uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+        update_installer_session_t session;
+
+        const size_t package_size = setup_standard_install(
+            &sim,
+            &flash,
+            BOOT_SLOT_A,
+            2U,
+            3U,
+            package,
+            sizeof(package),
+            &active,
+            &candidate
+        );
+        const size_t writes_before = sim.write_log_count;
+        update_install_options_t options = make_install_options_with_sizes(
+            program_buffer,
+            sizeof(program_buffer),
+            readback_buffer,
+            sizeof(readback_buffer),
+            NULL,
+            NULL
+        );
+
+        package[SIGNED_MANIFEST_SIZE + SIGNED_SIGNATURE_SIZE] = 0x00U;
+        expect_install_status(
+            "stream init for bad padding",
+            UPDATE_INSTALL_OK,
+            update_installer_session_init(
+                &session,
+                &flash,
+                update_public_key,
+                &options,
+                NULL
+            )
+        );
+        expect_install_status(
+            "stream bad padding rejected",
+            UPDATE_INSTALL_ERR_PACKAGE,
+            update_installer_begin(
+                &session,
+                package,
+                (size_t)SIGNED_IMAGE_HEADER_SIZE
+            )
+        );
+        expect_u32("bad padding caused no write", (uint32_t)writes_before, (uint32_t)sim.write_log_count);
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)package_size;
+        (void)candidate;
+    }
+
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+        uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+        update_installer_session_t session;
+
+        const size_t package_size = setup_standard_install(
+            &sim,
+            &flash,
+            BOOT_SLOT_A,
+            2U,
+            3U,
+            package,
+            sizeof(package),
+            &active,
+            &candidate
+        );
+        const size_t writes_before = sim.write_log_count;
+        update_install_options_t options = make_install_options_with_sizes(
+            program_buffer,
+            sizeof(program_buffer),
+            readback_buffer,
+            sizeof(readback_buffer),
+            NULL,
+            NULL
+        );
+
+        package[SIGNED_MANIFEST_SIZE] ^= 0x01U;
+        expect_install_status(
+            "stream init for bad signature",
+            UPDATE_INSTALL_OK,
+            update_installer_session_init(
+                &session,
+                &flash,
+                update_public_key,
+                &options,
+                NULL
+            )
+        );
+        expect_install_status(
+            "stream bad signature rejected",
+            UPDATE_INSTALL_ERR_PACKAGE,
+            update_installer_begin(
+                &session,
+                package,
+                (size_t)SIGNED_IMAGE_HEADER_SIZE
+            )
+        );
+        expect_u32("bad signature caused no write", (uint32_t)writes_before, (uint32_t)sim.write_log_count);
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)package_size;
+        (void)candidate;
+    }
+}
+
+static void test_update_installer_streaming_rejects_versions_before_write(void)
+{
+    for (uint32_t package_version = 2U; package_version <= 3U; ++package_version) {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+        uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+        update_installer_session_t session;
+
+        const size_t package_size = setup_standard_install(
+            &sim,
+            &flash,
+            BOOT_SLOT_A,
+            3U,
+            package_version,
+            package,
+            sizeof(package),
+            &active,
+            &candidate
+        );
+        const size_t writes_before = sim.write_log_count;
+        update_install_options_t options = make_install_options_with_sizes(
+            program_buffer,
+            sizeof(program_buffer),
+            readback_buffer,
+            sizeof(readback_buffer),
+            NULL,
+            NULL
+        );
+
+        expect_install_status(
+            "stream init for rollback",
+            UPDATE_INSTALL_OK,
+            update_installer_session_init(
+                &session,
+                &flash,
+                update_public_key,
+                &options,
+                NULL
+            )
+        );
+        expect_install_status(
+            "stream rollback rejected",
+            UPDATE_INSTALL_ERR_ROLLBACK,
+            update_installer_begin(
+                &session,
+                package,
+                (size_t)SIGNED_IMAGE_HEADER_SIZE
+            )
+        );
+        expect_u32("rollback caused no write", (uint32_t)writes_before, (uint32_t)sim.write_log_count);
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)package_size;
+        (void)candidate;
+    }
+}
+
+static void test_update_installer_streaming_detects_bad_payload_hash(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+    uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+
+    const size_t package_size = setup_standard_install(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options_with_sizes(
+        program_buffer,
+        sizeof(program_buffer),
+        readback_buffer,
+        sizeof(readback_buffer),
+        NULL,
+        NULL
+    );
+
+    package[SIGNED_IMAGE_HEADER_SIZE + 16U] ^= 0x01U;
+    expect_install_status(
+        "stream bad payload hash rejected",
+        UPDATE_INSTALL_ERR_HASH,
+        stream_package_with_block_size(
+            &flash,
+            package,
+            package_size,
+            64U,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+    expect_install_failure_invariants(&sim, &flash, active);
+    (void)candidate;
+}
+
+static void begin_streaming_sequence_test(
+    simulated_flash_t *sim,
+    boot_flash_t *flash,
+    update_installer_session_t *session,
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE],
+    const boot_slot_descriptor_t **active,
+    const boot_slot_descriptor_t **candidate,
+    update_install_options_t *options
+)
+{
+    static uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+    static uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+    const size_t package_size = setup_standard_install(
+        sim,
+        flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        package,
+        TEST_PACKAGE_BUFFER_SIZE,
+        active,
+        candidate
+    );
+
+    *options = make_install_options_with_sizes(
+        program_buffer,
+        sizeof(program_buffer),
+        readback_buffer,
+        sizeof(readback_buffer),
+        NULL,
+        NULL
+    );
+    expect_install_status(
+        "stream sequence init",
+        UPDATE_INSTALL_OK,
+        update_installer_session_init(
+            session,
+            flash,
+            update_public_key,
+            options,
+            NULL
+        )
+    );
+    expect_install_status(
+        "stream sequence begin",
+        UPDATE_INSTALL_OK,
+        update_installer_begin(
+            session,
+            package,
+            (size_t)SIGNED_IMAGE_HEADER_SIZE
+        )
+    );
+    (void)package_size;
+}
+
+static void test_update_installer_streaming_rejects_sequence_errors(void)
+{
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        update_installer_session_t session;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        update_install_options_t options;
+
+        begin_streaming_sequence_test(
+            &sim,
+            &flash,
+            &session,
+            package,
+            &active,
+            &candidate,
+            &options
+        );
+        expect_install_status(
+            "stream skipped first block rejected",
+            UPDATE_INSTALL_ERR_SEQUENCE,
+            update_installer_write(
+                &session,
+                1U,
+                &package[SIGNED_IMAGE_HEADER_SIZE],
+                1U
+            )
+        );
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)candidate;
+    }
+
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        update_installer_session_t session;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        update_install_options_t options;
+
+        begin_streaming_sequence_test(
+            &sim,
+            &flash,
+            &session,
+            package,
+            &active,
+            &candidate,
+            &options
+        );
+        expect_install_status(
+            "stream first block accepted",
+            UPDATE_INSTALL_OK,
+            update_installer_write(
+                &session,
+                0U,
+                &package[SIGNED_IMAGE_HEADER_SIZE],
+                64U
+            )
+        );
+        expect_install_status(
+            "stream duplicate block rejected",
+            UPDATE_INSTALL_ERR_SEQUENCE,
+            update_installer_write(
+                &session,
+                0U,
+                &package[SIGNED_IMAGE_HEADER_SIZE],
+                64U
+            )
+        );
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)candidate;
+    }
+
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        update_installer_session_t session;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        update_install_options_t options;
+
+        begin_streaming_sequence_test(
+            &sim,
+            &flash,
+            &session,
+            package,
+            &active,
+            &candidate,
+            &options
+        );
+        expect_install_status(
+            "stream too much data rejected",
+            UPDATE_INSTALL_ERR_SEQUENCE,
+            update_installer_write(
+                &session,
+                0U,
+                &package[SIGNED_IMAGE_HEADER_SIZE],
+                TEST_UPDATE_PAYLOAD_SIZE + 1U
+            )
+        );
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)candidate;
+    }
+
+    {
+        simulated_flash_t sim;
+        boot_flash_t flash;
+        update_installer_session_t session;
+        const boot_slot_descriptor_t *active = NULL;
+        const boot_slot_descriptor_t *candidate = NULL;
+        uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+        update_install_options_t options;
+
+        begin_streaming_sequence_test(
+            &sim,
+            &flash,
+            &session,
+            package,
+            &active,
+            &candidate,
+            &options
+        );
+        expect_install_status(
+            "stream partial block accepted",
+            UPDATE_INSTALL_OK,
+            update_installer_write(
+                &session,
+                0U,
+                &package[SIGNED_IMAGE_HEADER_SIZE],
+                64U
+            )
+        );
+        expect_install_status(
+            "stream premature finish rejected",
+            UPDATE_INSTALL_ERR_SEQUENCE,
+            update_installer_finish(&session)
+        );
+        expect_install_failure_invariants(&sim, &flash, active);
+        (void)candidate;
+    }
+}
+
+static void test_update_installer_streaming_rejects_invalid_api_states(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    update_installer_session_t session;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+    uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+    update_install_options_t options;
+
+    const size_t package_size = setup_standard_install(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    options = make_install_options_with_sizes(
+        program_buffer,
+        sizeof(program_buffer),
+        readback_buffer,
+        sizeof(readback_buffer),
+        NULL,
+        NULL
+    );
+
+    memset(&session, 0, sizeof(session));
+    expect_install_status(
+        "stream finish before begin rejected",
+        UPDATE_INSTALL_ERR_STATE,
+        update_installer_finish(&session)
+    );
+    expect_install_status(
+        "stream init for invalid state",
+        UPDATE_INSTALL_OK,
+        update_installer_session_init(
+            &session,
+            &flash,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+
+    {
+        boot_metadata_record_t current;
+        boot_metadata_record_t writing;
+
+        expect_metadata_status(
+            "recover metadata before invalid begin",
+            BOOT_METADATA_OK,
+            boot_metadata_recover_from_flash(&flash, &current, NULL)
+        );
+        writing = metadata_writing(
+            &current,
+            BOOT_SLOT_A,
+            BOOT_SLOT_B,
+            3U
+        );
+        expect_metadata_status(
+            "commit invalid begin writing",
+            BOOT_METADATA_OK,
+            boot_metadata_commit(&flash, &writing)
+        );
+    }
+
+    expect_install_status(
+        "stream begin after metadata changed rejected",
+        UPDATE_INSTALL_ERR_ACTIVE_STATE,
+        update_installer_begin(
+            &session,
+            package,
+            (size_t)SIGNED_IMAGE_HEADER_SIZE
+        )
+    );
+    expect_install_failure_invariants(&sim, &flash, active);
+    (void)package_size;
+    (void)candidate;
+}
+
+static void test_update_installer_streaming_abort(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    update_installer_session_t session;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+    uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+    boot_metadata_record_t recovered;
+
+    const size_t package_size = setup_streaming_install_with_bootable_active(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        TEST_UPDATE_PAYLOAD_SIZE,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options_with_sizes(
+        program_buffer,
+        sizeof(program_buffer),
+        readback_buffer,
+        sizeof(readback_buffer),
+        NULL,
+        NULL
+    );
+
+    expect_install_status(
+        "stream abort init",
+        UPDATE_INSTALL_OK,
+        update_installer_session_init(
+            &session,
+            &flash,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+    expect_install_status(
+        "stream abort begin",
+        UPDATE_INSTALL_OK,
+        update_installer_begin(
+            &session,
+            package,
+            (size_t)SIGNED_IMAGE_HEADER_SIZE
+        )
+    );
+    expect_install_status(
+        "stream abort partial write",
+        UPDATE_INSTALL_OK,
+        update_installer_write(
+            &session,
+            0U,
+            &package[SIGNED_IMAGE_HEADER_SIZE],
+            64U
+        )
+    );
+    expect_install_status(
+        "stream abort",
+        UPDATE_INSTALL_OK,
+        update_installer_abort(&session)
+    );
+    expect_install_status(
+        "stream write after abort rejected",
+        UPDATE_INSTALL_ERR_STATE,
+        update_installer_write(
+            &session,
+            64U,
+            &package[SIGNED_IMAGE_HEADER_SIZE + 64U],
+            64U
+        )
+    );
+    expect_metadata_status(
+        "recover rejected abort",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "abort rejected metadata",
+        &recovered,
+        3U,
+        BOOT_METADATA_STATE_REJECTED_INVALID,
+        BOOT_SLOT_A,
+        BOOT_SLOT_B,
+        3U
+    );
+    expect_reset_selects_active("reset after stream abort", &flash, active);
+    expect_install_failure_invariants(&sim, &flash, active);
+    (void)package_size;
+    (void)candidate;
+}
+
+static void test_update_installer_streaming_write_after_finish_rejected(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    update_installer_session_t session;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_SMALL_INSTALL_CHUNK];
+    uint8_t readback_buffer[TEST_SMALL_INSTALL_CHUNK];
+    size_t payload_offset = 0U;
+
+    const size_t package_size = setup_standard_install(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options_with_sizes(
+        program_buffer,
+        sizeof(program_buffer),
+        readback_buffer,
+        sizeof(readback_buffer),
+        NULL,
+        NULL
+    );
+
+    expect_install_status(
+        "stream finish init",
+        UPDATE_INSTALL_OK,
+        update_installer_session_init(
+            &session,
+            &flash,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+    expect_install_status(
+        "stream finish begin",
+        UPDATE_INSTALL_OK,
+        update_installer_begin(
+            &session,
+            package,
+            (size_t)SIGNED_IMAGE_HEADER_SIZE
+        )
+    );
+    while (payload_offset < TEST_UPDATE_PAYLOAD_SIZE) {
+        expect_install_status(
+            "stream finish write",
+            UPDATE_INSTALL_OK,
+            update_installer_write(
+                &session,
+                payload_offset,
+                &package[SIGNED_IMAGE_HEADER_SIZE + payload_offset],
+                64U
+            )
+        );
+        payload_offset += 64U;
+    }
+    expect_install_status(
+        "stream finish",
+        UPDATE_INSTALL_OK,
+        update_installer_finish(&session)
+    );
+    expect_install_status(
+        "stream write after finish rejected",
+        UPDATE_INSTALL_ERR_STATE,
+        update_installer_write(
+            &session,
+            TEST_UPDATE_PAYLOAD_SIZE,
+            &package[SIGNED_IMAGE_HEADER_SIZE],
+            1U
+        )
+    );
+    expect_protected_regions_unchanged(&sim, active);
+    expect_no_forbidden_writes(&sim, active);
+    (void)package_size;
+    (void)candidate;
+}
+
+static void run_streaming_with_hook_failure(
+    const char *name,
+    update_install_fault_point_t point,
+    uint32_t detail,
+    uint8_t match_detail
+)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    install_fault_config_t fault = {point, detail, match_detail};
+
+    const size_t package_size = setup_standard_install(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        install_fault_hook,
+        &fault
+    );
+
+    expect_install_status(
+        name,
+        UPDATE_INSTALL_ERR_INJECTED,
+        stream_package_with_block_size(
+            &flash,
+            package,
+            package_size,
+            64U,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+    expect_install_failure_invariants(&sim, &flash, active);
+    (void)candidate;
+}
+
+static void test_update_installer_streaming_fault_injection(void)
+{
+    run_streaming_with_hook_failure(
+        "stream metadata WRITING fault",
+        UPDATE_INSTALL_FAULT_METADATA_WRITING,
+        0U,
+        0U
+    );
+    run_streaming_with_hook_failure(
+        "stream erase fault",
+        UPDATE_INSTALL_FAULT_ERASE_SECTOR,
+        STM32F429_SLOT_B_FIRST_SECTOR,
+        1U
+    );
+    run_streaming_with_hook_failure(
+        "stream program fault",
+        UPDATE_INSTALL_FAULT_PROGRAM_BLOCK,
+        0U,
+        1U
+    );
+    run_streaming_with_hook_failure(
+        "stream readback fault",
+        UPDATE_INSTALL_FAULT_READBACK,
+        0U,
+        1U
+    );
+    run_streaming_with_hook_failure(
+        "stream hash-begin fault",
+        UPDATE_INSTALL_FAULT_HASH_BEGIN,
+        3U,
+        1U
+    );
+    run_streaming_with_hook_failure(
+        "stream hash-complete fault",
+        UPDATE_INSTALL_FAULT_HASH_COMPLETE,
+        3U,
+        1U
+    );
+    run_streaming_with_hook_failure(
+        "stream verify-installed fault",
+        UPDATE_INSTALL_FAULT_VERIFY_INSTALLED,
+        3U,
+        1U
+    );
+    run_streaming_with_hook_failure(
+        "stream candidate-ready fault",
+        UPDATE_INSTALL_FAULT_METADATA_CANDIDATE_READY,
+        3U,
+        1U
+    );
+}
+
+static void run_streaming_reset_after_hook_failure(
+    const char *name,
+    update_install_fault_point_t point,
+    uint32_t detail,
+    uint8_t match_detail
+)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    install_fault_config_t fault = {point, detail, match_detail};
+
+    const size_t package_size = setup_streaming_install_with_bootable_active(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        TEST_UPDATE_PAYLOAD_SIZE,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        install_fault_hook,
+        &fault
+    );
+
+    expect_install_status(
+        name,
+        UPDATE_INSTALL_ERR_INJECTED,
+        stream_package_with_block_size(
+            &flash,
+            package,
+            package_size,
+            64U,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+    expect_reset_selects_active(name, &flash, active);
+    expect_install_failure_invariants(&sim, &flash, active);
+    (void)candidate;
+}
+
+static void test_update_installer_streaming_reset_after_faults(void)
+{
+    run_streaming_reset_after_hook_failure(
+        "reset after stream metadata WRITING fault",
+        UPDATE_INSTALL_FAULT_METADATA_WRITING,
+        0U,
+        0U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream erase fault",
+        UPDATE_INSTALL_FAULT_ERASE_SECTOR,
+        STM32F429_SLOT_B_FIRST_SECTOR,
+        1U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream program fault",
+        UPDATE_INSTALL_FAULT_PROGRAM_BLOCK,
+        4U,
+        1U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream readback fault",
+        UPDATE_INSTALL_FAULT_READBACK,
+        4U,
+        1U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream hash-begin fault",
+        UPDATE_INSTALL_FAULT_HASH_BEGIN,
+        3U,
+        1U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream hash-complete fault",
+        UPDATE_INSTALL_FAULT_HASH_COMPLETE,
+        3U,
+        1U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream verify-installed fault",
+        UPDATE_INSTALL_FAULT_VERIFY_INSTALLED,
+        3U,
+        1U
+    );
+    run_streaming_reset_after_hook_failure(
+        "reset after stream candidate-ready fault",
+        UPDATE_INSTALL_FAULT_METADATA_CANDIDATE_READY,
+        3U,
+        1U
+    );
+}
+
+static void test_update_installer_streaming_reset_mid_write_falls_back(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    update_installer_session_t session;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+
+    const size_t package_size = setup_streaming_install_with_bootable_active(
+        &sim,
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        TEST_UPDATE_PAYLOAD_SIZE,
+        package,
+        sizeof(package),
+        &active,
+        &candidate
+    );
+    update_install_options_t options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        NULL,
+        NULL
+    );
+
+    expect_install_status(
+        "reset mid-write init",
+        UPDATE_INSTALL_OK,
+        update_installer_session_init(
+            &session,
+            &flash,
+            update_public_key,
+            &options,
+            NULL
+        )
+    );
+    expect_install_status(
+        "reset mid-write begin",
+        UPDATE_INSTALL_OK,
+        update_installer_begin(
+            &session,
+            package,
+            (size_t)SIGNED_IMAGE_HEADER_SIZE
+        )
+    );
+    expect_install_status(
+        "reset mid-write payload",
+        UPDATE_INSTALL_OK,
+        update_installer_write(
+            &session,
+            0U,
+            &package[SIGNED_IMAGE_HEADER_SIZE],
+            64U
+        )
+    );
+    expect_reset_selects_active("reset during streaming write", &flash, active);
+    expect_install_failure_invariants(&sim, &flash, active);
+    (void)package_size;
+    (void)candidate;
 }
 
 static void test_slot_selection_successful_upgrade_and_confirmation(void)
@@ -4125,6 +5659,7 @@ int main(void)
     test_blank_device_can_be_factory_provisioned_and_boots_slot_a();
     test_update_package_parse_and_verify_security_cases();
     test_update_installer_success_to_candidate_ready();
+    test_update_installer_installs_package_larger_than_io_buffers();
     test_update_installer_uses_opposite_inactive_slot();
     test_update_installer_rejects_rollback_and_active_slot_package();
     test_update_installer_rejects_bad_metadata_states();
@@ -4132,7 +5667,20 @@ int main(void)
     test_update_installer_flash_failure_injection();
     test_update_installer_detects_post_program_corruption();
     test_update_installer_detects_final_hash_mismatch();
+    test_update_installer_rejects_manifest_size_swap_after_hash();
     test_update_installer_detects_verifier_failure_after_programming();
+    test_update_installer_streaming_success_block_sizes();
+    test_update_installer_streaming_updates_b_to_a();
+    test_update_installer_streaming_rejects_header_errors();
+    test_update_installer_streaming_rejects_versions_before_write();
+    test_update_installer_streaming_detects_bad_payload_hash();
+    test_update_installer_streaming_rejects_sequence_errors();
+    test_update_installer_streaming_rejects_invalid_api_states();
+    test_update_installer_streaming_abort();
+    test_update_installer_streaming_write_after_finish_rejected();
+    test_update_installer_streaming_fault_injection();
+    test_update_installer_streaming_reset_after_faults();
+    test_update_installer_streaming_reset_mid_write_falls_back();
 
     test_slot_selection_successful_upgrade_and_confirmation();
     test_slot_selection_missing_confirmation_exhausts_attempts();
