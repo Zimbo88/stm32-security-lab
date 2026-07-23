@@ -15,5 +15,5 @@ _Noreturn void boot_result_halt(void)
     uart_puts("Application will NOT be started.\n");
     uart_puts("Bootloader halted safely.\n");
 
-    led_show_retro_loop();
+    led_show_halt(BOOT_LED_STATE_RECOVERY);
 }

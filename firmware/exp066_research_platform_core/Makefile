@@ -69,8 +69,14 @@ UPDATE_PACKAGE_TOOL ?= ../../tools/update_package.py
 SIGNING_SEED ?=
 PUBLIC_KEY_HEX ?=
 PUBLIC_KEY_HEADER ?=
+ifneq ($(strip $(SIGNING_SEED)),)
+SIGNING_SEED_DEP := $(SIGNING_SEED)
+endif
+ifneq ($(strip $(PUBLIC_KEY_HEADER)),)
+PUBLIC_KEY_VERIFY_DEPS := $(PUBLIC_KEY_HEADER)
+endif
 
-.PHONY: all clean report signed verify-signed update-package inspect-update-package verify-update-package verify-layout require-signing-seed require-public-key slot-a slot-b slot-releases
+.PHONY: all clean report signed verify-signed update-package inspect-update-package verify-update-package verify-layout require-signing-seed require-public-key slot-a slot-b slot-releases FORCE
 all: $(BIN) $(HEX) verify-layout
 	@echo "MCU: $(STM32F429_MCU)"
 	@echo "Layout profile: $(STM32F429_LAYOUT_PROFILE)"
@@ -114,33 +120,69 @@ require-public-key:
 	fi
 signed: update-package
 verify-signed: verify-update-package
-update-package: $(BIN) require-signing-seed
+update-package: require-signing-seed $(UPDATE_PACKAGE) $(UPDATE_PACKAGE_BUILD_REPORT)
+inspect-update-package: $(UPDATE_PACKAGE_INSPECT_REPORT)
+verify-update-package: $(UPDATE_PACKAGE_VERIFY_REPORT)
+$(UPDATE_PACKAGE) $(UPDATE_PACKAGE_BUILD_REPORT) &: $(BIN) $(UPDATE_PACKAGE_TOOL) $(SIGNING_SEED_DEP) | $(BUILD)
+	@test -n "$(SIGNING_SEED)" || { \
+		echo "ERROR: set SIGNING_SEED to an explicit Ed25519 seed path"; \
+		exit 1; \
+	}
+	@test -f "$(SIGNING_SEED)" || { \
+		echo "ERROR: SIGNING_SEED does not name a file: $(SIGNING_SEED)"; \
+		exit 1; \
+	}
 	@if [ "$(LEGACY_SIGNED)" != "$(UPDATE_PACKAGE)" ] && [ -e "$(LEGACY_SIGNED)" ]; then \
 		echo "Removing legacy EXP066 signed-image artifact: $(LEGACY_SIGNED)"; \
 		rm -f "$(LEGACY_SIGNED)"; \
 	fi
+	rm -f $(UPDATE_PACKAGE_INSPECT_REPORT) $(UPDATE_PACKAGE_VERIFY_REPORT)
 	python3 $(UPDATE_PACKAGE_TOOL) build \
 	    --application $(BIN) \
 	    --seed "$(SIGNING_SEED)" \
 	    --slot $(SLOT) \
 	    --output $(UPDATE_PACKAGE) \
 	    --json-output $(UPDATE_PACKAGE_BUILD_REPORT)
-inspect-update-package: update-package
+$(UPDATE_PACKAGE_INSPECT_REPORT): $(UPDATE_PACKAGE) $(UPDATE_PACKAGE_TOOL)
+	@echo "Inspecting update package:"
+	@echo "  package: $(UPDATE_PACKAGE)"
+	@echo "  report : $(UPDATE_PACKAGE_INSPECT_REPORT)"
 	python3 $(UPDATE_PACKAGE_TOOL) inspect \
 	    --package $(UPDATE_PACKAGE) \
 	    --json-output $(UPDATE_PACKAGE_INSPECT_REPORT)
-verify-update-package: update-package require-public-key
+$(UPDATE_PACKAGE_VERIFY_REPORT): $(UPDATE_PACKAGE) $(BIN) $(UPDATE_PACKAGE_TOOL) $(PUBLIC_KEY_VERIFY_DEPS) FORCE
 	@key_arg=""; \
+	key_value=""; \
 	if [ -n "$(PUBLIC_KEY_HEX)" ]; then \
-		key_arg="--public-key-hex $(PUBLIC_KEY_HEX)"; \
+		key_arg="--public-key-hex"; \
+		key_value="$(PUBLIC_KEY_HEX)"; \
 	else \
-		key_arg="--public-key-header $(PUBLIC_KEY_HEADER)"; \
+		key_arg="--public-key-header"; \
+		key_value="$(PUBLIC_KEY_HEADER)"; \
+	fi; \
+	if [ -n "$(PUBLIC_KEY_HEX)" ] && [ -n "$(PUBLIC_KEY_HEADER)" ]; then \
+		echo "ERROR: set only one of PUBLIC_KEY_HEX or PUBLIC_KEY_HEADER"; \
+		exit 1; \
+	fi; \
+	if [ -z "$(PUBLIC_KEY_HEX)" ] && [ -z "$(PUBLIC_KEY_HEADER)" ]; then \
+		echo "ERROR: set PUBLIC_KEY_HEX or PUBLIC_KEY_HEADER for verification"; \
+		exit 1; \
+	fi; \
+	echo "Verifying update package:"; \
+	echo "  package    : $(UPDATE_PACKAGE)"; \
+	echo "  application: $(BIN)"; \
+	echo "  slot       : $(SLOT)"; \
+	echo "  key source : $$key_arg $$key_value"; \
+	echo "  report     : $(UPDATE_PACKAGE_VERIFY_REPORT)"; \
+	if [ "$$key_arg" = "--public-key-header" ] && [ ! -f "$$key_value" ]; then \
+		echo "ERROR: PUBLIC_KEY_HEADER does not name a file: $$key_value"; \
+		exit 1; \
 	fi; \
 	python3 $(UPDATE_PACKAGE_TOOL) verify \
 	    --package $(UPDATE_PACKAGE) \
 	    --slot $(SLOT) \
 	    --application $(BIN) \
-	    $$key_arg \
+	    $$key_arg "$$key_value" \
 	    --json-output $(UPDATE_PACKAGE_VERIFY_REPORT)
 report: signed
 	@wc -c $(BIN) $(SIGNED)
@@ -152,3 +194,4 @@ slot-b:
 slot-releases: slot-a slot-b
 clean:
 	rm -rf $(BUILD)
+FORCE:

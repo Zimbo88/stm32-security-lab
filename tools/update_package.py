@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import subprocess
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -56,11 +58,61 @@ def write_json(path: Path | None, data: dict[str, Any]) -> None:
         path.write_text(text, encoding="ascii")
 
 
+def sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def git_commit() -> str | None:
+    commit = release_artifacts.git_output(["rev-parse", "HEAD"])
+    if commit is None:
+        return None
+    if len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit.lower()):
+        return None
+    status = release_artifacts.git_output(
+        ["status", "--porcelain", "--untracked-files=no"]
+    )
+    if status is None or status:
+        return None
+    return commit
+
+
 def public_key_from_args(args: argparse.Namespace) -> bytes:
     try:
         return release_artifacts.public_key_from_args(args)
     except release_artifacts.VerificationError as exc:
         raise PackageError(str(exc)) from exc
+
+
+def public_key_report_from_args(
+    args: argparse.Namespace
+) -> tuple[bytes, dict[str, Any]]:
+    public_key_hex = getattr(args, "public_key_hex", None)
+    public_key_header = getattr(args, "public_key_header", None)
+
+    if public_key_hex is not None:
+        key = public_key_from_args(args)
+        return key, {
+            "public_key_source": "public-key-hex",
+            "public_key_hex": key.hex(),
+            "public_key_sha256": sha256_hex(key),
+        }
+
+    if public_key_header is None:
+        raise PackageError("public key header path is unavailable")
+
+    header_bytes = read_file(public_key_header, "public key header")
+    key = public_key_from_args(args)
+    return key, {
+        "public_key_source": "public-key-header",
+        "public_key_header_path": release_artifacts.repo_path(public_key_header),
+        "public_key_header_sha256": sha256_hex(header_bytes),
+        "public_key_hex": key.hex(),
+        "public_key_sha256": sha256_hex(key),
+    }
 
 
 def slot_from_vector(vector_address: int) -> str | None:
@@ -298,8 +350,104 @@ def success_report(payload: dict[str, Any]) -> dict[str, Any]:
     return {"schema_version": 1, "result": "ok", **payload}
 
 
-def failure_report(error: Exception) -> dict[str, Any]:
-    return {"schema_version": 1, "result": "failed", "error": str(error)}
+def failure_report(
+    error: Exception,
+    context: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    report: dict[str, Any] = {
+        "schema_version": 1,
+        "result": "failed",
+        "error": str(error),
+    }
+    if context is not None:
+        report.update(context)
+    return report
+
+
+def verify_report_context(
+    args: argparse.Namespace,
+    *,
+    package: bytes | None,
+    application: bytes | None,
+    public_key: bytes | None,
+    public_key_report: dict[str, Any] | None,
+) -> dict[str, Any]:
+    manifest_size = LAYOUT["signed_manifest_size"]
+    context: dict[str, Any] = {
+        "verification_timestamp_utc": utc_timestamp(),
+        "package_path": release_artifacts.repo_path(args.package),
+        "package_sha256": sha256_hex(package) if package is not None else None,
+        "package_size": len(package) if package is not None else None,
+        "public_key_source": None,
+        "public_key_hex": public_key.hex() if public_key is not None else None,
+        "public_key_sha256": sha256_hex(public_key) if public_key is not None else None,
+        "signed_region_offset": 0,
+        "signed_region_size": manifest_size,
+        "signed_region_description": "Ed25519 signature over serialized manifest bytes only",
+        "layout_profile": LAYOUT["profile"],
+        "target": LAYOUT["target"],
+        "tool_path": release_artifacts.repo_path(Path(__file__)),
+        "git_commit": git_commit(),
+    }
+
+    if args.application is not None:
+        context["application_path"] = release_artifacts.repo_path(args.application)
+        context["application_sha256"] = (
+            sha256_hex(application) if application is not None else None
+        )
+
+    if public_key_report is not None:
+        context.update(public_key_report)
+    elif getattr(args, "public_key_hex", None) is not None:
+        context["public_key_source"] = "public-key-hex"
+    elif getattr(args, "public_key_header", None) is not None:
+        context["public_key_source"] = "public-key-header"
+        context["public_key_header_path"] = release_artifacts.repo_path(
+            args.public_key_header
+        )
+
+    if package is not None:
+        try:
+            inspected = inspect_package_bytes(package)
+            context["package"] = inspected
+            context["slot"] = inspected["slot"]
+            context["image_version"] = inspected["image_version"]
+            context["payload_sha512"] = inspected["payload_sha512"]
+        except Exception as exc:
+            context["package_inspect_error"] = str(exc)
+
+    return context
+
+
+def verify_success_report(
+    args: argparse.Namespace,
+    *,
+    package: bytes,
+    application: bytes | None,
+    public_key: bytes,
+    public_key_report: dict[str, Any],
+    verified: dict[str, Any],
+) -> dict[str, Any]:
+    context = verify_report_context(
+        args,
+        package=package,
+        application=application,
+        public_key=public_key,
+        public_key_report=public_key_report,
+    )
+    verification = verified["verification"]
+    package_report = verified["package"]
+    context.update({
+        "slot": package_report["slot"],
+        "image_version": package_report["image_version"],
+        "payload_sha512": package_report["payload_sha512"],
+        "signature_valid": verification["signature_valid"],
+        "payload_hash_valid": verification["payload_hash_valid"],
+        "application_payload_match": verification["application_payload_match"],
+        "target_layout": release_artifacts.layout_report(),
+        **verified,
+    })
+    return success_report(context)
 
 
 def run_build(args: argparse.Namespace) -> int:
@@ -345,23 +493,55 @@ def run_inspect(args: argparse.Namespace) -> int:
 
 
 def run_verify(args: argparse.Namespace) -> int:
+    package: bytes | None = None
+    application: bytes | None = None
+    public_key: bytes | None = None
+    public_key_report: dict[str, Any] | None = None
     try:
+        package = read_file(args.package, "package")
         application = read_file(args.application, "application") if args.application else None
-        report = success_report(
-            {
-                "target_layout": release_artifacts.layout_report(),
-                **verify_package_bytes(
-                    read_file(args.package, "package"),
-                    public_key_from_args(args),
-                    slot=args.slot,
-                    application=application,
-                ),
-            }
+        public_key, public_key_report = public_key_report_from_args(args)
+        verified = verify_package_bytes(
+            package,
+            public_key,
+            slot=args.slot,
+            application=application,
+        )
+        report = verify_success_report(
+            args,
+            package=package,
+            application=application,
+            public_key=public_key,
+            public_key_report=public_key_report,
+            verified=verified,
         )
         write_json(args.json_output, report)
         return EXIT_OK
     except Exception as exc:
-        write_json(args.json_output, failure_report(exc))
+        if package is None:
+            try:
+                package = read_file(args.package, "package")
+            except Exception:
+                package = None
+        if application is None and args.application is not None:
+            try:
+                application = read_file(args.application, "application")
+            except Exception:
+                application = None
+        if public_key_report is None:
+            try:
+                public_key, public_key_report = public_key_report_from_args(args)
+            except Exception:
+                public_key = None
+                public_key_report = None
+        context = verify_report_context(
+            args,
+            package=package,
+            application=application,
+            public_key=public_key,
+            public_key_report=public_key_report,
+        )
+        write_json(args.json_output, failure_report(exc, context))
         return EXIT_FAILED
 
 

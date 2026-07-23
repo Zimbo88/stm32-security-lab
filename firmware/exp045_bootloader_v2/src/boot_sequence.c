@@ -6,11 +6,14 @@
 #include "boot_policy.h"
 #include "boot_result.h"
 #include "delay.h"
+#include "led_show.h"
 #include "performance.h"
 #include "recovery_policy.h"
 #include "reset_cause.h"
 #include "signed_image.h"
 #include "uart.h"
+
+#define BOOT_LED_BOOT_DELAY_CYCLES 700000U
 
 static void boot_performance_print(void)
 {
@@ -36,6 +39,10 @@ static void boot_performance_print(void)
 _Noreturn void boot_sequence_execute(void)
 {
     performance_init(board_clock_get_sysclk_hz());
+    led_show_init();
+    led_show_indicate(BOOT_LED_STATE_BOOTING);
+    delay_cycles(BOOT_LED_BOOT_DELAY_CYCLES);
+    led_show_all_off();
 
     const reset_cause_t reset_cause = reset_cause_capture();
     boot_info_print_banner();
@@ -60,6 +67,7 @@ _Noreturn void boot_sequence_execute(void)
     }
 
     uart_puts("Selecting boot slot and verifying image...\n");
+    led_show_indicate(BOOT_LED_STATE_VERIFYING);
 
     performance_measurements_reset();
 
@@ -110,10 +118,11 @@ _Noreturn void boot_sequence_execute(void)
 
     uart_puts("Signature and payload hash accepted.\n");
     uart_puts("Jumping to application...\n");
+    led_show_all_off();
     delay_cycles(4000000U);
 
     const verify_status_t jump_status = signed_image_jump(&selection.jump_context);
     boot_result_print(jump_status);
 
-    boot_result_halt();
+    led_show_halt(BOOT_LED_STATE_FATAL);
 }

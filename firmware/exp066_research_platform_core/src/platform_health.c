@@ -16,12 +16,8 @@ static const health_frame_t pattern_booting[] = {
 };
 
 static const health_frame_t pattern_healthy[] = {
-    { PLATFORM_LED1, 1U },
-    { PLATFORM_LED2, 1U },
-    { PLATFORM_LED3, 1U },
     { PLATFORM_LED4, 1U },
-    { PLATFORM_LED3, 1U },
-    { PLATFORM_LED2, 1U }
+    { 0U, 9U }
 };
 
 static const health_frame_t pattern_degraded[] = {

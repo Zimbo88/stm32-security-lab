@@ -316,3 +316,64 @@ def test_exp066_signed_target_builds_bootloader_v2_slot_a_package(
     report = json.loads(report_path.read_text(encoding="ascii"))
     assert report["result"] == "ok"
     assert report["verification"]["signature_valid"] is True
+    assert report["package_sha256"] == sha256(artifact)
+    assert report["public_key_sha256"] == hashlib.sha256(
+        bytes.fromhex(public_key_hex)
+    ).hexdigest()
+    assert report["verification_timestamp_utc"]
+
+    negative_build = tmp_path / "negative_make_build"
+    negative_project = "exp066_research_platform_core_negative"
+    negative_ok = subprocess.run(
+        [
+            "make",
+            "-C",
+            "firmware/exp066_research_platform_core",
+            "clean",
+            "verify-update-package",
+            f"BUILD={negative_build}",
+            f"PROJECT={negative_project}",
+            "LAYOUT_PROFILE=stm32f429_1m",
+            f"SIGNING_SEED={seed_path}",
+            f"PUBLIC_KEY_HEX={public_key_hex}",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert negative_ok.returncode == 0, negative_ok.stdout + negative_ok.stderr
+
+    wrong_key_hex = bytes(SigningKey(bytes(reversed(range(32)))).verify_key).hex()
+    failed = subprocess.run(
+        [
+            "make",
+            "-C",
+            "firmware/exp066_research_platform_core",
+            "verify-update-package",
+            f"BUILD={negative_build}",
+            f"PROJECT={negative_project}",
+            "LAYOUT_PROFILE=stm32f429_1m",
+            f"SIGNING_SEED={seed_path}",
+            f"PUBLIC_KEY_HEX={wrong_key_hex}",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert failed.returncode != 0
+    assert "Verifying update package:" in failed.stdout
+    assert "key source : --public-key-hex" in failed.stdout
+    failed_report_path = (
+        negative_build / f"{negative_project}_slot_a_package_verify.json"
+    )
+    failed_report = json.loads(failed_report_path.read_text(encoding="ascii"))
+    assert failed_report["result"] == "failed"
+    failed_package = negative_build / f"{negative_project}_slot_a_update_v2.bin"
+    assert failed_report["package_sha256"] == sha256(failed_package)
+    assert failed_report["public_key_sha256"] == hashlib.sha256(
+        bytes.fromhex(wrong_key_hex)
+    ).hexdigest()
+    assert "signature verification failed" in failed_report["error"]

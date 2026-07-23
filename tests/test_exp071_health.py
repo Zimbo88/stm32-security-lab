@@ -84,12 +84,23 @@ class Exp071HealthTests(unittest.TestCase):
                 for (uint32_t i = 0U; i < 6U; ++i) {
                     platform_health_service_tick();
                 }
-                if (expect(writes[0] == 0x01U, 2) != 0) return 2;
-                if (expect(writes[1] == 0x02U, 3) != 0) return 3;
-                if (expect(writes[2] == 0x04U, 4) != 0) return 4;
-                if (expect(writes[3] == 0x08U, 5) != 0) return 5;
-                if (expect(writes[4] == 0x04U, 6) != 0) return 6;
-                if (expect(writes[5] == 0x02U, 7) != 0) return 7;
+                if (expect(writes[0] == 0x08U, 2) != 0) return 2;
+                for (uint32_t i = 1U; i < 6U; ++i) {
+                    if (expect(writes[i] == 0U, 3) != 0) return 3;
+                }
+                if (expect((platform_health_get_led_mask() & 0x07U) == 0U, 4) != 0) return 4;
+
+                platform_health_init();
+                platform_health_apply_boot_policy(0U, 0U, 1U, 0U);
+                reset_writes();
+                for (uint32_t i = 0U; i < 11U; ++i) {
+                    platform_health_service_tick();
+                }
+                if (expect(writes[0] == 0x08U, 5) != 0) return 5;
+                for (uint32_t i = 1U; i < 10U; ++i) {
+                    if (expect(writes[i] == 0U, 6) != 0) return 6;
+                }
+                if (expect(writes[10] == 0x08U, 7) != 0) return 7;
 
                 platform_health_set_state(PLATFORM_DEGRADED);
                 reset_writes();

@@ -2,6 +2,8 @@
 
 #include "delay.h"
 
+#include <stddef.h>
+
 #define REG32(address) (*(volatile uint32_t *)(address))
 
 #define RCC_AHB1ENR REG32(0x40023830UL)
@@ -44,6 +46,54 @@ typedef struct {
     uint8_t mask;
     uint8_t duration;
 } led_frame_t;
+
+static const led_frame_t pattern_booting[] = {
+    { LED_SHOW_LED4, 1U },
+    { 0U,           1U }
+};
+
+static const led_frame_t pattern_verifying[] = {
+    { LED_SHOW_LED2, 1U }
+};
+
+static const led_frame_t pattern_recovery[] = {
+    { LED_SHOW_LED1, 1U },
+    { 0U,           2U },
+    { LED_SHOW_LED1, 1U },
+    { 0U,           10U }
+};
+
+static const led_frame_t pattern_fatal[] = {
+    { LED_SHOW_ALL, 1U },
+    { 0U,           1U }
+};
+
+static const led_frame_t *frames_for_state(
+    boot_led_state_t state,
+    uint32_t *count
+)
+{
+    if (count == NULL) {
+        return pattern_fatal;
+    }
+
+    switch (state) {
+    case BOOT_LED_STATE_BOOTING:
+        *count = (uint32_t)(sizeof(pattern_booting) / sizeof(pattern_booting[0]));
+        return pattern_booting;
+    case BOOT_LED_STATE_VERIFYING:
+        *count =
+            (uint32_t)(sizeof(pattern_verifying) / sizeof(pattern_verifying[0]));
+        return pattern_verifying;
+    case BOOT_LED_STATE_RECOVERY:
+        *count = (uint32_t)(sizeof(pattern_recovery) / sizeof(pattern_recovery[0]));
+        return pattern_recovery;
+    case BOOT_LED_STATE_FATAL:
+    default:
+        *count = (uint32_t)(sizeof(pattern_fatal) / sizeof(pattern_fatal[0]));
+        return pattern_fatal;
+    }
+}
 
 static void gpio_configure_output(uint32_t base, uint32_t pin)
 {
@@ -154,72 +204,49 @@ void led_show_all_off(void)
     led_show_write(0U);
 }
 
-_Noreturn void led_show_retro_loop(void)
+uint8_t led_show_state_mask(boot_led_state_t state, uint32_t phase)
 {
-    /*
-     * Original retro-platformer-inspired visual rhythm.
-     * This is not a transcription of a copyrighted melody.
-     */
-    static const led_frame_t intro[] = {
-        { LED_SHOW_LED1,                         1U },
-        { LED_SHOW_LED2,                         1U },
-        { LED_SHOW_LED3,                         1U },
-        { LED_SHOW_LED4,                         2U },
+    uint32_t count = 0U;
+    const led_frame_t *frames = frames_for_state(state, &count);
 
-        { LED_SHOW_LED1 | LED_SHOW_LED3,         1U },
-        { LED_SHOW_LED2 | LED_SHOW_LED4,         1U },
-        { LED_SHOW_ALL,                          1U },
-        { 0U,                                    1U },
+    return frames[phase % count].mask;
+}
 
-        { LED_SHOW_LED1,                         1U },
-        { LED_SHOW_LED1 | LED_SHOW_LED2,         1U },
-        { LED_SHOW_LED1 | LED_SHOW_LED2 |
-          LED_SHOW_LED3,                         1U },
-        { LED_SHOW_ALL,                          2U },
+uint8_t led_show_state_duration_units(boot_led_state_t state, uint32_t phase)
+{
+    uint32_t count = 0U;
+    const led_frame_t *frames = frames_for_state(state, &count);
 
-        { LED_SHOW_LED4,                         1U },
-        { LED_SHOW_LED3,                         1U },
-        { LED_SHOW_LED2,                         1U },
-        { LED_SHOW_LED1,                         2U },
+    return frames[phase % count].duration;
+}
 
-        { LED_SHOW_LED2 | LED_SHOW_LED3,         1U },
-        { LED_SHOW_LED1 | LED_SHOW_LED4,         1U },
-        { LED_SHOW_ALL,                          2U },
-        { 0U,                                    2U }
-    };
+void led_show_indicate(boot_led_state_t state)
+{
+    led_show_write(led_show_state_mask(state, 0U));
+}
 
-    static const led_frame_t loop[] = {
-        { LED_SHOW_LED1,                         1U },
-        { LED_SHOW_LED2,                         1U },
-        { LED_SHOW_LED3,                         1U },
-        { LED_SHOW_LED4,                         1U },
+void led_show_signal(boot_led_state_t state)
+{
+    uint32_t count = 0U;
+    const led_frame_t *frames = frames_for_state(state, &count);
 
-        { LED_SHOW_LED3,                         1U },
-        { LED_SHOW_LED2,                         1U },
+    led_show_play(frames, count);
+    led_show_all_off();
+}
 
-        { LED_SHOW_LED1 | LED_SHOW_LED4,         1U },
-        { LED_SHOW_LED2 | LED_SHOW_LED3,         1U },
-
-        { LED_SHOW_ALL,                          1U },
-        { 0U,                                    1U },
-
-        { LED_SHOW_LED1 | LED_SHOW_LED2,         1U },
-        { LED_SHOW_LED3 | LED_SHOW_LED4,         1U },
-        { LED_SHOW_ALL,                          1U },
-        { 0U,                                    2U }
-    };
+_Noreturn void led_show_halt(boot_led_state_t state)
+{
+    uint32_t count = 0U;
+    const led_frame_t *frames = frames_for_state(state, &count);
 
     led_show_init();
 
-    led_show_play(
-        intro,
-        (uint32_t)(sizeof(intro) / sizeof(intro[0]))
-    );
-
     for (;;) {
-        led_show_play(
-            loop,
-            (uint32_t)(sizeof(loop) / sizeof(loop[0]))
-        );
+        led_show_play(frames, count);
     }
+}
+
+_Noreturn void led_show_retro_loop(void)
+{
+    led_show_halt(BOOT_LED_STATE_RECOVERY);
 }
