@@ -207,6 +207,11 @@ make -C firmware/exp066_research_platform_core slot-releases \
   PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
 
+The default EXP066 package image version is `2`. Those packages are suitable
+for factory provisioning or offline verification. A positive UART update from
+an already confirmed version-2 slot must use a strictly higher package version,
+otherwise rollback protection rejects it as a same-version update.
+
 The current `stm32f429_1m` slot bases are:
 
 | Region | Address |
@@ -341,6 +346,26 @@ PYTHONPATH=tools python3 -m stm32ctl \
   --package firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin \
   --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
   --block-size 512
+```
+
+If the active confirmed image is version `2`, first build a higher-version
+candidate package from the already slot-linked binary:
+
+```bash
+python3 tools/update_package.py build \
+  --application firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin \
+  --seed firmware/exp065_signed_app/keys/firmware_signing_seed.bin \
+  --slot b \
+  --image-version 3 \
+  --output build/exp066_slot_b_v3_update_v2.bin \
+  --json-output build/exp066_slot_b_v3_package_build.json
+
+python3 tools/update_package.py verify \
+  --package build/exp066_slot_b_v3_update_v2.bin \
+  --slot b \
+  --application firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin \
+  --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
+  --json-output build/exp066_slot_b_v3_package_verify.json
 ```
 
 See [stm32ctl](docs/stm32ctl.md),

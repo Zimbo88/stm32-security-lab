@@ -9,6 +9,17 @@ versioning.
 
 - No unreleased changes are documented yet.
 
+## [1.0.2] - 2026-07-27
+
+### Changed
+
+- Clarified the difference between default Slot A/Slot B version-2 factory
+  artifacts and strictly higher-version packages required for positive
+  rollback-protected A/B update tests.
+- Added release guidance for publishing Slot B version 3 and Slot A version 4
+  update packages as hardware-validation examples without changing the package
+  format or firmware trust model.
+
 ## [1.0.1] - 2026-07-27
 
 ### Added

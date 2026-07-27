@@ -77,6 +77,11 @@ inspection JSON, and offline verification JSON under:
 - `firmware/exp066_research_platform_core/build/slot_a`
 - `firmware/exp066_research_platform_core/build/slot_b`
 
+The default EXP066 image version is `2`. Default Slot A/Slot B packages are
+useful for factory provisioning and offline release verification. For a
+rollback-protected positive update from an already confirmed version-2 image,
+build a candidate package with a strictly higher `--image-version`.
+
 ## Sign Firmware
 
 The EXP065 legacy application target still produces the original version-1
@@ -108,6 +113,26 @@ the obsolete `exp066_research_platform_core_signed.bin` version-1 artifact.
 The signer rejects unsupported manifest versions, unsupported flags, invalid
 target compatibility, invalid image type, invalid vector tables, and payloads
 outside the selected slot before writing the package.
+
+Example higher-version Slot B package for an A-to-B hardware update from an
+active version-2 Slot A image:
+
+```sh
+python3 tools/update_package.py build \
+  --application firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin \
+  --seed /path/to/release_signing_seed.bin \
+  --slot b \
+  --image-version 3 \
+  --output build/exp066_slot_b_v3_update_v2.bin \
+  --json-output build/exp066_slot_b_v3_package_build.json
+
+python3 tools/update_package.py verify \
+  --package build/exp066_slot_b_v3_update_v2.bin \
+  --slot b \
+  --application firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin \
+  --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
+  --json-output build/exp066_slot_b_v3_package_verify.json
+```
 
 ## Verify Signed Image
 
