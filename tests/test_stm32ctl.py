@@ -11,7 +11,8 @@ from nacl.signing import SigningKey
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from stm32ctl.client import Stm32Client  # noqa: E402
+from stm32ctl.cli import DEFAULT_TIMEOUT  # noqa: E402
+from stm32ctl.client import DEFAULT_RESPONSE_TIMEOUT_SECONDS, Stm32Client  # noqa: E402
 from stm32ctl.errors import CrcError, NackError, ProtocolTimeout  # noqa: E402
 from stm32ctl.package import load_and_verify_package  # noqa: E402
 from stm32ctl.protocol import (  # noqa: E402
@@ -221,6 +222,11 @@ def test_timeout() -> None:
 
     with pytest.raises(ProtocolTimeout):
         client.hello()
+
+
+def test_cli_and_client_default_timeout_match_hardware_budget() -> None:
+    assert DEFAULT_TIMEOUT == DEFAULT_RESPONSE_TIMEOUT_SECONDS
+    assert DEFAULT_TIMEOUT >= 15.0
 
 
 def test_bad_crc_response() -> None:

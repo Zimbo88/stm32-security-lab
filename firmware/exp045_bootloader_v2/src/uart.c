@@ -15,6 +15,7 @@
 #define USART_SR_NE                 (1UL << 2)
 #define USART_SR_ORE                (1UL << 3)
 #define USART_SR_RXNE               (1UL << 5)
+#define USART_SR_TC                 (1UL << 6)
 #define USART_SR_TXE                (1UL << 7)
 #define USART_SR_RX_ERROR_MASK \
     (USART_SR_PE | USART_SR_FE | USART_SR_NE | USART_SR_ORE)
@@ -294,6 +295,20 @@ void uart_put_u32(uint32_t value)
     while (count != 0U) {
         uart_putc(buffer[--count]);
     }
+}
+
+uart_status_t uart_wait_tx_complete(void)
+{
+    uint32_t polls = UART_TX_READY_MAX_POLLS;
+
+    while ((uart_read_sr() & USART_SR_TC) == 0U) {
+        if (polls == 0UL) {
+            return UART_TIMEOUT;
+        }
+        --polls;
+    }
+
+    return UART_OK;
 }
 
 uint8_t uart_rx_ready(void)

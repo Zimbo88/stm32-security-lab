@@ -217,6 +217,24 @@ static void test_uart_tx_wait_is_bounded(void)
     expect_u32("uart bounded tx keeps DR", 0U, uart_host_get_usart_dr() & 0xFFU);
 }
 
+static void test_uart_wait_tx_complete(void)
+{
+    uart_host_reset_registers();
+    uart_host_set_usart_sr(UART_HOST_USART_SR_TXE | UART_HOST_USART_SR_TC);
+    expect_status(
+        "uart tx complete ready",
+        UART_OK,
+        uart_wait_tx_complete()
+    );
+
+    uart_host_set_usart_sr(UART_HOST_USART_SR_TXE);
+    expect_status(
+        "uart tx complete bounded",
+        UART_TIMEOUT,
+        uart_wait_tx_complete()
+    );
+}
+
 static void test_uart_rx_ready_and_getc(void)
 {
     uint8_t byte = 0U;
@@ -354,6 +372,7 @@ int main(void)
     test_byte_reader_timeout_and_partial_read();
     test_uart_init_and_tx();
     test_uart_tx_wait_is_bounded();
+    test_uart_wait_tx_complete();
     test_uart_rx_ready_and_getc();
     test_uart_rx_errors();
     test_uart_timeout_read_flush_and_reader();

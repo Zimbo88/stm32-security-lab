@@ -7,14 +7,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from .client import Stm32Client, UpdateResult
+from .client import DEFAULT_RESPONSE_TIMEOUT_SECONDS, Stm32Client, UpdateResult
 from .errors import EXIT_FAILED, Stm32CtlError
 from .package import PackageInfo, load_and_verify_package
 from .protocol import Info, TargetStatus, status_name
 from .transport import SerialPort
 
 DEFAULT_BAUD = 115200
-DEFAULT_TIMEOUT = 1.0
+DEFAULT_TIMEOUT = DEFAULT_RESPONSE_TIMEOUT_SECONDS
 DEFAULT_RETRIES = 1
 
 

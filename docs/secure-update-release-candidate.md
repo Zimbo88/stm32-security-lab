@@ -35,6 +35,9 @@ update chain. RDP2 is not approved by this report.
 - Existing deterministic-build tooling uses `git archive HEAD`, so it validates
   committed HEAD. Run it after committing or from the exact tree intended for
   release evidence.
+- Positive update `BEGIN_UPDATE` includes candidate-slot erase on hardware. The
+  measured STM32F429IGT6 erase/program path requires a multi-second host
+  response timeout.
 
 ## Validation Results
 
@@ -88,13 +91,52 @@ Patch-3 hardware-readiness run:
   - `ruff` and `python3 -m ruff` are not available in the system Python; use
     `.venv-hil/bin/ruff` for local checks.
 
+Hardware completion run, 2026-07-27, STM32F429IGT6, RDP Level 0:
+
+- Root-cause timing for the previous A-to-B failure:
+  - HELLO ACK: about 20 ms.
+  - `BEGIN_UPDATE` ACK: 6.31 s A-to-B, 6.41 s B-to-A.
+  - 512-byte `WRITE_BLOCK` ACKs: about 80 ms each.
+  - `FINISH_UPDATE` ACK and verification: about 1.01 s.
+- Positive A-to-B update:
+  - Slot A version 2 confirmed baseline booted with SHA-512 and Ed25519
+    verification enabled.
+  - Slot B version 3 update completed with 39 write frames.
+  - Bootloader selected Slot B as `TRIAL` after reset.
+  - EXP066 booted and confirmed Slot B.
+  - Follow-up console metadata showed `CONFIRMED`, active slot B, version 3.
+  - Slot B flash readback matched the transferred package byte-for-byte.
+- Positive B-to-A update:
+  - Slot B version 3 confirmed baseline updated to Slot A version 4.
+  - Bootloader selected Slot A as `TRIAL` after reset.
+  - EXP066 booted and confirmed Slot A.
+  - Follow-up console metadata showed `CONFIRMED`, active slot A, version 4.
+  - Slot A flash readback matched the transferred package byte-for-byte.
+- Negative hardware update tests passed:
+  - lower version rejected with `ROLLBACK`;
+  - same version rejected with `ROLLBACK`;
+  - wrong slot package rejected with `VERIFY`;
+  - corrupted manifest, target field and signature rejected before release;
+  - corrupted payload rejected at `FINISH_UPDATE`;
+  - abort after first block left only confirmed fallback bootable;
+  - reset during `WRITING` left only confirmed fallback bootable;
+  - bad CRC and skipped sequence returned `NACK(CRC)` and `NACK(SEQUENCE)`;
+  - partial frame timeout and random UART bytes did not block normal boot.
+- Final board state restored:
+  - metadata `CONFIRMED`, active slot A, version 4;
+  - Slot B contains the valid tested version 3 image;
+  - final boot selected confirmed Slot A and executed SHA-512 and Ed25519;
+  - final Option Bytes remained `OPTCR=0x0fffaaed`,
+    `OPTCR1=0x0fff0000`.
+
 ## Bootloader Size
 
-Current Patch-3 hardware-readiness size:
+Current hardware-validation size after the UART timeout and trial-metadata
+fixes:
 
-- Bootloader binary: 29,712 bytes.
+- Bootloader binary: 29,816 bytes.
 - Reserved bootloader region: 32,768 bytes.
-- Free reserve: 3,056 bytes.
+- Free reserve: 2,952 bytes.
 - EXP066 Slot A application binary: 19,884 bytes.
 - EXP066 Slot A update package: 20,396 bytes.
 - EXP066 Slot B application binary: 19,876 bytes.
@@ -122,21 +164,19 @@ Largest stack users observed:
 
 ## Hardware Tests Not Yet Run
 
-No physical board flashing, UART update, power-loss test, or confirmation /
-rollback hardware run has been performed by this preparation step. Required
-first-run coverage is in `docs/secure-update-hardware-test.md`.
+Physical power removal and visual LED observation remain manual evidence items.
+The completed run used ST-Link reset for reset/power-failure class checks and
+UART evidence for boot/update state. RDP2 remains blocked until physical
+power-loss timing has been repeated with controlled target power.
 
 ## RDP2 Blockers
 
 RDP2 is not released. Blockers:
 
-- No RDP0 hardware update cycle has been completed both A to B and B to A.
 - Power-loss behavior has not been physically verified during erase, program,
   finish, post-`CANDIDATE_READY`, or pre-confirmation phases.
-- Poll-budget UART timing is not calibrated against the real board clock and
-  reset behavior.
-- Recovery procedure under failed updates has not been validated without debug
-  assumptions.
+- Recovery procedure under failed updates has not been validated after
+  physically removing target power.
 - Option Byte policy and irreversible provisioning steps are not documented or
   rehearsed for this chain.
 

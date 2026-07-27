@@ -23,6 +23,7 @@ from .protocol import (
     write_frame,
 )
 
+DEFAULT_RESPONSE_TIMEOUT_SECONDS = 15.0
 ProgressCallback = Callable[[int, int], None]
 
 
@@ -39,7 +40,7 @@ class Stm32Client:
         self,
         transport: ByteTransport,
         *,
-        timeout: float = 1.0,
+        timeout: float = DEFAULT_RESPONSE_TIMEOUT_SECONDS,
         retries: int = 1,
     ) -> None:
         self.transport = transport

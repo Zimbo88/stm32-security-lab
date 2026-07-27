@@ -7,7 +7,7 @@ PORT=""
 PACKAGE=""
 PUBLIC_KEY_HEADER="${ROOT}/firmware/exp045_bootloader_v2/src/firmware_public_key.h"
 BLOCK_SIZE="512"
-TIMEOUT="1.0"
+TIMEOUT="15.0"
 RUN_UPDATE=0
 ALLOW_TARGET_WRITE=0
 RUN_RESET=0
@@ -29,7 +29,7 @@ Options:
   --package PATH              Signed update package to verify or send.
   --public-key-header PATH    Public key header for local package verification.
   --block-size BYTES          stm32ctl update block size, default 512.
-  --timeout SECONDS           stm32ctl timeout, default 1.0.
+  --timeout SECONDS           stm32ctl timeout, default 15.0.
   --run-update                Run stm32ctl update. Requires --allow-target-write.
   --allow-target-write        Explicitly allow UART firmware update writes.
   --reset-target              Request stm32ctl reset after read-only checks.

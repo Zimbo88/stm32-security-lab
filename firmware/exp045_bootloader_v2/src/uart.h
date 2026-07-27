@@ -34,6 +34,7 @@ uart_status_t uart_read_timeout(
     size_t *bytes_read
 );
 uart_status_t uart_flush_rx(void);
+uart_status_t uart_wait_tx_complete(void);
 void uart_byte_reader_init(byte_reader_t *reader);
 const char *uart_status_text(uart_status_t status);
 
@@ -43,6 +44,7 @@ const char *uart_status_text(uart_status_t status);
 #define UART_HOST_USART_SR_NE    (1UL << 2)
 #define UART_HOST_USART_SR_ORE   (1UL << 3)
 #define UART_HOST_USART_SR_RXNE  (1UL << 5)
+#define UART_HOST_USART_SR_TC    (1UL << 6)
 #define UART_HOST_USART_SR_TXE   (1UL << 7)
 #define UART_HOST_USART_CR1_UE   (1UL << 13)
 #define UART_HOST_USART_CR1_TE   (1UL << 3)

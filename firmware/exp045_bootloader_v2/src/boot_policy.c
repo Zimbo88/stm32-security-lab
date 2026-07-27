@@ -52,7 +52,7 @@ boot_slot_selection_status_t boot_policy_select(
 {
     boot_flash_t flash;
 
-    if (boot_flash_target_init_readonly(&flash) != BOOT_FLASH_OK) {
+    if (boot_flash_target_init_metadata(&flash) != BOOT_FLASH_OK) {
         return BOOT_SLOT_SELECTION_ERR_METADATA;
     }
 

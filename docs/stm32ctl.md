@@ -28,7 +28,8 @@ python3 -m stm32ctl --port /dev/ttyUSB0 update --package path/to/firmware.update
 Common options:
 
 - `--baud`: UART baudrate, default `115200`.
-- `--timeout`: response timeout in seconds, default `1.0`.
+- `--timeout`: response timeout in seconds, default `15.0`. Hardware
+  `BEGIN_UPDATE` includes candidate-slot erase and may take several seconds.
 - `--retries`: retries for idempotent read-only requests only, default `1`.
 - `--json`: emit machine-readable JSON.
 

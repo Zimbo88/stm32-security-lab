@@ -142,6 +142,20 @@ def test_confirmation_health_gate_and_existing_api_usage() -> None:
     assert "boot_flash_target_init_metadata" in source
 
 
+def test_boot_policy_uses_metadata_writable_flash_backend() -> None:
+    source = (
+        ROOT
+        / "firmware"
+        / "exp045_bootloader_v2"
+        / "src"
+        / "boot_policy.c"
+    ).read_text(encoding="ascii")
+    body = source.split("boot_slot_selection_status_t boot_policy_select", 1)[1]
+
+    assert "boot_flash_target_init_metadata(&flash)" in body
+    assert "boot_flash_target_init_readonly(&flash)" not in body
+
+
 def test_exp066_slot_a_and_slot_b_release_targets(tmp_path: Path) -> None:
     seed = bytes(32)
     seed_path = tmp_path / "test_seed.bin"

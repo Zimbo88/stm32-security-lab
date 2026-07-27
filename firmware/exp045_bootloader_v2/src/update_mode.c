@@ -38,7 +38,9 @@ static update_protocol_status_t uart_binary_write(
         uart_putc((char)data[i]);
     }
 
-    return UPDATE_PROTOCOL_STATUS_OK;
+    return (uart_wait_tx_complete() == UART_OK)
+        ? UPDATE_PROTOCOL_STATUS_OK
+        : UPDATE_PROTOCOL_STATUS_IO_ERROR;
 }
 
 static uint8_t uart_console_write(
