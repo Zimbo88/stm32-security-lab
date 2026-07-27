@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 import tarfile
 import tempfile
@@ -44,6 +45,10 @@ BUILD_OUTPUTS = (
     "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_release_manifest.json",
     "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_package_verify.json",
 )
+
+VOLATILE_JSON_FIELDS_BY_SUFFIX = {
+    "_package_verify.json": ("verification_timestamp_utc",),
+}
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -213,10 +218,25 @@ def build_checkout(checkout: Path) -> dict[str, str]:
         checkout,
     )
 
-    return {
-        output: hashlib.sha256((checkout / output).read_bytes()).hexdigest()
-        for output in BUILD_OUTPUTS
-    }
+    return {output: artifact_hash(checkout, output) for output in BUILD_OUTPUTS}
+
+
+def normalized_artifact_bytes(checkout: Path, output: str) -> bytes:
+    data = (checkout / output).read_bytes()
+
+    for suffix, fields in VOLATILE_JSON_FIELDS_BY_SUFFIX.items():
+        if output.endswith(suffix):
+            report = json.loads(data.decode("ascii"))
+            for field in fields:
+                if field in report:
+                    report[field] = "<normalized>"
+            return json.dumps(report, indent=2, sort_keys=True).encode("ascii") + b"\n"
+
+    return data
+
+
+def artifact_hash(checkout: Path, output: str) -> str:
+    return hashlib.sha256(normalized_artifact_bytes(checkout, output)).hexdigest()
 
 
 def mismatched_outputs(left_hashes: dict[str, str], right_hashes: dict[str, str]) -> list[str]:

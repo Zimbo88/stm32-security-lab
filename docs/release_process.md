@@ -164,11 +164,12 @@ The release manifest includes:
 
 ## Offline Verification
 
-`tools/release_artifacts.py verify-signed` verifies one legacy signed image.
-`tools/release_artifacts.py verify-release` verifies the complete release
-artifact set.
-`tools/update_package.py verify` verifies an authenticated update package for a
-specific slot and target compatibility identifier.
+`tools/release_artifacts.py verify-signed` verifies one legacy version-1 signed
+image. `tools/release_artifacts.py verify-release` verifies that legacy
+version-1 release artifact set.
+EXP066 secure-update-v2 releases are verified with `tools/update_package.py
+verify`, which authenticates an update package for a specific slot and target
+compatibility identifier.
 
 Both commands parse the manifest using explicit little-endian fields, verify
 the payload SHA-512, verify the detached Ed25519 signature over the manifest,
@@ -208,6 +209,11 @@ EXP045, EXP065, and EXP066, signs deterministic test images with a non-secret
 test seed, generates release manifests and Slot A/Slot B update packages, and
 compares the resulting ELF, BIN, HEX, signed image, update package, and release
 JSON hashes.
+
+Update-package verification reports are compared after normalizing only the
+volatile `verification_timestamp_utc` field. Firmware binaries, signed packages,
+package hashes, key fingerprints, slot metadata, and verification results remain
+part of the deterministic comparison.
 
 CI uses the same deterministic test seed only for reproducibility checks. It is
 not a production signing key and is not a release trust anchor.

@@ -139,7 +139,7 @@ if [[ "${SKIP_BUILD}" -ne 1 ]]; then
     run_logged exp066_slot_a_build \
         make -C "${ROOT}/firmware/exp066_research_platform_core" clean all LAYOUT_PROFILE=stm32f429_1m
     run_logged exp066_slot_b_build \
-        make -C "${ROOT}/firmware/exp066_research_platform_core" SLOT=b BUILD=build_slot_b PROJECT=exp066_research_platform_core_slot_b clean all LAYOUT_PROFILE=stm32f429_1m
+        make -C "${ROOT}/firmware/exp066_research_platform_core" SLOT=b BUILD=build/slot_b PROJECT=exp066_research_platform_core_slot_b clean all LAYOUT_PROFILE=stm32f429_1m
 fi
 
 if [[ -n "${PACKAGE}" ]]; then

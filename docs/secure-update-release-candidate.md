@@ -1,6 +1,6 @@
 # Secure Update Release Candidate
 
-Date: 2026-07-23
+Date: 2026-07-27
 
 Scope: first RDP0 hardware-in-the-loop release candidate for the EXP045 secure
 update chain. RDP2 is not approved by this report.
@@ -33,13 +33,16 @@ update chain. RDP2 is not approved by this report.
 - The current binary protocol does not expose `slots` or `metadata`; those are
   available through the read-only diagnostic console.
 - Existing deterministic-build tooling uses `git archive HEAD`, so it validates
-  committed HEAD rather than this dirty release-candidate worktree.
+  committed HEAD. Run it after committing or from the exact tree intended for
+  release evidence.
 
 ## Validation Results
 
-Final preparation run:
+Patch-3 hardware-readiness run:
 
-- `python3 -m pytest`: 157 passed.
+- `python3 -m pytest -q tests`: 135 passed.
+- Targeted Python checks passed:
+  - `python3 -m pytest -q tests/test_release_artifacts.py tests/test_update_package_tool.py tests/test_exp066_prehardware.py`: 20 passed.
 - Normal C host tests passed:
   - `make -C tests/update_protocol clean test`
   - `make -C tests/update_storage clean test`
@@ -56,40 +59,46 @@ Final preparation run:
   - `tests/host_verifier`
   - `tools`
 - Bootloader clean build and report passed:
-  - `make -C firmware/exp045_bootloader_v2 clean report`
+  - `make -C firmware/exp045_bootloader_v2 clean report LAYOUT_PROFILE=stm32f429_1m`
 - exp066 clean builds passed:
-  - Slot A: `make -C firmware/exp066_research_platform_core clean all LAYOUT_PROFILE=stm32f429_1m`
-  - Slot B: `make -C firmware/exp066_research_platform_core SLOT=b BUILD=build_slot_b PROJECT=exp066_research_platform_core_slot_b clean all LAYOUT_PROFILE=stm32f429_1m`
+  - Slot A: `make -C firmware/exp066_research_platform_core clean verify-signed LAYOUT_PROFILE=stm32f429_1m SIGNING_SEED=../exp065_signed_app/keys/firmware_signing_seed.bin PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h`
+  - Slot B: `make -C firmware/exp066_research_platform_core slot-b LAYOUT_PROFILE=stm32f429_1m SIGNING_SEED=../exp065_signed_app/keys/firmware_signing_seed.bin PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h`
+- Offline update-package verification passed:
+  - Slot A with header key and hex key.
+  - Slot B with header key and hex key.
+  - Wrong public key rejected with `Ed25519 signature verification failed`.
 - `git diff --check`: passed.
 - Ruff:
-  - `.venv-hil/bin/ruff check tools/stm32ctl tests/test_stm32ctl.py tests/test_update_protocol.py tests/test_bootloader_uart.py tests/test_diagnostic_console.py`: passed.
-  - `.venv-hil/bin/ruff check tests tools/secure_boot_hil/secure_boot_hil tools/secure_boot_hil/host_tests`: passed.
-  - `.venv-hil/bin/ruff check tools/check_deterministic_build.py`: passed.
+  - `.venv-hil/bin/ruff check tools/check_deterministic_build.py tests/test_release_artifacts.py`: passed.
+- Deterministic build:
+  - `python3 tools/check_deterministic_build.py`: passed.
+  - The comparison normalizes only the volatile `verification_timestamp_utc`
+    field in update-package verification reports; firmware binaries, packages,
+    package hashes, key fingerprints, slot metadata and verification results
+    remain compared.
+- Hardware helper script:
+  - `bash -n tools/run_secure_update_hardware_test.sh`: passed.
+  - `tools/run_secure_update_hardware_test.sh --help`: passed.
+- Repository audit:
+  - `bash audit/run_repository_audit.sh`: passed and wrote
+    `audit/repository-audit.txt`.
 - Mypy:
   - `.venv-hil/bin/mypy tools/stm32ctl tests/test_stm32ctl.py`: passed.
-- Repository audit:
-  - `bash audit/run_repository_audit.sh`: passed and wrote `audit/repository-audit.txt`.
-- Deterministic build:
-  - Initial run exposed a deterministic-checker artifact path bug.
-  - After fixing the checker to run the existing `inspect-update-package`
-    step for exp066 base-slot artifacts, `python3 tools/check_deterministic_build.py`
-    passed.
-  - The deterministic checker still validates an exported `HEAD` tree, not
-    uncommitted RC-only files.
+- Tool availability:
+  - `ruff` and `python3 -m ruff` are not available in the system Python; use
+    `.venv-hil/bin/ruff` for local checks.
 
 ## Bootloader Size
 
-Optimized RC size after replacing the synthetic internal HELLO frame path:
+Current Patch-3 hardware-readiness size:
 
-- Bootloader binary: 29,616 bytes.
+- Bootloader binary: 29,712 bytes.
 - Reserved bootloader region: 32,768 bytes.
-- Free reserve: 3,152 bytes.
-- Previous measured size before this RC optimization: 29,824 bytes.
-- Net improvement: 208 bytes.
-
-The optimization does not change the wire protocol. It removes the need for the
-bootloader integration path to encode a HELLO frame and feed it back through the
-parser after the entry classifier has already accepted a valid HELLO.
+- Free reserve: 3,056 bytes.
+- EXP066 Slot A application binary: 19,884 bytes.
+- EXP066 Slot A update package: 20,396 bytes.
+- EXP066 Slot B application binary: 19,876 bytes.
+- EXP066 Slot B update package: 20,388 bytes.
 
 Largest linked symbols/modules observed in the final validation:
 

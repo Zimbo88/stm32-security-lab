@@ -308,3 +308,27 @@ def test_deterministic_mismatch_reports_changed_output() -> None:
     assert any(name.endswith(".elf") for name in deterministic.BUILD_OUTPUTS)
     assert any(name.endswith(".hex") for name in deterministic.BUILD_OUTPUTS)
     assert any(name.endswith("release_manifest.json") for name in deterministic.BUILD_OUTPUTS)
+
+
+def test_deterministic_verify_report_hash_normalizes_timestamp_only(tmp_path: Path) -> None:
+    output = "firmware/exp066_research_platform_core/build/example_package_verify.json"
+    path = tmp_path / output
+    path.parent.mkdir(parents=True)
+    report = {
+        "package_sha256": "a" * 64,
+        "result": "ok",
+        "verification_timestamp_utc": "2026-07-27T09:00:00Z",
+    }
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    first = deterministic.artifact_hash(tmp_path, output)
+
+    report["verification_timestamp_utc"] = "2026-07-27T09:00:01Z"
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    second = deterministic.artifact_hash(tmp_path, output)
+
+    report["package_sha256"] = "b" * 64
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="ascii")
+    third = deterministic.artifact_hash(tmp_path, output)
+
+    assert first == second
+    assert first != third

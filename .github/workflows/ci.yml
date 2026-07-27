@@ -85,21 +85,24 @@ jobs:
             LAYOUT_PROFILE=stm32f429_1m \
             SIGNING_SEED=/tmp/ci_signing_seed.bin \
             PUBLIC_KEY_HEX="${PUBLIC_KEY_HEX}"
-          python tools/release_artifacts.py verify-release \
-            --bootloader-elf firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf \
-            --bootloader-bin firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin \
-            --bootloader-hex firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.hex \
-            --application-elf firmware/exp066_research_platform_core/build/exp066_research_platform_core.elf \
-            --application-bin firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
-            --application-hex firmware/exp066_research_platform_core/build/exp066_research_platform_core.hex \
-            --signed-image firmware/exp066_research_platform_core/build/exp066_research_platform_core_signed.bin \
+          python tools/update_package.py verify \
+            --package firmware/exp066_research_platform_core/build/exp066_research_platform_core_slot_a_update_v2.bin \
+            --slot a \
+            --application firmware/exp066_research_platform_core/build/exp066_research_platform_core.bin \
             --public-key-hex "${PUBLIC_KEY_HEX}" \
-            --manifest-output firmware/exp066_research_platform_core/build/ci_release_manifest.json \
-            --report-output firmware/exp066_research_platform_core/build/ci_release_verification.json \
-            --application-name exp066_research_platform_core \
-            --bootloader-version exp045 \
-            --release-version ci \
-            --git-commit "${GITHUB_SHA}"
+            --json-output firmware/exp066_research_platform_core/build/ci_slot_a_update_verify.json
+          python tools/update_package.py verify \
+            --package firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_update_v2.bin \
+            --slot a \
+            --application firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.bin \
+            --public-key-hex "${PUBLIC_KEY_HEX}" \
+            --json-output firmware/exp066_research_platform_core/build/slot_a/ci_slot_a_release_verify.json
+          python tools/update_package.py verify \
+            --package firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin \
+            --slot b \
+            --application firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin \
+            --public-key-hex "${PUBLIC_KEY_HEX}" \
+            --json-output firmware/exp066_research_platform_core/build/slot_b/ci_slot_b_release_verify.json
 
       - name: Run host C verifier tests
         run: |

@@ -5,6 +5,7 @@
 
 #define UART_BAUD_115200            115200UL
 #define UART_FLUSH_RX_MAX_DRAINS    1024UL
+#define UART_TX_READY_MAX_POLLS     1000000UL
 
 #define RCC_AHB1ENR_GPIOAEN         (1UL << 0)
 #define RCC_APB2ENR_USART1EN        (1UL << 4)
@@ -245,7 +246,13 @@ void uart_init_115200_hsi16(void)
 
 void uart_putc(char c)
 {
+    uint32_t polls = UART_TX_READY_MAX_POLLS;
+
     while ((uart_read_sr() & USART_SR_TXE) == 0U) {
+        if (polls == 0UL) {
+            return;
+        }
+        --polls;
     }
     uart_write_dr((uint32_t)(uint8_t)c);
 }

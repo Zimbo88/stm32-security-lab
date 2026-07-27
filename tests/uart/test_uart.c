@@ -207,6 +207,16 @@ static void test_uart_init_and_tx(void)
     expect_u32("uart putc DR", 'Z', uart_host_get_usart_dr() & 0xFFU);
 }
 
+static void test_uart_tx_wait_is_bounded(void)
+{
+    uart_host_reset_registers();
+    uart_host_set_usart_sr(0U);
+
+    uart_putc('X');
+
+    expect_u32("uart bounded tx keeps DR", 0U, uart_host_get_usart_dr() & 0xFFU);
+}
+
 static void test_uart_rx_ready_and_getc(void)
 {
     uint8_t byte = 0U;
@@ -343,6 +353,7 @@ int main(void)
 {
     test_byte_reader_timeout_and_partial_read();
     test_uart_init_and_tx();
+    test_uart_tx_wait_is_bounded();
     test_uart_rx_ready_and_getc();
     test_uart_rx_errors();
     test_uart_timeout_read_flush_and_reader();

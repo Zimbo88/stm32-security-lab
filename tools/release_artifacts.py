@@ -596,7 +596,10 @@ def build_parser() -> argparse.ArgumentParser:
     add_public_key_args(signed)
     signed.set_defaults(func=run_verify_signed)
 
-    release = subparsers.add_parser("verify-release", help="verify complete release artifacts")
+    release = subparsers.add_parser(
+        "verify-release",
+        help="verify legacy version-1 release artifacts",
+    )
     release.add_argument("--bootloader-elf", required=True, type=Path)
     release.add_argument("--bootloader-bin", required=True, type=Path)
     release.add_argument("--bootloader-hex", required=True, type=Path)

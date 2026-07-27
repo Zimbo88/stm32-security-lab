@@ -118,6 +118,11 @@ The deterministic build check compares ELF, BIN, HEX, update packages, package
 inspection JSON, and package verification JSON outputs from two independent
 archived source trees.
 
+For update-package verification JSON, only the volatile
+`verification_timestamp_utc` field is normalized before comparison. The
+remaining report fields, including package hashes, key fingerprints, slot
+metadata, and verification booleans, are still compared.
+
 ## What Host Tests Prove
 
 The host tests provide repeatable evidence for manifest parsing, little-endian

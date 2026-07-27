@@ -10,14 +10,15 @@ Use these shell variables in the examples:
 ```sh
 export PORT=/dev/ttyUSB0
 export PYTHONPATH=tools
-export PKG_A=build/releases/slot_a/firmware.update.bin
-export PKG_B=build/releases/slot_b/firmware.update.bin
+export PKG_A=firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_update_v2.bin
+export PKG_B=firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin
 export PUBKEY=firmware/exp045_bootloader_v2/src/firmware_public_key.h
 ```
 
-`PKG_A` and `PKG_B` are placeholders for signed update packages whose manifest
-vector addresses are `0x08020200` and `0x08080200` respectively. Use packages
-with monotonically increasing image versions for the positive tests.
+Build `PKG_A` and `PKG_B` with `make -C firmware/exp066_research_platform_core
+slot-releases`. Their manifest vector addresses must be `0x08020200` and
+`0x08080200` respectively. Use packages with monotonically increasing image
+versions for the positive tests.
 
 ## Phase A - Setup
 
@@ -34,7 +35,7 @@ with monotonically increasing image versions for the positive tests.
 | B1 build bootloader | Repository checkout is the release-candidate tree. | `make -C firmware/exp045_bootloader_v2 clean report` | None from target. Build report shows the bootloader binary and remaining space. | Unchanged. | Unchanged. | Build succeeds and binary size is inside `0x8000` bytes. | Stop; fix build before hardware. |
 | B2 flash bootloader manually | RDP Level 0 confirmed. This is a manual flash operation, not performed by automation. | `st-flash write firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin 0x08000000` | Target may reset and later print the boot banner. | Existing metadata unchanged. | Existing boot decision. | ST-Link write succeeds; no Option Bytes are changed. | Reflash known-good bootloader manually. |
 | B3 install confirmed Slot A | Build or obtain a valid signed Slot A image at `0x08020000` and confirmed metadata records for version `N`. | `tools/build/boot_metadata_provision.bin create-confirmed --slot a --image-version N --copy-a-output hil-results/meta_a.bin --copy-b-output hil-results/meta_b.bin` | None from target. | Generated records encode `CONFIRMED`, active slot A, no candidate, confirmation true. | A. | Records are generated and reviewed before manual flashing to metadata sectors. | Regenerate metadata; do not proceed with ambiguous records. |
-| B4 flash Slot A and metadata manually | Slot A signed image and metadata records from B3 are ready. | `st-flash write <slot-a-signed-image.bin> 0x08020000` | None required during flash. | After manual metadata flash: `CONFIRMED`, active A. | A. | Bootloader later selects A and application starts. | Reflash Slot A and confirmed metadata. |
+| B4 flash Slot A and metadata manually | Slot A update package and metadata records from B3 are ready. | `st-flash write "$PKG_A" 0x08020000` | None required during flash. | After manual metadata flash: `CONFIRMED`, active A. | A. | Bootloader later selects A and application starts. | Reflash Slot A and confirmed metadata. |
 | B5 observe boot output | Power cycle or reset with no UART input. | `python3 -m serial.tools.miniterm "$PORT" 115200` | Banner contains `EXP045 BOOTLOADER V2`, reset cause, slot policy, `Signature and payload hash accepted.`, then jump. | `CONFIRMED`, active A. | A. | Application for Slot A runs and can confirm if needed. | Reflash known-good Slot A and metadata. |
 | B6 capture baseline | Enter console with a complete text line during the entry window. | Type `metadata` then `slots` then `boot` in the console. | Console starts with `diagnostic console readonly`; metadata and slot descriptors print. | `CONFIRMED`, active A, candidate none. | A after `boot`. | Captured output matches expected slot bases and metadata. | Reset target and retry with a shorter time from reset to first line. |
 
