@@ -1,65 +1,66 @@
 # Bootloader UART Transport
 
-Der Bootloader verwendet USART1 im Polling-Betrieb.
+The bootloader uses USART1 in polling mode.
 
 - TX: PA9, Alternate Function AF7.
-- RX: PA10, Alternate Function AF7, interner Pull-up aktiv.
-- Baudrate: 115200 Baud.
-- Clock-Basis: `uart_init()` nutzt `board_clock_get_sysclk_hz()`. Im aktuellen
-  Board-Clock-Stand bleibt der Controller auf HSI mit 16 MHz, daraus ergibt
-  sich `USART1_BRR = 0x008B`.
+- RX: PA10, Alternate Function AF7, internal pull-up enabled.
+- Baud rate: 115200 baud.
+- Clock basis: `uart_init()` uses `board_clock_get_sysclk_hz()`. With the
+  current board-clock configuration the controller remains on 16 MHz HSI, which
+  yields `USART1_BRR = 0x008B`.
 
-## Empfangsverhalten
+## Receive Behavior
 
-Der Empfang ist bewusst interrupt- und DMA-frei. Timeouts sind als Poll-Budget
-definiert, nicht als Wandzeit:
+RX is intentionally interrupt-free and DMA-free. Timeouts are poll budgets, not
+calibrated wall-clock milliseconds:
 
-- `uart_getc_nonblocking()` prueft einmal auf ein Byte.
-- `uart_getc_timeout()` versucht hoechstens `timeout_polls` Polls.
-- `uart_read_timeout()` verwendet das Poll-Budget pro erwartetes Byte und gibt
-  die Anzahl bereits gelesener Bytes zurueck.
-- `uart_flush_rx()` verwirft ausstehende RX-Daten und bricht intern nach einer
-  festen Drain-Grenze ab.
+- `uart_getc_nonblocking()` checks once for one byte.
+- `uart_getc_timeout()` polls at most `timeout_polls` times.
+- `uart_read_timeout()` applies the poll budget to each expected byte and
+  returns the number of bytes already read.
+- `uart_flush_rx()` discards pending RX data and stops after a fixed drain
+  limit.
 
-USART-Fehler werden vor der Datenuebergabe erkannt. Overrun, Framing, Noise und
-Parity werden durch die uebliche STM32F4-Sequenz Statusregister lesen,
-Datenregister lesen behandelt; das betroffene Byte wird verworfen und der
-Fehlerstatus an den Aufrufer gemeldet.
+USART errors are detected before a byte is handed to the caller. Overrun,
+framing, noise, and parity errors are cleared through the STM32F4 sequence of
+reading the status register and then the data register. The affected byte is
+discarded and the error status is returned to the caller.
 
-## Transportneutrale Reader-Schicht
+## Transport-Neutral Reader Layer
 
-`byte_reader_t` kapselt einen nichtblockierenden Byte-Reader mit Kontextzeiger.
-Parser koennen spaeter gegen `byte_reader_getc_timeout()` und
-`byte_reader_read_timeout()` implementiert werden. Auf dem Ziel wird
-`uart_byte_reader_init()` verwendet; Host-Tests koennen stattdessen einen Fake-
-Reader ohne USART-Register einsetzen.
+`byte_reader_t` wraps a nonblocking byte reader with a context pointer. Parsers
+use `byte_reader_getc_timeout()` and `byte_reader_read_timeout()` instead of
+direct USART register access. The target initializes this with
+`uart_byte_reader_init()`. Host tests use fake readers without USART registers.
 
-## Bootloader-Einstieg
+## Bootloader Entry Window
 
-Nach `board_clock_init()` und `uart_init()` oeffnet der Bootloader ein kurzes,
-begrenztes UART-Einstiegfenster. Ein gueltiges `HELLO`-Frame des
-UART-Binaerprotokolls mit Sequenznummer 0 aktiviert den Update-Modus. Eine
-vollstaendige Textzeile aktiviert die read-only Diagnosekonsole. Ohne
-gueltiges `HELLO`, ohne vollstaendige Textzeile, bei UART-Rauschen oder nach
-Ablauf des Poll-Budgets laeuft die normale Secure-Boot-Sequenz weiter.
+After `board_clock_init()` and `uart_init()`, the bootloader opens a short,
+bounded UART entry window:
 
-Das Einstiegfenster ist aktuell rein zeit- beziehungsweise poll-basiert:
+- A valid binary `HELLO` frame with protocol sequence number 0 activates update
+  mode.
+- A complete text line activates the read-only diagnostic console.
+- No valid `HELLO`, no complete text line, UART noise, or poll-budget expiry
+  continues into normal secure boot.
 
-- keine DMA- oder Interrupt-Abhaengigkeit,
-- kein ST-ROM-Bootloader,
-- keine Option-Byte- oder RDP-Aenderung,
-- kein physischer Update-GPIO.
+The entry window has:
 
-Ein Update-GPIO wird bewusst noch nicht gewaehlt, weil das konkrete Board-
-Pinout im Repository noch nicht eindeutig genug dokumentiert ist. Bis dahin
-werden Update- und Diagnosemodus nur durch das begrenzte UART-Einstiegfenster
-aktiviert.
+- no DMA dependency;
+- no interrupt dependency;
+- no ST-ROM-bootloader dependency;
+- no Option-Byte or RDP change;
+- no physical update GPIO.
 
-Im Update-Modus gibt der Bootloader keine menschlichen Diagnosezeilen auf
-derselben UART-Verbindung aus. Antworten sind ausschliesslich binaere
-ACK/NACK-Frames. Nach erfolgreichem `FINISH_UPDATE` muss der Installer
-`CANDIDATE_READY` committed haben; danach fordert der Bootloader ueber
-AIRCR/SYSRESETREQ einen kontrollierten Systemreset an.
+No update GPIO is selected yet because the repository does not document a
+definitive spare board pin for that purpose. Until then, update and diagnostic
+mode are entered only through the bounded UART entry window.
 
-Die Textkonsole ist in `docs/uart-diagnostic-console.md` beschrieben. Sie hat
-keine Flash-Schreib-, Erase-, Slot-, Versions-, Option-Byte- oder RDP-Befehle.
+In update mode, the bootloader does not emit human-readable diagnostic lines on
+the same UART stream. Responses are binary ACK/NACK frames only. After a
+successful `FINISH_UPDATE`, the installer must have committed
+`CANDIDATE_READY`; the bootloader then waits for UART transmission complete and
+requests a controlled AIRCR/SYSRESETREQ reset.
+
+The text console is documented in `docs/uart-diagnostic-console.md`. It has no
+Flash write, erase, slot, version, Option-Byte, or RDP commands.

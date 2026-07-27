@@ -17,10 +17,10 @@ debug, flash-protection, reset, clock and communication configurations.
 RDP Level 2 must not be enabled on the primary STM32F429IGT6 development
 board.
 
-RDP Level 2 also must not be enabled for EXP071. Recovery is not yet proven,
-target-side update installation is not implemented, host-side module
-installation remains simulated, and hardware power-loss behavior has not been
-validated.
+RDP Level 2 also must not be enabled for EXP071. The target-side secure-update
+path has RDP0 hardware evidence, but physical recovery, irreversible
+provisioning, hardware-backed rollback, host-side module-to-target
+installation, and controlled power-loss behavior are not sufficient for RDP2.
 
 Experiments involving irreversible configuration require:
 
@@ -48,6 +48,17 @@ Completed work includes:
 - boot timing measurement
 - reset interruption campaign
 - end-to-end secure boot validation
+
+### v1.0.1 – Secure Update Hardware Validation
+
+Completed work includes:
+
+- streaming authenticated update installer;
+- deterministic UART binary update protocol;
+- `stm32ctl` host update client;
+- Slot A to Slot B and Slot B to Slot A hardware update validation at RDP0;
+- rollback rejection and corrupted-package negative tests on hardware;
+- release-readiness documentation for public Open Source review.
 
 ### EXP066-EXP071 – Pre-hardware research platform integration
 

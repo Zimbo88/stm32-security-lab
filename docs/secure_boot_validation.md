@@ -1,9 +1,9 @@
 # Secure Boot Validation
 
-This document describes the current validation coverage for EXP045,
-EXP065, and EXP066. It combines earlier manual board observations with the
-current automated host checks. No new hardware flashing or option-byte
-operation is implied by the automated tests.
+This document describes the current validation coverage for EXP045, EXP065,
+and EXP066. It combines automated host checks with completed RDP0 hardware
+validation evidence. No default host or CI command flashes hardware or changes
+Option Bytes.
 
 ## Configuration
 
@@ -131,6 +131,25 @@ verification, signing-tool input validation, boundary-value rejection, redundant
 jump-context validation in host mode, release artifact integrity, reproducible
 release metadata, and failure-code stability.
 
+## Hardware Validation Evidence
+
+The secure-update-v2 completion run on 2026-07-27 validated the boot and update
+chain on an STM32F429IGT6-class target at RDP Level 0. The campaign observed:
+
+- Slot A confirmed boot with a concrete slot decision;
+- SHA-512 and Ed25519 execution before application jump;
+- valid A-to-B update, Slot B trial boot, and Slot B confirmation;
+- valid B-to-A update, Slot A trial boot, and Slot A confirmation;
+- rollback rejection for same and lower versions;
+- fail-closed rejection of corrupted manifest, target, signature, and payload
+  cases;
+- fallback after abort and reset during `WRITING`;
+- UART CRC, sequence, partial-frame, and random-byte negative cases;
+- flash readback matching the transferred packages after positive updates;
+- Option Bytes unchanged throughout the campaign.
+
+See `docs/validation-summary.md` and `docs/release-readiness.md`.
+
 ## What Host Tests Do Not Prove
 
 The host tests do not validate:
@@ -153,16 +172,19 @@ review before any production claim.
 ## Secure Failure Behavior
 
 On a verification failure, the bootloader prints the failure status and halts
-instead of starting the application. Recovery remains unavailable in this
-baseline, so the halt is safe but not operationally complete.
+or falls back through the documented slot policy instead of starting the
+rejected image. A physical recovery input is not selected in this baseline, so
+fail-closed halt remains safe but not operationally complete when no confirmed
+fallback image is available.
 
 The jump path also treats final handoff validation failures as security
 failures: it returns an explicit verifier status to the boot sequence, which
 prints the status and enters the centralized halt path.
 
-## Remaining Critical Gaps
+## Remaining Security Boundaries
 
-The current implementation still lacks authenticated update transport,
-hardware-backed rollback state, physical recovery, bootloader write protection,
-debug/option-byte provisioning policy, and fault-injection countermeasures. It
-must not be described as production ready.
+The current implementation includes a research UART secure-update transport,
+but it still lacks hardware-backed rollback state, physical recovery,
+bootloader write protection, debug/Option-Byte provisioning policy, production
+key custody, and fault-injection countermeasures. It must not be described as
+production ready.

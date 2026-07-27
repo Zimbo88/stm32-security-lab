@@ -1,10 +1,10 @@
 # Authenticated Update Installation
 
-This phase adds a host-simulated authenticated firmware update installer. The
-follow-on Stage-0 slot-selection, trial boot, confirmation, and fallback phase
-is documented in `docs/stage0_slot_selection.md`. This installer phase does not
-add real target flash programming, transport, option-byte programming, WRP, RDP,
-or physical hardware flashing.
+This document records the authenticated installer design that started as a
+host-simulated phase and now has a target implementation in the secure-update
+v2 path. Stage-0 slot selection, trial boot, confirmation, and fallback are
+documented in `docs/stage0_slot_selection.md`. The current release still does
+not add option-byte programming, WRP, RDP, or automatic hardware flashing.
 
 ## Package Format
 
@@ -56,7 +56,8 @@ Stage 0 and the simulated installer being the only trusted metadata writers.
 
 ## Install Sequence
 
-The host-simulated installer performs this sequence:
+The installer performs this sequence in host simulation and in the reviewed
+target streaming path:
 
 1. Recover validated metadata.
 2. Require a confirmed active slot.
@@ -133,8 +134,10 @@ python3 tools/update_package.py install-sim \
 
 Default commands and CI jobs are host-only and do not flash hardware.
 
-## Deferred Work
+## Remaining Production Work
 
-Later phases must add hardware-backed rollback protection, target
-flash-controller programming, transport, USB DFU, UART update handling,
-WRP/RDP/option-byte provisioning, and physical hardware validation.
+The research implementation now includes target flash programming, UART update
+handling, and RDP0 hardware validation. Later production work must still add
+hardware-backed rollback protection, physical recovery policy, USB/network
+transport only if explicitly selected, WRP/RDP/Option-Byte provisioning, key
+custody, and repeated physical power-loss validation.

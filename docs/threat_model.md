@@ -24,6 +24,9 @@ The adversary may:
 - Replace the complete firmware image
 - Sign firmware with an unauthorized key
 - Provide an older correctly signed firmware image
+- Provide a signed update package for the wrong slot
+- Interrupt or abort an update before completion
+- Send malformed UART update frames
 - Provide an unsupported manifest format
 - Provide noncanonical manifest flags or reserved fields
 - Provide malformed payload ranges or address-overflow cases
@@ -41,6 +44,9 @@ The adversary may:
 | Unsupported manifest | Header-version validation |
 | Noncanonical manifest metadata | Flags and reserved-field validation |
 | Malformed payload range | Size, flash-region, and overflow validation |
+| Wrong update slot | Slot-bound manifest vector address and inactive-slot policy |
+| Partial update | Metadata states and final `CANDIDATE_READY` commit rule |
+| Malformed UART frame | Bounded parser, length checks, CRC32, sequence checks |
 | Invalid stack pointer | Initial MSP range and alignment validation |
 | Invalid execution target | Reset-vector validation |
 | Handoff context drift | Redundant pre-jump validation and flash vector re-read |
@@ -68,7 +74,7 @@ The current implementation does not claim to protect against:
 - Compromise of the signing host
 - Theft of the private signing seed
 - Malicious replacement of an unprotected bootloader
-- Secure firmware update transport
+- Production remote-update authorization beyond signed firmware packages
 - Confidentiality of firmware contents
 - Hardware-backed monotonic version counters
 - Production key provisioning and rotation

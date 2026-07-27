@@ -27,6 +27,13 @@ python -m pip install -e tools/secure_boot_hil[dev]
 tools/secure_boot_hil/scripts/run_host_checks.sh
 ```
 
+Use the `PYTHON` environment variable when the checks should run inside a
+specific virtual environment:
+
+```bash
+PYTHON="$PWD/.venv-hil/bin/python" tools/secure_boot_hil/scripts/run_host_checks.sh
+```
+
 ## Dry Run
 
 ```bash

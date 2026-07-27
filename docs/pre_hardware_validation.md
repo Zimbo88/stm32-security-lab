@@ -1,9 +1,11 @@
 # Pre-Hardware Validation Readiness
 
-This phase is software-only preparation for controlled STM32F429 hardware
-validation. It does not flash a board, alter option bytes, enable WRP/RDP, or
-perform voltage, clock, reset, electromagnetic, laser, or other physical fault
-injection.
+This document records the software-only preparation used before controlled
+STM32F429 hardware validation. The current release has since completed RDP0
+secure-boot and dual-slot secure-update validation; this document remains the
+reference for host checks and pre-hardware safety boundaries. It does not flash
+a board, alter option bytes, enable WRP/RDP, or perform voltage, clock, reset,
+electromagnetic, laser, or other physical fault injection.
 
 ## Diagnostic Security Boundary
 
@@ -194,11 +196,10 @@ compares both slot release outputs across exported clean checkouts.
   staged
 - option bytes, WRP, RDP, and hardware rollback counters remain unchanged
 
-## Deferred Work
+## Deferred Production Work
 
-Hardware validation still needs controlled board flashing, serial observation,
-trial boot, confirmation, fallback, flash erase/program timing, voltage
-assumption checks, reset-cause observation, and power-loss behavior tests.
-WRP/RDP, option-byte programming, irreversible provisioning, hardware-backed
-rollback protection, UART/USB/network update transport, and physical
+The RDP0 secure-boot and dual-slot UART secure-update path now has hardware
+evidence. WRP/RDP, Option-Byte programming, irreversible provisioning,
+hardware-backed rollback protection, USB/network update transport, production
+recovery, repeated controlled power-removal evidence, and physical
 fault-injection campaigns remain explicitly deferred.

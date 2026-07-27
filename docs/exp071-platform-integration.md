@@ -1,8 +1,10 @@
 # EXP071 platform integration, health indication, diagnostics, and release readiness
 
-EXP071 turns the signed EXP066 research platform into a coherent pre-hardware
-integration release. It does not flash hardware, modify option bytes, activate
-RDP, or claim that host simulations are hardware-complete.
+EXP071 turns the signed EXP066 research platform into a coherent runtime
+diagnostics and health-indication layer. The current secure-boot/update release
+has RDP0 hardware evidence, but this EXP071 document does not itself flash
+hardware, modify option bytes, activate RDP, or claim that host simulations are
+hardware-complete.
 
 ## Implementation boundaries
 
@@ -17,8 +19,7 @@ RDP, or claim that host simulations are hardware-complete.
   atomic A/B module installation, power-loss recovery, rollback, and
   quarantine behavior.
 - Designed but not hardware-validated: MPU isolation for native modules,
-  hardware update flow, watchdog recovery, brownout behavior, and module slots
-  in real Flash.
+  watchdog recovery, brownout behavior, and module slots in real Flash.
 - Not implemented: target-side module execution, target-side module install,
   USB/Ethernet/LCD/SDRAM/gyroscope drivers, arbitrary memory/register access,
   Flash write commands, option-byte write commands, and RDP commands.
@@ -52,7 +53,7 @@ PH12, active-low. Higher-level code uses only logical LED masks.
 | State | Pattern |
 |---|---|
 | `BOOTING` | Slow progressive fill, then off. |
-| `HEALTHY` | Continuous Knight-Rider scan: LED1, LED2, LED3, LED4, LED3, LED2. |
+| `HEALTHY` | LED4-only heartbeat: one tick on, nine ticks off. |
 | `DEGRADED` | Two short all-LED flashes followed by a pause. |
 | `UPDATING` | Directional progress fill and drain. |
 | `RECOVERY` | Alternating outer LEDs and inner LEDs. |
@@ -127,7 +128,8 @@ easteregg stop
 ```
 
 The Knight-Rider Easter egg is LED-only, bounded, and returns to automatic
-health indication.
+health indication. It is a temporary diagnostic effect; it is not the normal
+`HEALTHY` pattern.
 
 ## Optional audio status
 
@@ -150,14 +152,16 @@ and separate hardware validation.
   software reset.
 - Validate retained fault record behavior after an induced fault on expendable
   hardware.
-- Validate signed EXP066 launch from Stage 0 and confirm the `VTOR` self-test.
-- Validate power-loss behavior for any future target-side update manager.
+- Repeat signed EXP066 launch observations from Stage 0 on any new board
+  revision.
+- Repeat update power-loss behavior with controlled target power before any
+  irreversible provisioning plan.
 - Validate watchdog servicing once watchdog support is enabled.
 
 ## RDP2 status
 
-RDP2 must still not be enabled. Recovery remains incomplete, target-side update
-installation is not hardware-validated, power-loss behavior is host-simulated
-only, and there is no independently reviewed provisioning checklist for the
-exact board. RDP2 would remove normal debug/recovery paths before the platform
-has proven hardware recovery behavior.
+RDP2 must still not be enabled. Target-side secure update has RDP0 hardware
+evidence, but physical recovery, irreversible provisioning, WRP/RDP policy,
+hardware-backed rollback, and controlled power-removal evidence are not
+sufficient for RDP2. RDP2 would remove normal debug/recovery paths before the
+platform has proven recovery behavior.

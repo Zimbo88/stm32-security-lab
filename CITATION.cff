@@ -6,7 +6,8 @@ authors:
   - family-names: Zimmermann
     given-names: Mathias
 license: "BSD-3-Clause"
-version: "1.0.0"
+version: "1.0.1"
+date-released: "2026-07-27"
 abstract: >-
   A reproducible STM32F429 secure-boot and embedded-security research platform
   with authenticated firmware, rollback-aware slot selection, controlled

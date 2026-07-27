@@ -36,6 +36,10 @@ service, and a module-manager placeholder. Register groups that could require
 changing clock state are reported unavailable. Module execution, arbitrary
 memory access, option-byte changes, and RDP activation are absent.
 
+In the normal healthy runtime state, EXP066 drives only LED4/PH12 as a
+non-blocking heartbeat. Other LED patterns are reserved for warning, update,
+recovery, fault, security, bounded LED tests, or the temporary Easter egg.
+
 EXP071 adds health commands (`health status`, `health acknowledge`), LED status
 and bounded test commands, and the bounded LED-only `easteregg knightrider`
 command. Audio remains unavailable by default because no speaker or buzzer pin
@@ -43,7 +47,9 @@ is documented for the board.
 
 Hardware procedure: connect USART1 (PA9/PA10, 115200 8-N-1), manually flash the
 signed image only after independent review, reset, and exercise commands from
-`docs/cli-reference.md`. Build and signing do not prove hardware behavior.
+`docs/cli-reference.md`. The current secure-boot and A/B update path has RDP0
+hardware evidence; new board revisions still require their own UART, LED,
+timing, and flash-readback observations.
 
 ## Confirmation Gate
 

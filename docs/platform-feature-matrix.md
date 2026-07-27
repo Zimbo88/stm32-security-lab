@@ -7,16 +7,16 @@ Status values are intentionally limited to:
 
 | Feature | Status | Relevant source files | Relevant tests | Limitations | Next concrete action |
 |---|---|---|---|---|---|
-| bootloader | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2` | EXP045 build/report | Hardware recovery is still incomplete. | Hardware boot validation on expendable board. |
-| secure firmware update | DOCUMENTED_DESIGN | `firmware/exp045_bootloader_v2`, EXP065 signer | EXP045/EXP065 builds | No target-side update receiver/installer. | Define authenticated recovery/update flow. |
-| UART update | NOT_IMPLEMENTED | none | none | No UART update protocol or Flash writer. | Design slot-based update protocol before coding. |
+| bootloader | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2` | EXP045 build/report, host verifier tests, RDP0 HIL | Physical recovery is still incomplete. | Keep hardware evidence current for each release. |
+| secure firmware update | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2`, `tools/update_package.py`, `tools/stm32ctl` | update installer/protocol/storage tests, stm32ctl tests, RDP0 HIL | Research transport only; no production key custody, update authorization, RDP2, or physical recovery. | Repeat power-removal and provisioning validation before irreversible protection. |
+| UART update | TARGET_IMPLEMENTED | `update_mode.c`, `update_protocol.c`, `update_service.c`, `uart.c`, `tools/stm32ctl` | `tests/update_protocol`, `tests/uart`, `tests/test_stm32ctl.py`, RDP0 HIL | USART1 polling transport; no physical update GPIO; no authenticated operator identity. | Add only reviewed recovery/provisioning policy before production deployment. |
 | optional USB update | OPTIONAL_NOT_SELECTED | none | none | USB stack not selected for this release. | Select only after hardware USB validation plan. |
 | CRC | TARGET_IMPLEMENTED | EXP045/EXP067/EXP070 helpers | `tests/test_exp067.py`, `tests/test_exp070.py` | CRC is integrity/error detection, not authentication. | Keep paired with signatures/hashes. |
 | version management | TARGET_IMPLEMENTED | EXP045 policy, EXP067 package header, EXP070 catalog | EXP045 build, EXP067/EXP070 tests | Bootloader rollback floor is compiled, not persistent. | Add persistent target policy only with update manager. |
 | anti-rollback | TARGET_IMPLEMENTED | EXP045 image policy, EXP070 simulator | EXP045 build, `tests/test_exp070.py` | EXP070 module rollback is simulated only. | Hardware-backed monotonic storage design. |
 | signature verification | TARGET_IMPLEMENTED | EXP045 verifier, EXP067 parser | EXP045 build, `tests/test_exp067.py` | Target verifies firmware image, not module packages. | Target module verifier only after slot design. |
-| RCC diagnostics | TARGET_IMPLEMENTED | `firmware/exp066_research_platform_core/src/platform.c` | EXP066 build, `tests/test_exp066_pure.py` | Read-only curated snapshot only. | UART hardware validation. |
-| GPIO diagnostics | TARGET_IMPLEMENTED | `platform.c`, `platform_led.c` | EXP066 build | GPIO diagnostics are curated; no arbitrary GPIO writes. | Validate LED pins/polarity on hardware. |
+| RCC diagnostics | TARGET_IMPLEMENTED | `firmware/exp066_research_platform_core/src/platform.c` | EXP066 build, `tests/test_exp066_pure.py`, RDP0 UART observations | Read-only curated snapshot only. | Expand only with reviewed read-only policy. |
+| GPIO diagnostics | TARGET_IMPLEMENTED | `platform.c`, `platform_led.c` | EXP066 build, LED host tests | GPIO diagnostics are curated; no arbitrary GPIO writes. | Repeat visual LED observation on each board revision. |
 | NVIC diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Only bank-0 curated read-only registers. | Expand only after interrupt inventory. |
 | SCB diagnostics | TARGET_IMPLEMENTED | `platform.c`, `fault.c` | EXP066 build | Curated fault/status registers only. | Validate fault snapshots on hardware. |
 | SysTick diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only; SysTick is not configured as scheduler. | Decide whether to enable real tick source. |
@@ -49,7 +49,7 @@ Status values are intentionally limited to:
 | runtime information | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Version, health, LED mask, reset, and self-test state only. | Add uptime units after real tick source. |
 | runtime vector-table monitor | TARGET_IMPLEMENTED | `runtime_monitor_vector.c`, `runtime_monitor.c` | RSM host tests, EXP066 build | Checks VTOR, MSP, core handlers, reserved entries, Thumb bits, and active-slot Flash range; no reset or recovery action. | Hardware UART capture and controlled vector test hook. |
 | UART CLI | TARGET_IMPLEMENTED | `platform.c`, `uart.c` | `tests/test_exp066_pure.py` | Blocking TX remains; RX is bounded. | Hardware CLI soak test. |
-| binary protocol | NOT_IMPLEMENTED | none | none | Text CLI only. | Design framed protocol separately. |
+| binary protocol | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2/src/update_protocol.c`, `tools/stm32ctl/protocol.py` | `tests/update_protocol`, `tests/test_stm32ctl.py`, RDP0 UART update tests | Protocol version 1; no `slots` or `metadata` binary commands. | Preserve wire compatibility or version any future change. |
 | optional USB CDC | OPTIONAL_NOT_SELECTED | none | none | USB not selected. | Add only after USB hardware/clock plan. |
 | optional Ethernet | OPTIONAL_NOT_SELECTED | none | none | Ethernet not selected. | Add only if PHY wiring is confirmed. |
 | LCD | NOT_IMPLEMENTED | none | none | No LTDC/LCD driver. | Hardware inventory and safe driver plan. |
@@ -59,5 +59,5 @@ Status values are intentionally limited to:
 | constrained signed native modules | HOST_TOOL_IMPLEMENTED | `tools/native_loader.py` | `tests/test_exp069.py` | Validator/simulator only; no target execution. | MPU-isolated target design and hardware tests. |
 | atomic module installation | SIMULATED_ONLY | `tools/module_install.py` | `tests/test_exp070.py` | JSON Flash simulation, not real Flash. | Hardware-safe target slot/journal implementation. |
 | rollback and quarantine | SIMULATED_ONLY | `tools/native_loader.py`, `tools/module_install.py` | EXP069/EXP070 tests | Host lifecycle/catalog simulation only. | Hardware-backed failure counters and rollback. |
-| LED platform health indication | TARGET_IMPLEMENTED | `platform_health.c`, `platform_led.c`, `platform.c` | `tests/test_exp071_health.py`, EXP066 build | Hardware LED polarity still needs validation. | UART/LED hardware validation. |
+| LED platform health indication | TARGET_IMPLEMENTED | `platform_health.c`, `platform_led.c`, `platform.c` | `tests/test_exp071_health.py`, EXP066 build | HEALTHY uses LED4 only; visual timing should be rechecked per board revision. | Keep normal heartbeat distinct from warning/fatal patterns. |
 | optional retro audio | OPTIONAL_NOT_SELECTED | `platform_audio.c`, `platform_audio.h` | `tests/test_exp071_health.py` | No documented speaker/buzzer pin. | Add external piezo pin assignment before implementation. |

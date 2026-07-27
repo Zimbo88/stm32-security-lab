@@ -1,6 +1,8 @@
 # STM32 Security Lab
 
-**A reproducible STM32F429 secure-boot and embedded-security research platform with authenticated firmware, rollback-aware slot selection, controlled recovery, and automated hardware-in-the-loop validation.**
+**A reproducible STM32F429 secure-boot and embedded-security reference
+laboratory with authenticated firmware, rollback-aware A/B updates, runtime
+diagnostics, and hardware-in-the-loop validation.**
 
 <p align="center">
   <img src="docs/assets/stm32f429-development-board.png"
@@ -8,226 +10,156 @@
        width="760">
 </p>
 
-> **Research status:** hardware validated<br>
-> **Target platform:** STM32F429 family<br>
-> **License:** BSD 3-Clause
-> **Primary focus:** defensive embedded-security research
+> **Status:** hardware validated at RDP Level 0 on an STM32F429IGT6-class board<br>
+> **Target platform:** STM32F429 family, `stm32f429_1m` layout profile<br>
+> **License:** BSD 3-Clause<br>
+> **Primary focus:** defensive embedded-security research and reviewable
+> reference code
 
-## Overview
+## Project Goal
 
-STM32 Security Lab is a research-oriented firmware and tooling repository for
-studying secure boot, authenticated firmware installation, boot metadata,
-rollback policy, recovery behavior, debug access, memory protection, and
-hardware fault response on STM32 microcontrollers.
+STM32 Security Lab is a controlled research repository for studying how secure
+boot, signed firmware, update state, rollback policy, flash behavior, runtime
+diagnostics, and hardware recovery interact on real STM32F429 hardware.
 
-The repository combines:
+The repository is intended to be understandable and reproducible for a new
+developer. It is not a certified production boot chain, but the current
+EXP045/EXP066 secure-boot and secure-update path has been tested on real
+hardware at RDP Level 0 and is suitable as an open reference implementation for
+review, experimentation, and further hardening.
 
-- a stage-0 secure bootloader;
-- signed application images;
-- SHA-512 integrity verification;
-- Ed25519 authentication;
-- redundant boot metadata;
-- A/B application slots;
-- update and recovery tooling;
-- deterministic host-side verification;
-- automated hardware-in-the-loop testing;
-- documented security experiments and observations.
+Only run destructive tests on hardware you own or are explicitly authorized to
+test.
 
-EXP066 also includes a Runtime Security Monitor foundation for a
-machine-parsable boot-to-runtime evidence summary and bounded vector-table
-monitoring. See
-[`docs/runtime-monitor.md`](docs/runtime-monitor.md).
-
-The project is designed as a reproducible laboratory environment rather than
-as a vendor product or certified production boot chain.
-
-## Why this project exists
-
-The project originated from defensive embedded-security research into how
-firmware trust, protection state, debug access, memory contents, and fault
-behavior interact on real microcontrollers.
-
-A secure boot chain was implemented first to establish a known and measurable
-security baseline. This baseline makes later experiments more meaningful:
-changes in boot behavior, memory state, authentication decisions, update
-handling, and protection settings can be compared against a controlled
-reference implementation.
-
-The STM32F429 family was selected as an accessible and capable research
-platform for understanding the architecture, flash organization, boot process,
-debug infrastructure, and protection mechanisms of the family. The resulting
-methods and tooling are intended to support future work on closely related
-STM32F429 variants, including the STM32F429VET6 target that motivated the
-broader investigation.
-
-The long-term research direction includes controlled analysis of:
-
-- fault injection and glitch response;
-- unauthorized or malformed firmware loading attempts;
-- protection-state transitions;
-- read-out protection behavior;
-- boot-chain corruption and recovery;
-- changes to memory and device state caused by security configuration;
-- observable behavior at and around the microcontroller during invasive tests.
-
-Only hardware owned by or explicitly entrusted to the researcher should be
-used for these experiments.
-
-## Security goals
-
-The implemented platform is designed to demonstrate and test the following
-properties:
-
-1. **Authenticity** — only images signed by an authorized key are accepted.
-2. **Integrity** — image contents are verified before execution.
-3. **Manifest validation** — malformed sizes, addresses, versions, and ranges
-   are rejected before use.
-4. **Safe failure** — invalid images do not receive control.
-5. **Redundant metadata** — boot decisions tolerate an invalid metadata copy.
-6. **Rollback control** — version policy can prevent booting older images.
-7. **Recovery** — failed tests restore the device to a verified baseline.
-8. **Reproducibility** — host tests and HIL tests document observable results.
-
-## Hardware platform
-
-The current implementation targets an STM32F429 development board built around
-an STM32F429IGT6-class device and is tested through an ST-LINK-compatible SWD
-debug interface.
-
-### Required equipment
-
-- STM32F429 development board;
-- ST-LINK-compatible programmer/debugger;
-- USB-to-UART interface when the board does not expose one directly;
-- Linux development host;
-- ARM GNU toolchain;
-- OpenOCD and/or `st-flash`;
-- Python 3 for host tooling and HIL orchestration.
-
-Board-specific wiring, interfaces, and component notes are documented in
-[`docs/hardware-platform.md`](docs/hardware-platform.md).
-
-## Architecture
+## Architecture At A Glance
 
 ```mermaid
 flowchart TD
-    RESET[Reset or power-on] --> STAGE0[Stage-0 bootloader]
-    STAGE0 --> META[Read redundant boot metadata]
-    META --> SELECT[Select candidate slot]
-    SELECT --> MANIFEST[Validate image manifest]
-    MANIFEST --> RANGE[Validate address and payload range]
-    RANGE --> HASH[Compute SHA-512]
-    HASH --> SIG[Verify Ed25519 signature]
-    SIG --> POLICY[Apply version and boot policy]
-    POLICY -->|Accepted| VECTOR[Validate vector table]
-    VECTOR --> JUMP[Transfer control to application]
-    MANIFEST -->|Rejected| FALLBACK[Try fallback or halt safely]
-    RANGE -->|Rejected| FALLBACK
-    HASH -->|Mismatch| FALLBACK
-    SIG -->|Invalid| FALLBACK
-    POLICY -->|Rejected| FALLBACK
+    Reset[Reset or power-on] --> Bootloader[EXP045 Stage-0 bootloader]
+    Bootloader --> Entry[Bounded UART entry window]
+    Entry -->|valid SUPD HELLO| UpdateMode[Binary update mode]
+    Entry -->|text line| Console[Read-only diagnostic console]
+    Entry -->|timeout or noise| BootPolicy[Boot policy]
+    Console -->|boot command or timeout| BootPolicy
+    UpdateMode --> Installer[Streaming update installer]
+    Installer --> Metadata[Redundant boot metadata]
+    Metadata --> BootPolicy
+    BootPolicy --> Verify[Manifest, SHA-512, Ed25519, vector checks]
+    Verify -->|accepted| App[EXP066 research platform]
+    Verify -->|rejected| Fallback[Fallback or recovery/fatal state]
+    App --> Confirm[Application confirmation]
+    Confirm --> Metadata
 ```
 
-A detailed description is available in
-[`docs/architecture.md`](docs/architecture.md).
+The trusted bootloader verifies a slot-linked signed image before jumping to
+the application. Updates are streamed over the UART binary protocol into the
+inactive slot, verified from flash, committed as `CANDIDATE_READY`, trial
+booted, and confirmed by the application only after its health gate passes.
 
-## Flash organization
+Detailed architecture:
 
-The repository uses a generated and centrally defined flash layout. The exact
-addresses remain source-controlled in:
+- [Secure Boot Architecture](docs/architecture.md)
+- [Memory Layout](docs/memory_layout.md)
+- [Stage-0 Slot Selection And Trial Boot](docs/stage0_slot_selection.md)
+- [Secure Update Streaming Design](docs/secure-update-streaming-design.md)
+- [UART Binary Update Protocol](docs/uart-binary-protocol.md)
+- [Runtime Security Monitor](docs/runtime-monitor.md)
 
-- `config/stm32f429_memory_layout.json`
-- `firmware/common/stm32f429_memory_layout.h`
-- `firmware/common/stm32f429_memory_layout.ld`
-- `firmware/common/stm32f429_memory_layout.mk`
+## Feature Overview
 
-```mermaid
-block-beta
-  columns 1
-  BL["Stage-0 bootloader"]
-  MA["Boot metadata copy A"]
-  MB["Boot metadata copy B"]
-  SA["Signed application slot A"]
-  SB["Signed application slot B"]
-  ST["Update or staging storage"]
-```
+Current release-quality reference components:
 
-Do not infer production addresses from this diagram. Use the generated layout
-files for the active target configuration.
+- EXP045 Stage-0 secure bootloader for STM32F429.
+- EXP066 slot-aware research application.
+- Canonical signed-image header with Ed25519 manifest authentication.
+- SHA-512 payload integrity verification.
+- Redundant boot metadata with explicit states.
+- Slot A/Slot B boot selection, trial boot, confirmation, and fallback.
+- Streaming secure-update installer with fixed RAM buffers and no heap.
+- USART1 polling RX/TX transport and deterministic `SUPD` binary protocol.
+- Read-only UART diagnostic console.
+- `stm32ctl` Python host client for `info`, `status`, `update`, and `reset`.
+- Runtime Security Monitor foundation in EXP066.
+- Deterministic build checker, release artifact validation, host tests, and HIL
+  tooling.
 
-## Repository structure
+Research or experimental components:
+
+- EXP067-EXP070 module-package, VM, native-loader, and atomic-install
+  simulations.
+- Runtime-monitor telemetry intended for evidence and diagnostics, not as an
+  isolated security enclave.
+- Physical recovery, option-byte policy, WRP/RDP provisioning, and
+  fault-injection campaigns.
+
+## Main Components
+
+| Component | Path | Purpose |
+|---|---|---|
+| Bootloader | `firmware/exp045_bootloader_v2` | Trusted Stage-0 verifier, boot policy, update mode, diagnostic console |
+| Application | `firmware/exp066_research_platform_core` | Slot-linked research platform, RSM, confirmation, LED heartbeat |
+| Shared layout | `config/`, `firmware/common/` | Generated STM32F429 flash and linker layout |
+| Update package tool | `tools/update_package.py` | Build, inspect, verify, and simulate update packages |
+| UART host client | `tools/stm32ctl/` | Host-side client for the bootloader binary protocol |
+| Factory metadata tool | `tools/boot_metadata_provision.c` | Create initial redundant `CONFIRMED` metadata records |
+| HIL framework | `tools/secure_boot_hil/` | Secure-boot hardware-in-the-loop campaign tooling |
+| Tests | `tests/` | Python tests and C host tests for verifier, update, UART, RSM, and tools |
+| Documentation | `docs/` | Architecture, validation, release, hardware, and research boundaries |
+
+## Repository Structure
 
 ```text
 .
-├── config/                 Generated-source memory layout configuration
-├── docs/                   Architecture, threat model, validation, and research notes
-├── firmware/               Bootloader, application, and experiment firmware
-├── hardware/               Hardware baselines and provisioning records
-├── logic/                  Logic-analyzer captures and timing observations
-├── logs/                   Curated experiment evidence
-├── modules/                Research platform modules and examples
-├── scripts/                Reproducible experiment scripts
-├── tests/                  Host-side tests
-├── third_party/            Vendored dependencies and license notices
-├── tools/                  Image, update, verification, and HIL tooling
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── SECURITY.md
-└── README.md
+|-- config/                 Source memory-layout profile
+|-- docs/                   Architecture, validation, release, and research docs
+|-- firmware/               Bootloader, application, and experiment firmware
+|-- hardware/               Curated hardware baselines and provisioning records
+|-- logs/                   Historical experiment evidence
+|-- modules/                Module-research examples and fixtures
+|-- scripts/                Experiment helper scripts
+|-- tests/                  Python and C host tests
+|-- third_party/            Vendored dependencies and license notices
+|-- tools/                  Signing, update, release, HIL, and host tools
+|-- CHANGELOG.md
+|-- CONTRIBUTING.md
+|-- SECURITY.md
+|-- CITATION.cff
+`-- README.md
 ```
 
-The numbered `expNNN_*` directories preserve the research history and make
-individual experiments traceable.
+The numbered `expNNN_*` directories preserve the research history. The current
+hardware-validated secure-update path is EXP045 plus EXP066.
 
-## Secure-boot validation
+## Hardware
 
-The hardware-in-the-loop framework performs positive and negative tests
-against the real target.
+The validated target is an STM32F429IGT6-class board with:
 
-Validated classes include:
+- ST-LINK-compatible SWD probe.
+- USART1 on PA9 TX and PA10 RX, 115200 baud, 8N1, 3.3 V TTL.
+- Active-low LEDs on LED1 PE3, LED2 PH10, LED3 PH11, LED4 PH12.
+- RDP Level 0 for the published hardware-validation evidence.
 
-- accepted authentic image;
-- modified payload;
-- invalid hash;
-- invalid signature;
-- malformed manifest fields;
-- invalid payload ranges;
-- authentication failures;
-- metadata and slot-selection behavior;
-- backup and restoration of protected flash regions.
+Use crossed UART wiring:
 
-The completed validation campaign produced:
-
-| Result | Count |
-|---|---:|
-| PASS | 15 |
-| FAIL | 0 |
-| ERROR | 0 |
-| SKIP | 0 |
-| Restore verified | Yes |
-
-The HIL runner verified restoration of the bootloader, metadata copies, slot A,
-and slot B after the campaign.
-
-Detailed test strategy and report semantics are documented under
-`tools/secure_boot_hil/docs/`.
-
-## Quick start
-
-### 1. Clone and enter the repository
-
-```bash
-Clone the repository using its GitHub page or an existing Git remote, then enter the working tree:
-
-```bash
-cd stm32-security-lab
+```text
+STM32 PA9 / USART1_TX  -> USB-UART RXD
+STM32 PA10 / USART1_RX <- USB-UART TXD
+GND                    -> USB-UART GND
 ```
 
-### 2. Install host dependencies
+Do not connect a 5 V serial adapter to the MCU pins. Do not change RDP or
+Option Bytes unless a separate, reviewed provisioning procedure explicitly
+requires it.
 
-Use the package manager appropriate for the development host. Typical tools
-include:
+More detail:
+
+- [Hardware Platform](docs/hardware-platform.md)
+- [Secure Update Hardware Test Plan](docs/secure-update-hardware-test.md)
+- [Hardware Validation Status](docs/release-readiness.md)
+
+## Prerequisites
+
+Typical Linux host tools:
 
 ```text
 arm-none-eabi-gcc
@@ -235,155 +167,327 @@ arm-none-eabi-binutils
 make
 python3
 python3-venv
-openocd
-stlink-tools
+openocd or stlink-tools
 ```
 
-### 3. Create the Python environment
+Python dependencies are listed in [requirements.txt](requirements.txt):
 
 ```bash
 python3 -m venv .venv-hil
 . .venv-hil/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python -m pip install -e tools/secure_boot_hil
+python -m pip install -e tools/secure_boot_hil[dev]
 ```
 
-### 4. Run host-side tests
+The repository never requires a private signing seed to run ordinary host
+tests. Building signed release packages requires an external 32-byte Ed25519
+signing seed supplied by path; private seeds must remain outside Git.
+
+## Build
+
+Build the bootloader:
 
 ```bash
-python -m pytest
-python -m ruff check .
+make -C firmware/exp045_bootloader_v2 clean all report LAYOUT_PROFILE=stm32f429_1m
 ```
 
-### 5. Build the bootloader and application
+Build the EXP066 application for the default slot:
 
 ```bash
-make -C firmware/exp045_bootloader_v2 clean all
-make -C firmware/exp066_research_platform_core clean all
+make -C firmware/exp066_research_platform_core clean all LAYOUT_PROFILE=stm32f429_1m
 ```
 
-### 6. Run hardware-in-the-loop validation
-
-Review the configured serial device, debugger, image paths, and target flash
-layout before running any hardware operation.
+Build Slot A and Slot B signed update releases:
 
 ```bash
-./run_hil_regression.sh
+make -C firmware/exp066_research_platform_core slot-releases \
+  LAYOUT_PROFILE=stm32f429_1m \
+  SIGNING_SEED=/path/to/release_signing_seed.bin \
+  PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
 ```
 
-The HIL runner can erase and rewrite flash. It should only be used with a
-recoverable target and verified backups.
+The current `stm32f429_1m` slot bases are:
 
-## Safety and authorization
+| Region | Address |
+|---|---:|
+| Bootloader | `0x08000000` |
+| Metadata A | `0x08008000` |
+| Metadata B | `0x0800c000` |
+| Slot A signed image | `0x08020000` |
+| Slot A payload/vector base | `0x08020200` |
+| Slot B signed image | `0x08080000` |
+| Slot B payload/vector base | `0x08080200` |
 
-This repository includes operations that can:
+The generated layout files are the authority for code and linker scripts.
 
-- erase or overwrite internal flash;
-- modify boot metadata;
-- change option bytes;
-- alter read-out or write protection;
-- disable normal debug access;
-- leave a target temporarily unbootable;
-- permanently restrict access when irreversible protection is enabled.
+## Flashing
 
-Do not perform these actions on devices that you do not own or have explicit
-authorization to test.
+Flashing is intentionally manual. Review every address before writing:
 
-RDP Level 2 may be irreversible. Consult the authoritative device
-documentation before changing protection settings.
+```bash
+st-flash write firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin 0x08000000
+st-flash write firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_update_v2.bin 0x08020000
+```
 
-## Threat model
+Create initial confirmed metadata:
 
-The project evaluates a software-controlled boot chain under a defined
-research threat model. It does not claim resistance against every physical
-attacker.
+```bash
+make -C tools boot-metadata-provision
+mkdir -p build/factory
+tools/build/boot_metadata_provision.bin create-confirmed \
+  --slot a \
+  --image-version 2 \
+  --sector-image \
+  --copy-a-output build/factory/boot_metadata_a.bin \
+  --copy-b-output build/factory/boot_metadata_b.bin \
+  --json-output build/factory/boot_metadata_provision.json
+st-flash write build/factory/boot_metadata_a.bin 0x08008000
+st-flash write build/factory/boot_metadata_b.bin 0x0800c000
+```
 
-Included concerns:
+The factory flow is documented in
+[Factory Provisioning Workflow](docs/factory_provisioning.md). It does not
+write Option Bytes, RDP, WRP, OTP, or any irreversible configuration.
 
-- unsigned or incorrectly signed firmware;
-- modified payloads;
-- malformed manifests;
-- invalid addresses and lengths;
-- stale firmware versions;
-- corrupted metadata;
-- interrupted update installation;
-- unexpected reset and recovery paths.
+## Tests
 
-Out of scope for the current validated baseline:
+Run all Python tests:
 
-- certified resistance to voltage, clock, electromagnetic, or laser fault injection;
-- side-channel resistance certification;
-- secure key storage backed by a dedicated hardware root of trust;
-- production provisioning at manufacturing scale;
-- formal verification of the complete boot chain;
-- resistance to decapsulation or invasive silicon analysis.
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest -q -p no:cacheprovider tests
+```
 
-See [`docs/threat_model.md`](docs/threat_model.md) and
-[`docs/limitations.md`](docs/limitations.md).
+Run C host tests:
 
-## Research workflow
+```bash
+make -C tests/host_verifier clean test
+make -C tests/update_storage clean test
+make -C tests/update_protocol clean test
+make -C tests/uart clean test
+make -C tests/diagnostic_console clean test
+make -C tests/rsm_core clean test
+make -C tools clean test
+```
 
-The repository follows a baseline-driven process:
+Run sanitizer variants where supported:
 
-1. capture the initial device state;
-2. implement one controlled security mechanism;
-3. verify expected positive behavior;
-4. inject negative and malformed cases;
-5. record UART, debugger, memory, and timing observations;
-6. restore the target;
-7. verify the restored state;
-8. document residual uncertainty.
+```bash
+make -C tests/host_verifier clean test SANITIZE=1
+make -C tests/update_storage clean test SANITIZE=1
+make -C tests/update_protocol clean test SANITIZE=1
+make -C tests/uart clean test SANITIZE=1
+make -C tests/diagnostic_console clean test SANITIZE=1
+make -C tools clean test SANITIZE=1
+```
 
-This approach is intended to separate observed hardware behavior from
-assumptions and to make later fault-injection work measurable.
+Run release checks:
 
-## Reproducibility
+```bash
+.venv-hil/bin/ruff check .
+.venv-hil/bin/mypy tools/stm32ctl tests/test_stm32ctl.py
+python3 tools/check_deterministic_build.py
+python3 tools/check_no_private_keys.py
+bash audit/run_repository_audit.sh
+git diff --check
+```
 
-Reproducibility is supported through:
+The GitHub CI workflow runs the same host, firmware, deterministic-build, and
+private-key checks without flashing hardware.
 
-- centrally generated memory-layout definitions;
-- deterministic build checks;
-- host-side image verification;
-- explicit negative tests;
-- flash-region backup and comparison;
-- machine-readable HIL reports;
-- preserved experiment scripts;
-- documented tool versions and test conditions.
+## Secure Boot
 
-Transient ST-LINK or USB failures may occur during repeated flashing. Such
-transport failures are reported separately from secure-boot test failures and
-should be evaluated using the captured command output.
+The bootloader accepts an image only when all of the following checks pass:
 
-## Limitations
+- canonical little-endian v2 manifest;
+- supported target compatibility and application image type;
+- image version allowed by policy;
+- payload range inside the selected slot;
+- initial MSP inside supported SRAM and 8-byte aligned;
+- Thumb reset vector inside the authenticated payload;
+- SHA-512 payload digest match;
+- Ed25519 signature over the serialized manifest;
+- final jump-context revalidation before `VTOR`, `MSP`, and branch.
 
-This is a research platform, not a drop-in production bootloader.
+Any malformed, corrupted, unsigned, downgraded, or structurally invalid image is
+rejected before execution.
 
-Before production use, an independent engineering and security review would
-still be required, including:
+See [Secure Boot Validation](docs/secure_boot_validation.md) and
+[Threat Model](docs/threat_model.md).
 
-- key-management design;
-- manufacturing provisioning;
-- lifecycle and revocation policy;
-- hardware-specific fault analysis;
-- recovery authorization;
-- secure update transport;
-- production logging policy;
-- formalized compatibility and migration guarantees.
+## Secure Update
 
-## Documentation
+The update chain keeps the full package out of RAM. The host sends the package
+through the `SUPD` UART binary protocol in bounded frames. The target:
 
-Start with:
+1. validates the header and signature before erasing the inactive slot;
+2. checks rollback policy before writing;
+3. commits `WRITING` metadata before candidate-slot erase;
+4. writes monotonic payload blocks only at the expected offset;
+5. keeps a streaming SHA-512 state during transfer;
+6. reads the installed image back from flash;
+7. verifies the installed manifest, signature, payload hash, padding, and
+   vector table;
+8. commits `CANDIDATE_READY` only after final verification;
+9. resets into the trial-boot path.
 
-- [`docs/project-motivation.md`](docs/project-motivation.md)
-- [`docs/hardware-platform.md`](docs/hardware-platform.md)
-- [`docs/architecture.md`](docs/architecture.md)
-- [`docs/threat_model.md`](docs/threat_model.md)
-- [`docs/secure_boot_validation.md`](docs/secure_boot_validation.md)
-- [`docs/validation-summary.md`](docs/validation-summary.md)
-- [`tools/secure_boot_hil/README.md`](tools/secure_boot_hil/README.md)
+Host update example:
 
-## Responsible use
+```bash
+PYTHONPATH=tools python3 -m stm32ctl \
+  --port /dev/ttyUSB0 \
+  --timeout 15 \
+  update \
+  --package firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin \
+  --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
+  --block-size 512
+```
+
+See [stm32ctl](docs/stm32ctl.md),
+[UART Binary Update Protocol](docs/uart-binary-protocol.md), and
+[Secure Update Audit](docs/secure-update-audit.md).
+
+## Runtime Security Monitor
+
+EXP066 includes a Runtime Security Monitor foundation. It reports public
+diagnostic evidence such as device family, flash size, reset cause, boot slot,
+health state, vector-monitor status, and event counters. Restricted diagnostics
+are disabled by default and must never be treated as authentication.
+
+Normal `HEALTHY` state uses a non-blocking LED4 heartbeat: 100 ms on, 900 ms
+off at the current health-service tick rate. Warning and fatal states use
+distinct patterns.
+
+See [Runtime Security Monitor](docs/runtime-monitor.md),
+[EXP066 CLI](docs/cli-reference.md), and
+[EXP071 Platform Integration](docs/exp071-platform-integration.md).
+
+## Hardware Validation Status
+
+Validated on real hardware at RDP Level 0:
+
+- secure boot from Slot A;
+- SHA-512 and Ed25519 execution before application jump;
+- slot selection and application handoff;
+- application confirmation;
+- A-to-B update to Slot B;
+- B-to-A update to Slot A;
+- rollback rejection for same and lower versions;
+- fail-closed rejection of corrupted manifest, target, signature, and payload;
+- UART CRC, sequence, partial-frame, and random-byte negative cases;
+- flash readback for positive update targets;
+- unchanged Option Bytes during the campaign.
+
+Host-only validation covers parser boundaries, verifier edge cases, metadata
+transitions, deterministic build reproducibility, package verification, and
+tool behavior.
+
+Not claimed by the current release:
+
+- RDP2 readiness;
+- production key custody or HSM-backed signing;
+- hardware-backed monotonic rollback counters;
+- physical recovery input;
+- certified fault-injection or side-channel resistance;
+- production remote-update authorization beyond signed firmware packages.
+
+See [Hardware Validation Status](docs/release-readiness.md) and
+[Validation Summary](docs/validation-summary.md).
+
+## Release Process
+
+Release preparation consists of:
+
+1. clean host tests and C host tests;
+2. deterministic build comparison;
+3. private-key scan;
+4. bootloader and Slot A/Slot B package verification;
+5. hardware-validation evidence for firmware or update-path changes;
+6. documentation and changelog review;
+7. annotated tag and GitHub release only after CI is green.
+
+Do not overwrite existing tags. If the previous tag exists, use the next patch
+tag.
+
+See [Release Process](docs/release_process.md),
+[Release Checklist](docs/RELEASE_CHECKLIST.md), and
+[Changelog](CHANGELOG.md).
+
+## Troubleshooting
+
+| Symptom | Likely cause | Check |
+|---|---|---|
+| `stm32ctl` timeout during update begin | Candidate-slot erase takes several seconds | Use `--timeout 15` or higher on real hardware |
+| `Slot decision = NONE` | Missing or invalid metadata | Recreate and flash both metadata copies |
+| SHA-512 or Ed25519 timing is `0 us` | Boot policy never selected an image | Inspect metadata and slot addresses |
+| Signature verification fails offline | Wrong public key or stale package report | Run `update_package.py verify` with current package hash |
+| App does not confirm trial boot | EXP066 did not reach the health gate | Use console `metadata`, `confirmation status`, and UART logs |
+| UART binary mode prints text | Entry classification failed or a terminal sent text | Reset and send a valid binary `HELLO` first |
+| ST-LINK write/read fails intermittently | Probe, USB, or target-state issue | Reconnect, reset target, and compare readback before debugging firmware |
+
+## FAQ
+
+**Is this production ready?**
+No. The secure-boot/update path is a hardware-validated research reference, not
+a certified product. Production use needs independent security review, key
+management, recovery policy, option-byte provisioning, and lifecycle design.
+
+**Does the repository contain a production signing key?**
+No. Private signing seeds and keys must remain outside Git. The committed public
+key header is not secret.
+
+**Can I enable RDP2?**
+No release document approves RDP2. RDP2 may be irreversible and is blocked until
+physical recovery and provisioning procedures are independently validated.
+
+**Can the host choose the update slot?**
+No. The host sends a signed package. The bootloader determines the inactive
+candidate slot from confirmed metadata and rejects mismatches.
+
+**Why is the signature over the manifest instead of the full payload?**
+The manifest contains the SHA-512 digest of the payload. Ed25519 authenticates
+the canonical manifest; SHA-512 binds the payload bytes to that signed
+manifest.
+
+**Why are some old experiment files still present?**
+The repository preserves numbered experiments as research history. Current
+release behavior is described by the EXP045, EXP066, `docs/`, `tools/`, and
+`tests/` paths linked above.
+
+## Known Limitations
+
+- No certified fault-injection, glitch, or side-channel resistance claim.
+- No production manufacturing key ceremony, rotation, revocation, or HSM flow.
+- No hardware-backed monotonic anti-rollback counter.
+- No physical recovery GPIO is selected in the repository.
+- No automatic Option Byte, WRP, RDP, or OTP provisioning.
+- No production remote-update authorization layer beyond signed packages and
+  rollback policy.
+- Physical power-removal timing should be repeated for each board and power
+  setup before irreversible provisioning.
+
+See [Limitations](docs/limitations.md).
+
+## Roadmap
+
+Short-term review work:
+
+- keep documentation, release notes, and hardware evidence current;
+- repeat physical power-removal tests with controlled target power;
+- add board-revision-specific LED and timing observations where available;
+- harden recovery entry and provisioning procedures before any RDP planning.
+
+Longer-term research:
+
+- hardware-backed rollback or monotonic policy storage;
+- write-protection and option-byte lifecycle studies;
+- physical fault-injection and brownout campaigns on expendable boards;
+- deeper Runtime Security Monitor evidence and boot mailbox design;
+- reviewed production key-custody model.
+
+See [Research Roadmap](docs/RESEARCH_ROADMAP.md).
+
+## Responsible Use
 
 The repository is published to support defensive research, education,
 reproducibility, and peer review. Users are responsible for complying with
@@ -392,38 +496,24 @@ laboratory safety procedures.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-Security reports should follow [`SECURITY.md`](SECURITY.md).
+See [Contributing](CONTRIBUTING.md). Security reports should follow
+[Security Policy](SECURITY.md).
 
 ## License
 
 Project-authored content is distributed under the
-[BSD 3-Clause License](LICENSE).
-
-Third-party components remain under their respective licenses.
+[BSD 3-Clause License](LICENSE). Third-party components remain under their
+respective licenses.
 
 ## Citation
 
-Citation metadata is provided in [`CITATION.cff`](CITATION.cff).
+Citation metadata is provided in [CITATION.cff](CITATION.cff).
 
 ## Author
 
-**Mathias Zimmermann**
-
-STM32 Security Lab is an independent embedded security research project
-created and maintained by Mathias Zimmermann.
-
-The project documents practical research on secure boot, authenticated
-firmware updates and embedded security on STM32F429 devices.
-
-## Development
-
-This repository was developed by Mathias Zimmermann.
-
-AI tools were used during development for documentation editing,
-refactoring suggestions, test generation and code review.
-
-System architecture, implementation decisions, debugging, hardware
-validation and final integration were performed manually on real STM32
+STM32 Security Lab is an independent embedded-security research project created
+and maintained by Mathias Zimmermann. AI tools were used during development for
+documentation editing, refactoring suggestions, test generation, and code
+review; system architecture, implementation decisions, debugging, hardware
+validation, and final integration were performed manually on real STM32
 hardware.

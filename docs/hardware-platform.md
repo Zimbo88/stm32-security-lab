@@ -28,6 +28,27 @@ Board revisions may expose additional peripherals. Their presence should be
 verified against the board schematic rather than inferred from similar
 development boards.
 
+## Validated Configuration
+
+The current release evidence was collected on an STM32F429IGT6-class board at
+RDP Level 0 with ST-LINK and USART1 attached. The secure-boot and dual-slot
+secure-update path was validated with the generated `stm32f429_1m` layout
+profile.
+
+Confirmed board-local signals used by the current firmware:
+
+| Signal | GPIO | Notes |
+|---|---|---|
+| USART1 TX | PA9 | 115200 baud, 8N1, 3.3 V TTL |
+| USART1 RX | PA10 | 115200 baud, 8N1, 3.3 V TTL |
+| LED1 | PE3 | Active-low |
+| LED2 | PH10 | Active-low |
+| LED3 | PH11 | Active-low |
+| LED4 | PH12 | Active-low, normal EXP066 heartbeat |
+
+No physical update or recovery GPIO has been selected. Do not invent one from a
+similar board without repository-backed pinout evidence.
+
 ## Debug and serial interfaces
 
 The HIL framework expects:
@@ -65,6 +86,10 @@ Before running destructive or protection-related experiments:
 6. avoid irreversible protection until recovery is no longer required.
 
 RDP Level 2 may permanently disable normal debug access.
+
+The current public release does not approve RDP1, RDP2, WRP, OTP, or Option
+Byte provisioning. All hardware-validation evidence for the release was
+collected with Option Bytes read only and left unchanged.
 
 ## ST-LINK reliability note
 

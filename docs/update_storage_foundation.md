@@ -1,9 +1,11 @@
 # Update Storage Foundation
 
-This document covers only the storage and metadata foundation for a later
-authenticated firmware update flow. It does not implement package installation,
-Stage-0 slot selection, trial boot, application confirmation, fallback policy,
-transport, option-byte programming, WRP, RDP, or hardware flash programming.
+This document records the storage and metadata foundation that later secure
+update phases build on. The current release also implements package
+installation, Stage-0 slot selection, trial boot, application confirmation,
+fallback policy, UART transport, and the reviewed STM32F429 target flash
+backend. Option-byte programming, WRP, RDP, and hardware-backed rollback remain
+out of scope.
 
 The follow-on host-simulated authenticated package and inactive-slot installer
 phase is documented in `docs/authenticated_update_installation.md`.
@@ -22,13 +24,14 @@ application payload. The recovery region is outside both slots and ends exactly
 at the 1 MiB flash boundary `0x08100000`. The previous 2 MiB map is retained
 only as the explicit `stm32f429_2m` legacy/reference profile.
 
-The current application and signer compatibility constants still alias Slot A:
+The initial foundation phase used Slot A as the factory compatibility target:
 
 - signed-image base: `0x08020000`
 - application vector base: `0x08020200`
 - maximum payload: `0x0005fe00` bytes
 
-Slot B constants are generated now for later update policy:
+The current source also uses generated Slot B constants for the inactive-slot
+update path:
 
 - signed-image base: `0x08080000`
 - application vector base: `0x08080200`
@@ -173,18 +176,14 @@ The host tests cover:
 The tests do not flash hardware and do not validate STM32 flash-controller
 register sequencing.
 
-## Remaining Limitations
+## Remaining Production Limitations
 
-This phase is not a complete updater. The following remain for later phases:
+The current release has completed the research updater path, but the following
+remain outside the production security boundary:
 
-- authenticated update package parsing and signature verification
-- installing images into the inactive slot
-- Stage-0 slot selection
-- trial boot and boot-attempt accounting in Stage 0
-- application confirmation API
-- automatic fallback
-- rollback-floor persistence
-- transport and recovery policy
-- target flash-controller backend
-- hardware validation of erase/program timing and power-loss behavior
-- hardware-backed metadata protection or anti-rollback
+- hardware-backed rollback-floor persistence;
+- physical recovery input and recovery authorization;
+- WRP/RDP/Option-Byte provisioning;
+- production key custody and revocation;
+- repeated controlled physical power-loss evidence for each target setup;
+- hardware-backed metadata protection or anti-rollback.

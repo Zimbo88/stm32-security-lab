@@ -2,10 +2,11 @@
 
 This phase adds deterministic Stage-0 slot selection, pending-trial boot
 attempt accounting, application confirmation, fallback to the last confirmed
-slot, and host simulation. It does not add UART transport, USB DFU, networking,
-option-byte programming, WRP, RDP, production flash programming,
-hardware-backed rollback protection, irreversible provisioning, or hardware
-flashing.
+slot, and host simulation. The current release also includes the UART
+secure-update transport and reviewed STM32F429 target flash backend. It still
+does not add USB DFU, networking, option-byte programming, WRP, RDP,
+hardware-backed rollback protection, irreversible provisioning, or automatic
+hardware flashing.
 
 ## Security Boundary
 
@@ -105,7 +106,7 @@ through the metadata API. No host or CI command performs hardware flashing.
 ## Hardware Limitations
 
 The STM32F429 target flash backend is implemented for the reviewed internal
-flash layout, but physical erase/program behavior still requires controlled
-hardware validation on the exact target. CI and default host workflows do not
-flash hardware. WRP/RDP, option-byte policy, irreversible provisioning, and
-hardware-backed rollback protection remain deferred.
+flash layout and has RDP0 hardware evidence for the secure-update path. CI and
+default host workflows do not flash hardware. WRP/RDP, Option-Byte policy,
+irreversible provisioning, physical recovery, and hardware-backed rollback
+protection remain deferred.

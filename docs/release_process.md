@@ -1,8 +1,9 @@
 # Release Process
 
-This document describes the current reproducible release workflow for the
-laboratory secure-boot baseline. It does not add firmware update transport,
-recovery mode, option-byte provisioning, RDP, WRP, or production key handling.
+This document describes the reproducible release workflow for the current
+laboratory secure-boot and secure-update baseline. It builds, signs, verifies,
+and packages artifacts; it does not flash hardware, change Option Bytes,
+enable RDP/WRP, or provide production key custody.
 
 ## Scope
 
@@ -18,8 +19,10 @@ The release workflow covers:
 - release manifest generation
 - deterministic rebuild comparison
 
-The workflow is host-only. It does not flash hardware and does not prove
-hardware boot behavior.
+The workflow is host-only. It does not flash hardware by itself. Hardware boot
+and secure-update behavior are covered by the separate validation procedure in
+`docs/secure-update-hardware-test.md` and summarized in
+`docs/release-readiness.md`.
 
 ## Build Inputs
 
@@ -220,11 +223,12 @@ not a production signing key and is not a release trust anchor.
 
 ## Security Boundaries
 
-This workflow improves supply-chain integrity and reproducibility evidence. It
-does not provide:
+This workflow improves supply-chain integrity and reproducibility evidence. The
+repository contains a research UART update transport, but the release workflow
+itself does not provide:
 
-- firmware update transport
-- physical recovery
+- hardware flashing or field deployment automation
+- physical recovery input
 - hardware-backed rollback counters
 - option-byte provisioning
 - RDP or WRP configuration

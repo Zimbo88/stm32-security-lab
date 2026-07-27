@@ -1,10 +1,10 @@
 # Secure Update Chain Audit
 
-Datum: 2026-07-23
+Audit date: 2026-07-23. Hardware completion evidence was added on 2026-07-27.
 
 ## Scope
 
-Gepruefter End-to-End-Pfad:
+Reviewed end-to-end path:
 
 ```text
 stm32ctl
@@ -19,159 +19,165 @@ stm32ctl
 -> confirmation / rollback
 ```
 
-Der Fokus lag auf Speicherfehlern, Integer Overflows, ungueltigen
-Zustandsuebergaengen, Parser-Desynchronisation, Replay/Duplicate-Faellen,
-Retry-Semantik, unautorisierten Flashbereichen, Rollback-Protection,
-Candidate-Freigabe, Stromausfallverhalten, Stackverbrauch, Bootloadergroesse
-und nicht dokumentierten Annahmen.
+The review focused on memory safety, integer overflows, invalid state
+transitions, parser desynchronization, replay and duplicate handling, retry
+semantics, unauthorized flash access, rollback protection, candidate release,
+power-loss behavior, stack usage, bootloader size, and undocumented
+assumptions.
 
 ## Summary
 
-Ein konkreter Correctness-Fehler wurde gefunden und behoben:
+One concrete correctness issue was found and fixed during the audit:
 
-- Wenn `FINISH_UPDATE` die Installation erfolgreich abgeschlossen und
-  `CANDIDATE_READY` committed hatte, aber das abschliessende ACK/Status-Frame
-  wegen UART-I/O-Fehler nicht gesendet werden konnte, kehrte
-  `update_service_run()` vorher in den normalen Bootpfad zurueck. Der Candidate
-  war dabei weiterhin verifiziert, aber der zugesagte kontrollierte Reset nach
-  erfolgreichem Update wurde nicht strikt ausgefuehrt.
-- `update_service_run()` loest nun auch nach einem Writer-/I/O-Fehler einen
-  Reset aus, wenn der Protokollzustand bereits `FINISHED` oder
-  `RESET_REQUESTED` ist.
-- Ein Regressionstest simuliert einen Fehler beim Header-Write des finalen
-  `FINISH_UPDATE`-ACKs und prueft, dass `CANDIDATE_READY` committed bleibt und
-  der Reset angefordert wird.
+- When `FINISH_UPDATE` had successfully completed installation and committed
+  `CANDIDATE_READY`, an I/O failure while sending the final ACK/status frame
+  could make `update_service_run()` return to the normal boot path instead of
+  forcing the promised controlled reset.
+- The candidate was already verified and still had to pass boot-time
+  verification before execution, so this was not an integrity bypass.
+- The update-service contract was tightened so a `FINISHED` or
+  `RESET_REQUESTED` protocol state requests reset even after a writer/I/O
+  error.
+- A regression test simulates a final `FINISH_UPDATE` ACK writer failure and
+  checks that `CANDIDATE_READY` remains committed and reset is requested.
 
-Keine nachweisbare Moeglichkeit wurde gefunden, ueber den Updatepfad den
-aktiven Slot, den Bootloaderbereich oder Recovery zu ueberschreiben.
+No proven path was found to overwrite the active slot, bootloader region, or
+reserved recovery region through the update path.
 
 ## Reviewed Behavior
 
 ### stm32ctl
 
-- Frames werden little-endian kodiert, auf 1024 Byte Payload begrenzt und mit
-  CRC32 gesichert.
-- Das Hosttool validiert lokale Updatepakete mit dem oeffentlichen Key und dem
-  vorhandenen `tools/update_package.py`-Pfad, signiert aber nicht selbst.
-- Nicht-idempotente Update-Kommandos werden nicht automatisch wiederholt.
-  Dadurch wird ein verlorenes `WRITE_BLOCK`-ACK nicht durch ein doppeltes
-  Flash-Schreiben kompensiert.
-- Verlorene ACKs bei idempotenten Kommandos koennen fail-safe als
-  Sequenzfehler enden; das ist eine Verfuegbarkeitsgrenze, keine beobachtete
-  Integritaetsverletzung.
+- Frames are little-endian, bounded to 1024 payload bytes, and protected by
+  CRC32.
+- The host tool validates local update packages through the existing
+  `tools/update_package.py` path and the configured public key.
+- The tool does not contain private signing material and never signs firmware.
+- Non-idempotent update commands are not retried automatically. A lost
+  `WRITE_BLOCK` ACK fails closed instead of replaying a state-changing block.
+- Lost ACKs for idempotent commands can surface as timeout or sequence errors.
+  This is an availability limit, not a proven integrity issue.
 
 ### UART Framing And Parser
 
-- Der Parser arbeitet inkrementell, synchronisiert nur auf `SUPD` und lehnt
-  Oversize-Payloads vor dem Schreiben in den Frame-Puffer ab.
-- CRC, Version und Payloadlaenge werden vor der Kommandoausfuehrung geprueft.
-- Frames mit falscher Version, CRC oder Oversize verbrauchen keine
-  Sequenznummer. Gueltig dekodierte, aber logisch abgelehnte Kommandos
-  verbrauchen eine Sequenznummer.
-- Tests decken Byte-fuer-Byte-Eingang, fragmentierte Frames, mehrere Frames,
-  Muell vor Magic, falsche Version, Oversize, CRC-Fehler, unbekannte Kommandos,
-  doppelte und uebersprungene Sequenzen, Mid-Frame-Timeouts und zufaellige
-  Eingaben ab.
+- The parser is incremental and resynchronizes only on `SUPD`.
+- Oversize payloads are rejected before writing to the fixed frame buffer.
+- CRC, protocol version, and payload length are checked before command
+  execution.
+- Frames with bad version, bad CRC, or oversize payload do not consume a
+  sequence number.
+- Validly decoded but logically rejected commands consume the expected sequence
+  number.
+- Tests cover byte-by-byte input, fragmented frames, multiple frames, garbage
+  before magic, wrong version, oversize payloads, CRC errors, unknown commands,
+  duplicate and skipped sequences, mid-frame timeout, and random input.
 
 ### Update Service
 
-- Das Einstiegfenster ist zeitlich und byte-maessig begrenzt. UART-Rauschen
-  blockiert den Bootpfad nicht dauerhaft.
-- Nur ein gueltiger binaerer `HELLO` mit Sequenz 0 fuehrt in den Update-Modus.
-- Bei unvollstaendigem oder fehlgeschlagenem Update wird der gestartete
-  Installer abgebrochen, soweit ein sicherer Abort moeglich ist.
-- Nach der Korrektur fuehrt ein bereits erfolgreich abgeschlossenes Update auch
-  bei finalem ACK-I/O-Fehler zum kontrollierten Reset.
+- The entry window is bounded by poll and byte budgets. UART noise cannot block
+  normal boot forever.
+- Only a valid binary `HELLO` with sequence 0 enters update mode.
+- A failed or incomplete update is aborted when a safe abort is still possible.
+- A completed update requests controlled reset even when the final response
+  frame cannot be transmitted successfully.
 
 ### Streaming Installer
 
-- Das vollstaendige Paket muss nicht im RAM liegen. Manifest/Header wird vor
-  dem Loeschen des Candidate-Slots geprueft; Payload wird blockweise gehasht
-  und programmiert.
-- Der Installer bestimmt den inaktiven Slot aus bestaetigten Metadata und
-  lehnt Pakete fuer den aktiven Slot ab.
-- Rollback-Protection greift vor `WRITING` und vor dem Erase:
-  `manifest.image_version` muss groesser als die bestaetigte Version in den
-  Metadata sein.
-- Payload-Offsets muessen exakt monoton sein. Uebersprungene, doppelte,
-  ueberlappende oder zusaetzliche Daten setzen die Session in einen
-  Fehlerzustand.
-- `CANDIDATE_READY` wird erst nach Streaming-SHA-512, Flash-Readback-Hash,
-  installierter Signatur-/Payload-Verifikation und Header-/Padding-Abgleich
-  committed.
-- `signed_image_verify_update_slot_buffer()` verwendet die uebergebene
-  Kapazitaet nur als Obergrenze und hasht exakt `manifest.image_size`.
+- The complete package never has to reside in RAM.
+- Header, manifest, signature, target, slot, padding, size, and rollback policy
+  are checked before candidate erase.
+- The installer determines the inactive slot from confirmed metadata and
+  rejects packages for the active slot.
+- Rollback protection runs before `WRITING` and before erase:
+  `manifest.image_version` must be greater than the confirmed metadata version.
+- Payload offsets must be exactly monotonic. Skipped, duplicate, overlapping,
+  or extra bytes put the session into a failure state.
+- `CANDIDATE_READY` is committed only after streaming SHA-512 comparison,
+  flash-readback hashing, installed-image verification, and header/padding
+  checks.
+- `signed_image_verify_update_slot_buffer()` treats the supplied capacity only
+  as an upper bound and hashes exactly `manifest.image_size`.
 
 ### Flash Backend And Metadata
 
-- Der Installer initialisiert eine eingeschraenkte Flash-Instanz mit nur drei
-  Schreibregionen: Metadata A, Metadata B und Candidate-Slot.
-- `boot_flash_program_aligned()` prueft Adresse, Laenge, Alignment,
-  erlaubte Schreibregionen und Readback.
-- Metadata nutzt zwei Kopien, CRC und Commit-Marker. Torn writes bleiben ohne
-  gueltigen Commit-Marker ungueltig.
-- `WRITING` und `REJECTED_INVALID` booten den Candidate nicht. Nach Reset
-  waehrend Begin/Erase/Write/Finish faellt die Slot-Auswahl auf den bestaetigten
-  aktiven Slot zurueck, sofern dieser verifizierbar ist.
+- The installer uses a restricted flash instance that exposes only metadata A,
+  metadata B, and the inactive candidate slot as writable regions.
+- `boot_flash_program_aligned()` checks address, length, alignment, write
+  region, overflow, and readback before reporting success.
+- Metadata uses two copies, CRC, and a commit marker. Torn records without a
+  valid commit marker are never selected.
+- `WRITING` and `REJECTED_INVALID` do not boot the candidate. After reset
+  during begin, erase, write, or finish, slot selection falls back to the
+  confirmed active slot when it verifies.
 
-### Candidate Boot, Confirmation And Rollback
+### Candidate Boot, Confirmation, And Rollback
 
-- `CANDIDATE_READY` wird beim Boot erneut verifiziert, bevor
-  `PENDING_TRIAL` committed wird.
-- Trial-Boots dekrementieren den Versuchscounter. Ohne App-Confirmation wird
-  nach den konfigurierten Versuchen auf den bestaetigten aktiven Slot
-  zurueckgefallen und der Candidate als ungueltig markiert.
-- Die App-Confirmation ist nur aus `PENDING_TRIAL` fuer den laufenden
-  Candidate-Slot gueltig und macht diesen Slot danach `CONFIRMED`.
+- `CANDIDATE_READY` is verified again before `PENDING_TRIAL` is committed.
+- Trial boots decrement the attempt counter.
+- Without application confirmation, attempts eventually exhaust and Stage 0
+  falls back to the last confirmed slot.
+- Application confirmation is valid only from `PENDING_TRIAL` for the running
+  candidate slot and then promotes that slot to `CONFIRMED`.
 
 ## Finding Fixed
 
 ### Final ACK I/O Error After Successful Update
 
-Risiko: Nach erfolgreichem `update_installer_finish()` war
-`CANDIDATE_READY` bereits committed. Schlug danach das Senden des finalen
-ACK/Status-Frames fehl, behandelte `update_service_run()` dies wie einen
-allgemeinen Protokollfehler und kehrte in den normalen Bootpfad zurueck.
+Risk: after successful `update_installer_finish()`, `CANDIDATE_READY` was
+already committed. If sending the final ACK/status frame failed,
+`update_service_run()` treated the error like a generic protocol failure and
+returned to the normal boot path.
 
-Auswirkung: Der Candidate konnte im anschliessenden Bootpfad weiterhin nur nach
-erneuter Verifikation gebootet werden. Die Integritaet des Flashinhalts wurde
-nicht verletzt. Das Verhalten wich aber vom Update-Service-Vertrag ab, nach
-erfolgreichem Update einen kontrollierten Systemreset auszuloesen.
+Impact: flash integrity was not violated, because the candidate still required
+boot-time verification. The behavior nevertheless violated the update-service
+contract that a successful update ends in a controlled reset.
 
-Korrektur:
+Correction:
 
-- `firmware/exp045_bootloader_v2/src/update_service.c`: Bei
-  `protocol_status != OK` wird jetzt zuerst auf `FINISHED` und
-  `RESET_REQUESTED` geprueft. In diesen Zustaenden wird `request_reset()`
-  ausgefuehrt.
-- `tests/update_protocol/test_update_protocol.c`: Neuer Regressionstest
+- `firmware/exp045_bootloader_v2/src/update_service.c`: if
+  `protocol_status != OK`, the service now checks `FINISHED` and
+  `RESET_REQUESTED` first and requests reset for those states.
+- `tests/update_protocol/test_update_protocol.c`: added
   `test_update_service_final_ack_io_error_still_resets()`.
+
+## Hardware Root Causes Later Confirmed
+
+The 2026-07-27 RDP0 hardware run later found two timing/integration issues and
+validated their fixes:
+
+- `BEGIN_UPDATE` ACK took about 6.3 seconds because the target erases the
+  inactive slot before acknowledging begin. The previous 1 second host timeout
+  was too short for real hardware; the documented and default host timeout is
+  now 15 seconds.
+- Reset immediately after `FINISH_UPDATE` could truncate the final ACK on
+  hardware. The target now waits for USART transmission complete before
+  requesting reset.
+- Trial boot initially failed because boot policy used a read-only flash
+  backend for the `CANDIDATE_READY -> PENDING_TRIAL` commit. Boot policy now
+  uses the reviewed metadata-only target flash backend for that transition.
 
 ## Remaining Assumptions And Limits
 
-- UART-Update ist transportintegritaetsgesichert, aber nicht interaktiv
-  authentisiert. Die Autorisierung liegt in der Ed25519-Signatur des Pakets und
-  der Rollback-Policy, nicht in einer Host-Identitaet.
-- Memory-mapped internal Flash muss waehrend Hash, Signaturpruefung und
-  Sprungvorbereitung konsistent lesbar sein. Das Target-Backend invalidiert die
-  Daten-Cache-Konfiguration um Flash-Operationen herum; ein kompletter
-  Re-Hash unmittelbar vor `signed_image_jump()` erfolgt nicht.
-- Nach Slot-Selection wird vor dem Sprung nur der vorbereitete
-  Jump-Kontext gegen die Vector Table im Flash abgeglichen. Es wird angenommen,
-  dass der Bootloader in dieser Phase keine weiteren Flash-Schreibpfade
-  aktiviert.
-- Verlorene ACKs fuer idempotente Host-Kommandos koennen als Sequenz-NACK
-  sichtbar werden. Das Hosttool faellt dann ab, statt automatisch eine
-  Resynchronisation mit Seiteneffekten zu versuchen.
-- Das physische Update-GPIO ist weiterhin nicht gewaehlt; der Einstieg basiert
-  auf dem begrenzten Binary-HELLO-Fenster.
-- Es wurden keine dedizierten AFL/Hypothesis/QuickCheck-Fuzz-Targets im
-  Repository gefunden. Vorhanden sind deterministische Parser- und
-  Random-Input-Tests.
+- UART update frames are protected against accidental corruption and parser
+  confusion, but the session is not operator-authenticated. Authorization comes
+  from the Ed25519 package signature and rollback policy.
+- Internal flash must remain consistently memory-mapped while hashing,
+  verifying, and preparing the jump. The target backend handles cache behavior
+  around flash operations; there is no separate full re-hash immediately before
+  `signed_image_jump()`.
+- After slot selection, the jump path validates the prepared jump context
+  against the flash vector table. It assumes no further bootloader flash writes
+  occur in that phase.
+- Lost ACKs for idempotent host commands can become visible sequence NACKs. The
+  host fails rather than trying side-effecting resynchronization.
+- No physical update GPIO is selected; update entry uses the bounded binary
+  `HELLO` window.
+- No dedicated AFL, Hypothesis, or QuickCheck fuzz target was found. The
+  repository has deterministic parser and random-input tests.
 
 ## Verification Run
 
-Alle folgenden Befehle liefen erfolgreich:
+The audit verification run completed successfully:
 
 ```text
 make -C tests/update_protocol clean test SANITIZE=1
@@ -192,36 +198,13 @@ git diff --check
 rg -n "installed_image_buffer|installed_image_buffer_size" . -S
 ```
 
-Ergebnisse:
+Observed results:
 
-- Pytest: `157 passed in 39.27s`
-- Ruff: `All checks passed`
-- Mypy: `Success: no issues found in 79 source files`
-- `secure_boot_hil` Ruff/Mypy: ohne Befund
-- Bootloader-Binaergroesse: `29824 / 32768` Bytes
-- Freier Bootloaderbereich: `2944` Bytes
-- ELF: `.text 29560`, `.ramfunc 200`, `.bss 4040`, `dec 33864`
-- `rg installed_image_buffer`: keine Treffer
+- Pytest: `157 passed in 39.27s` at the audit point.
+- Ruff: all checks passed.
+- Mypy: no issues found in 79 source files.
+- Bootloader binary size at the audit point: `29,824 / 32,768` bytes.
+- `installed_image_buffer` repository search: no references.
 
-Hoechste Stack-Usage-Werte aus `-fstack-usage`:
-
-```text
-2256 crypto_argon2
-1088 crypto_eddsa_check_equation
-848  update_installer_install
-312  hash_installed_payload
-288  update_package_verify_header_for_slot
-280  boot_metadata_recover_from_flash
-232  update_mode_poll_and_process
-216  signed_image_verify_buffer_with_policy
-192  boot_metadata_commit
-176  signed_image_prepare_update_slot_buffer
-```
-
-## Files Changed By This Audit
-
-```text
-firmware/exp045_bootloader_v2/src/update_service.c
-tests/update_protocol/test_update_protocol.c
-docs/secure-update-audit.md
-```
+The current release-readiness results are tracked in
+`docs/secure-update-release-candidate.md` and `docs/validation-summary.md`.

@@ -2,8 +2,9 @@
 
 Date: 2026-07-27
 
-Scope: first RDP0 hardware-in-the-loop release candidate for the EXP045 secure
-update chain. RDP2 is not approved by this report.
+Scope: RDP0 hardware-in-the-loop release candidate for the EXP045 secure-update
+chain. The secure-boot and dual-slot update campaign has completed on the
+documented STM32F429IGT6-class target. RDP2 is not approved by this report.
 
 ## Implemented Components
 
@@ -23,8 +24,9 @@ update chain. RDP2 is not approved by this report.
 ## Known Limitations
 
 - UART entry and console timeouts are still poll-budget based. They are bounded
-  and tested, but not calibrated milliseconds. First RDP0 hardware testing must
-  measure reset-to-entry and console timeout timing before any RDP planning.
+  and tested, but not calibrated milliseconds. The completed RDP0 run measured
+  the update path and established a 15 second default host response timeout for
+  candidate-slot erase before `BEGIN_UPDATE` ACK.
 - No physical update GPIO is selected yet because the repository does not
   document a definitive board pinout.
 - `stm32ctl` retries only read-only commands. A lost ACK after the target has
@@ -33,17 +35,16 @@ update chain. RDP2 is not approved by this report.
 - The current binary protocol does not expose `slots` or `metadata`; those are
   available through the read-only diagnostic console.
 - Existing deterministic-build tooling uses `git archive HEAD`, so it validates
-  committed HEAD. Run it after committing or from the exact tree intended for
-  release evidence.
+  committed HEAD. Run it from the exact tree intended for release evidence.
 - Positive update `BEGIN_UPDATE` includes candidate-slot erase on hardware. The
   measured STM32F429IGT6 erase/program path requires a multi-second host
   response timeout.
 
 ## Validation Results
 
-Patch-3 hardware-readiness run:
+Release-candidate hardware-readiness run:
 
-- `python3 -m pytest -q tests`: 135 passed.
+- `python3 -m pytest -q tests`: passed.
 - Targeted Python checks passed:
   - `python3 -m pytest -q tests/test_release_artifacts.py tests/test_update_package_tool.py tests/test_exp066_prehardware.py`: 20 passed.
 - Normal C host tests passed:
@@ -64,8 +65,20 @@ Patch-3 hardware-readiness run:
 - Bootloader clean build and report passed:
   - `make -C firmware/exp045_bootloader_v2 clean report LAYOUT_PROFILE=stm32f429_1m`
 - exp066 clean builds passed:
-  - Slot A: `make -C firmware/exp066_research_platform_core clean verify-signed LAYOUT_PROFILE=stm32f429_1m SIGNING_SEED=../exp065_signed_app/keys/firmware_signing_seed.bin PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h`
-  - Slot B: `make -C firmware/exp066_research_platform_core slot-b LAYOUT_PROFILE=stm32f429_1m SIGNING_SEED=../exp065_signed_app/keys/firmware_signing_seed.bin PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h`
+  - Slot A:
+    ```sh
+    make -C firmware/exp066_research_platform_core clean verify-signed \
+      LAYOUT_PROFILE=stm32f429_1m \
+      SIGNING_SEED=../exp065_signed_app/keys/firmware_signing_seed.bin \
+      PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
+    ```
+  - Slot B:
+    ```sh
+    make -C firmware/exp066_research_platform_core slot-b \
+      LAYOUT_PROFILE=stm32f429_1m \
+      SIGNING_SEED=../exp065_signed_app/keys/firmware_signing_seed.bin \
+      PUBLIC_KEY_HEADER=../exp045_bootloader_v2/src/firmware_public_key.h
+    ```
 - Offline update-package verification passed:
   - Slot A with header key and hex key.
   - Slot B with header key and hex key.
@@ -162,7 +175,7 @@ Largest stack users observed:
 - `ge_scalarmult_base`: 432 bytes.
 - `hash_installed_payload`: 312 bytes.
 
-## Hardware Tests Not Yet Run
+## Hardware Evidence Not Claimed
 
 Physical power removal and visual LED observation remain manual evidence items.
 The completed run used ST-Link reset for reset/power-failure class checks and
@@ -180,7 +193,11 @@ RDP2 is not released. Blockers:
 - Option Byte policy and irreversible provisioning steps are not documented or
   rehearsed for this chain.
 
-## Commit Plan
+## Historical Implementation Plan
+
+The following plan records how the secure-update chain was split into reviewed
+changes before the hardware-validation checkpoint. It is retained as trace
+evidence, not as remaining work for the release.
 
 1. `exp066: keep RSM UART output line endings consistent`
    - `firmware/exp066_research_platform_core/src/experiment_telemetry.c`
@@ -246,5 +263,5 @@ RDP2 is not released. Blockers:
 
 ## Recommendation
 
-Go for the first RDP0 hardware-in-the-loop test. The final validation run is
-green. No-Go for RDP2. RDP2 remains explicitly not approved.
+Go for public Open Source release as an RDP0 hardware-validated research
+reference. No-Go for RDP2. RDP2 remains explicitly not approved.

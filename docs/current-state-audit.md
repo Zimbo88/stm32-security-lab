@@ -3,19 +3,17 @@
 Audit date: 2026-07-17. This audit is based on repository inspection and
 offline builds only. No board was flashed, erased, reset, or reconfigured.
 
-Post-audit hardening note: subsequent commits corrected the EXP066 vector
-table, introduced the generated STM32F429 memory layout, tightened canonical
-manifest validation, hardened the signer, added host C verifier tests, and
-added CI/reproducibility checks. A later Stage-0 hardening pass added
-redundant pre-jump validation, compile-time layout assertions, final flash
-vector re-read before handoff, and expanded malformed-image boundary tests.
-The release workflow now generates HEX artifacts, verifies signed images and
-complete release artifact sets offline, emits structured release manifests, and
-compares ELF/BIN/HEX/signed-image/release-JSON outputs across archived source
-trees. Historical observations below are preserved as audit evidence; use
-`firmware/exp045_bootloader_v2/README.md`, `docs/memory_layout.md`,
-`docs/secure_boot_validation.md`, `docs/release_process.md`, and the current
-source for the implemented baseline.
+Post-audit hardening note: this file is a historical audit snapshot, not the
+current release-readiness report. Subsequent commits corrected the EXP066
+vector table, introduced the generated STM32F429 memory layout, tightened
+canonical manifest validation, hardened the signer, added host C verifier
+tests, added CI/reproducibility checks, implemented the secure-update-v2 UART
+path, and completed RDP0 A/B update hardware validation. Historical
+observations below are preserved as audit evidence; use
+`README.md`, `firmware/exp045_bootloader_v2/README.md`,
+`docs/memory_layout.md`, `docs/secure_boot_validation.md`,
+`docs/release_process.md`, `docs/release-readiness.md`, and the current source
+for the implemented baseline.
 
 ## Repository overview
 

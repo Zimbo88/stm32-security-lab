@@ -1,9 +1,10 @@
 # Secure Update Hardware Test Plan
 
-This is the first hardware-in-the-loop plan for the EXP045 secure-update
-chain. It is explicitly an RDP0 test plan. Do not enable RDP1 or RDP2, do not
-change Option Bytes, and do not rely on the ST ROM bootloader for the update
-path.
+This is the RDP0 hardware-in-the-loop plan for the EXP045 secure-update chain.
+The core secure-boot and A/B update path has been validated on an
+STM32F429IGT6-class board at RDP Level 0. Repeat the plan for each new board
+revision or power setup. Do not enable RDP1 or RDP2, do not change Option
+Bytes, and do not rely on the ST ROM bootloader for the update path.
 
 Use these shell variables in the examples:
 
@@ -47,14 +48,14 @@ versions for the positive tests.
 | C2 binary status | Same as C1. | `python3 -m stm32ctl --port "$PORT" status` | Binary ACKs for HELLO and GET_STATUS; host prints session and installer state. | Unchanged. | No boot while command owns update entry. | Exit code 0 and status decodes. | Reset target and retry. |
 | C3 text console | Send a text line instead of binary HELLO. | `python3 -m serial.tools.miniterm "$PORT" 115200`, then type `help` and `boot`. | `diagnostic console readonly`, prompt, command list, then `boot`. | Unchanged. | A. | Console commands are read-only and `boot` continues normal boot. | Reset target. |
 | C4 entry timeout | Do not send any UART byte after reset. | `python3 -m serial.tools.miniterm "$PORT" 115200` | Normal boot banner after entry window expires. | Unchanged. | A. | No indefinite wait; application starts. | Reset target. |
-| C5 random UART noise | Send random bytes that do not form a valid frame or text line. | `python3 - <<'PY'\nimport os, serial\ns=serial.Serial('/dev/ttyUSB0',115200,timeout=0.1)\ns.write(os.urandom(64))\ns.close()\nPY` | Bootloader eventually falls through to normal boot or ignores noise. | Unchanged. | A. | Noise does not hold boot forever and does not enter update mode. | Reset target; stop noise source. |
+| C5 random UART noise | Send random bytes that do not form a valid frame or text line. | `python3 - <<'PY'\nimport os, serial\ns=serial.Serial(os.environ['PORT'],115200,timeout=0.1)\ns.write(os.urandom(64))\ns.close()\nPY` | Bootloader eventually falls through to normal boot or ignores noise. | Unchanged. | A. | Noise does not hold boot forever and does not enter update mode. | Reset target; stop noise source. |
 
 ## Phase D - Update A To B
 
 | Test | Preparation | Command | Expected UART output | Expected metadata | Expected bootslot | Pass/fail criterion | Recovery |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| D1 verify package locally | Slot A is confirmed version `N`; `PKG_B` is version `N+1` or higher and targets Slot B. | `python3 -m stm32ctl --port "$PORT" update --package "$PKG_B" --public-key-header "$PUBKEY" --quiet --block-size 512` | Host first prints no progress because `--quiet`; UART carries only binary frames. | During transfer: `WRITING`, active A, candidate B. After finish: `CANDIDATE_READY` committed before reset. | Reset into B trial. | Command exits 0 and target performs controlled reset. | If command fails before finish, reset; active A must still boot. |
-| D2 transfer with progress | Use a package large enough to require multiple `WRITE_BLOCK` frames. | `python3 -m stm32ctl --port "$PORT" update --package "$PKG_B" --public-key-header "$PUBKEY" --block-size 512` | Host stderr shows `update: done/total`; final stdout says `update complete`. | Same as D1. | B after reset. | All ACKs received; no text is mixed into binary stream. | Reset and inspect `status` or console metadata. |
+| D1 quiet update | Slot A is confirmed version `N`; `PKG_B` is version `N+1` or higher and targets Slot B. | `python3 -m stm32ctl --port "$PORT" --timeout 15 update --package "$PKG_B" --public-key-header "$PUBKEY" --quiet --block-size 512` | Host first prints no progress because `--quiet`; UART carries only binary frames. | During transfer: `WRITING`, active A, candidate B. After finish: `CANDIDATE_READY` committed before reset. | Reset into B trial. | Command exits 0 and target performs controlled reset. | If command fails before finish, reset; active A must still boot. |
+| D2 transfer with progress | Use a package large enough to require multiple `WRITE_BLOCK` frames. | `python3 -m stm32ctl --port "$PORT" --timeout 15 update --package "$PKG_B" --public-key-header "$PUBKEY" --block-size 512` | Host stderr shows `update: done/total`; final stdout says `update complete`. | Same as D1. | B after reset. | All ACKs received; no text is mixed into binary stream. | Reset and inspect `status` or console metadata. |
 | D3 candidate boot | Let the reset from D1/D2 complete. | `python3 -m serial.tools.miniterm "$PORT" 115200` | Boot banner, slot policy selects candidate, signature/hash accepted, jump to Slot B. | Boot selection transitions from `CANDIDATE_READY` to trial state before jump. | B. | Slot B firmware starts. | If B fails, bootloader must fall back to confirmed A on later boot attempts. |
 | D4 application confirmation | Slot B application contains the confirmation call. | Observe app UART or other confirmation indicator, then reset. | Next boot reports confirmed selection without fallback. | `CONFIRMED`, active B, candidate none, confirmation true, version `N+1`. | B. | Console `metadata` shows active B confirmed. | If not confirmed, repeat with app build that calls confirmation. |
 
@@ -62,7 +63,7 @@ versions for the positive tests.
 
 | Test | Preparation | Command | Expected UART output | Expected metadata | Expected bootslot | Pass/fail criterion | Recovery |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| E1 verify Slot A package | Slot B is confirmed version `M`; `PKG_A` is version `M+1` or higher and targets Slot A. | `python3 -m stm32ctl --port "$PORT" update --package "$PKG_A" --public-key-header "$PUBKEY" --block-size 512` | Binary transfer with ACKs and progress. | During transfer: `WRITING`, active B, candidate A. After finish: `CANDIDATE_READY`. | Reset into A trial. | Command exits 0; target resets. | If failed, active B must remain bootable. |
+| E1 update Slot A package | Slot B is confirmed version `M`; `PKG_A` is version `M+1` or higher and targets Slot A. | `python3 -m stm32ctl --port "$PORT" --timeout 15 update --package "$PKG_A" --public-key-header "$PUBKEY" --block-size 512` | Binary transfer with ACKs and progress. | During transfer: `WRITING`, active B, candidate A. After finish: `CANDIDATE_READY`. | Reset into A trial. | Command exits 0; target resets. | If failed, active B must remain bootable. |
 | E2 candidate and confirmation | Let candidate A boot and confirm. | `python3 -m serial.tools.miniterm "$PORT" 115200` | Boot banner selects A and jumps; later reset remains on A. | `CONFIRMED`, active A, candidate none, version `M+1`. | A. | A runs and confirms. | Reflash confirmed B metadata only if trial recovery is not enough. |
 
 ## Phase F - Negative Tests
@@ -78,7 +79,7 @@ versions for the positive tests.
 | F7 aborted transfer | Start an update and interrupt before finish. | Press Ctrl-C during `python3 -m stm32ctl --port "$PORT" update --package "$PKG_B"` | Host prints interrupted/error; best-effort abort is attempted if begin succeeded. | Either unchanged or rejected `WRITING`; never `CANDIDATE_READY`. | Confirmed slot. | Reset boots confirmed slot. | Reset; if metadata is `WRITING`, boot policy must not boot candidate. |
 | F8 mid-frame timeout | Send partial header or partial payload then stop. | Custom sender writes first 5 bytes of a valid frame and closes port. | If command known, `NACK(TIMEOUT)`; otherwise timeout and resync. | Unchanged. | Confirmed slot. | Later reset boots confirmed slot. | Reset. |
 | F9 lost final ACK | Drop host RX after `FINISH_UPDATE` is sent. | Disconnect RX after final payload, before finish ACK. | Target may still reset after committing `CANDIDATE_READY`; host times out. | If finish reached and verified: `CANDIDATE_READY`; otherwise confirmed slot. | Candidate only if verification completed. | No half-written image becomes bootable. | Reconnect UART; inspect metadata after reset. |
-| F10 random data | Send repeated random frames and bytes. | `python3 - <<'PY'\nimport os, serial, time\ns=serial.Serial('/dev/ttyUSB0',115200,timeout=0.1)\nfor _ in range(50):\n    s.write(os.urandom(37)); time.sleep(0.01)\ns.close()\nPY` | Parser resynchronizes or entry window times out. | Unchanged. | Confirmed slot. | No permanent boot block. | Reset. |
+| F10 random data | Send repeated random frames and bytes. | `python3 - <<'PY'\nimport os, serial, time\ns=serial.Serial(os.environ['PORT'],115200,timeout=0.1)\nfor _ in range(50):\n    s.write(os.urandom(37)); time.sleep(0.01)\ns.close()\nPY` | Parser resynchronizes or entry window times out. | Unchanged. | Confirmed slot. | No permanent boot block. | Reset. |
 | F11 oversize package | Package payload exceeds slot maximum or frame payload exceeds 1024. | `python3 -m stm32ctl --port "$PORT" update --package too_large.update.bin --public-key-header "$PUBKEY"` | Host local validation or target length/verify NACK. | Unchanged. | Confirmed slot. | No write beyond candidate slot. | Use a valid package. |
 
 ## Phase G - Power-Loss Tests
@@ -98,14 +99,22 @@ already bootable. Use a switchable target supply or ST-Link reset/power control.
 
 ## Timing Calibration
 
-The first RDP0 test uses the existing poll-budget entry and frame timeouts.
-Before changing firmware timing, measure them on hardware:
+The entry window still uses poll budgets, not calibrated milliseconds. The
+completed STM32F429IGT6 run measured these update-path timings:
+
+- HELLO ACK: about 20 ms.
+- `BEGIN_UPDATE` ACK: about 6.3-6.4 s because inactive-slot erase happens
+  before ACK.
+- 512-byte `WRITE_BLOCK` ACKs: about 80 ms each.
+- `FINISH_UPDATE` ACK and verification: about 1.0 s.
+
+`stm32ctl` therefore defaults to a 15 second response timeout. Before changing
+firmware timing for a new board, measure:
 
 1. Capture reset-to-normal-boot time with no UART input.
 2. Capture reset-to-HELLO success time using `stm32ctl info`.
 3. Capture console inactivity timeout after entering text mode.
 4. Repeat at least ten times and record min/max in the HIL log.
 
-If the spread is too wide for reliable operation, add a SysTick or timer based
-millisecond clock in a separate change. The current RC intentionally avoids a
-late timing architecture change before the first RDP0 hardware run.
+If the spread is too wide for reliable operation on a different board, add a
+SysTick or timer based millisecond clock in a separate reviewed change.
