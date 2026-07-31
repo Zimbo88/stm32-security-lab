@@ -11,7 +11,13 @@ C_HOST_SUITES := \
 	tests/update_protocol \
 	tests/update_storage
 
-.PHONY: test-fast test-security fuzz coverage sanitize static-analysis mutation clean
+RELEASE_VERSION ?= v1.1.0-rc1-local
+RELEASE_DIR ?= dist/$(RELEASE_VERSION)
+RELEASE_TEST_KEY ?= 0
+RELEASE_SIGNING_SEED ?=
+
+.PHONY: test-fast test-security fuzz coverage sanitize static-analysis mutation \
+	release-candidate verify-release publication-scan clean
 
 test-fast:
 	$(PYTHON) -m pytest -q -p no:cacheprovider tests
@@ -67,6 +73,18 @@ static-analysis:
 
 mutation:
 	$(PYTHON) tools/mutation_smoke.py --json-output fuzz/findings-local/mutation.json
+
+release-candidate:
+	$(PYTHON) tools/release_candidate.py --output $(RELEASE_DIR) \
+		--release-version $(RELEASE_VERSION) \
+		$(if $(filter 1,$(RELEASE_TEST_KEY)),--test-key,) \
+		$(if $(RELEASE_SIGNING_SEED),--signing-seed $(RELEASE_SIGNING_SEED),)
+
+verify-release:
+	$(PYTHON) tools/verify_release_candidate.py --release-dir $(RELEASE_DIR)
+
+publication-scan:
+	$(PYTHON) tools/publication_scan.py --tracked --output publication-scan.json
 
 clean:
 	$(MAKE) -C fuzz clean

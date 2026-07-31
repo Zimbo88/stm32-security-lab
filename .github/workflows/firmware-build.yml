@@ -1,0 +1,49 @@
+name: Firmware build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.12"
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi make
+          python -m pip install -r requirements.txt
+      - name: Build bootloader and applications
+        run: |
+          make -C firmware/exp045_bootloader_v2 clean all report LAYOUT_PROFILE=stm32f429_1m
+          make -C firmware/exp065_signed_app clean all LAYOUT_PROFILE=stm32f429_1m
+          python - <<'PY'
+          from pathlib import Path
+          from nacl.signing import SigningKey
+          seed = bytes(range(32))
+          Path("/tmp/ci-test-seed.bin").write_bytes(seed)
+          Path("/tmp/ci-test-public-key.hex").write_text(bytes(SigningKey(seed).verify_key).hex(), encoding="ascii")
+          PY
+          key="$(cat /tmp/ci-test-public-key.hex)"
+          make -C firmware/exp065_signed_app signed LAYOUT_PROFILE=stm32f429_1m SIGNING_SEED=/tmp/ci-test-seed.bin
+          make -C firmware/exp066_research_platform_core slot-releases LAYOUT_PROFILE=stm32f429_1m SIGNING_SEED=/tmp/ci-test-seed.bin PUBLIC_KEY_HEX="$key"
+      - name: Verify markers and artifact signatures
+        run: |
+          python tools/rdp2_marker.py inspect --output /tmp/marker-report.json
+          python tools/release_artifacts.py verify-signed --signed-image firmware/exp065_signed_app/build/exp065_signed_app_signed.bin --application firmware/exp065_signed_app/build/exp065_signed_app.bin --public-key-hex "$(cat /tmp/ci-test-public-key.hex)"
+          python tools/update_package.py verify --package firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_update_v2.bin --slot a --application firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.bin --public-key-hex "$(cat /tmp/ci-test-public-key.hex)"
+          python tools/update_package.py verify --package firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin --slot b --application firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin --public-key-hex "$(cat /tmp/ci-test-public-key.hex)"
