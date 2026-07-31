@@ -73,3 +73,6 @@ audit/repository-audit.txt
 # Local publication installer backups
 .publication-backup-*/
 .publication-suite-backup-*/
+
+# RDP2 research baseline output; never commit dumps, keys, or lab captures
+baseline/rdp2-final/
