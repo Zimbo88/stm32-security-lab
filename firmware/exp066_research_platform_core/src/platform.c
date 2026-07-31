@@ -5,6 +5,7 @@
 #include "platform_confirmation.h"
 #include "platform_audio.h"
 #include "platform_health.h"
+#include "research_markers.h"
 #include "runtime_monitor.h"
 #include "uart.h"
 
@@ -593,6 +594,7 @@ void platform_init(void)
 {
     rsm_config_t rsm_config;
 
+    rdp2_research_markers_init();
     uart_init();
     log_init();
     platform_health_init();

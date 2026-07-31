@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "purpose": "Synthetic, non-secret research markers for the pre-RDP2 baseline.",
+  "markers": [
+    {
+      "id": "RDP2-BOOT-MARKER-01",
+      "value": "RDP2-BOOT-MARKER-01",
+      "storage": "bootloader_flash",
+      "symbol_start": "__rdp2_boot_marker_start",
+      "symbol_end": "__rdp2_boot_marker_end",
+      "image_base": "0x08000000",
+      "elf": "firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.elf",
+      "binary": "firmware/exp045_bootloader_v2/build/exp045_bootloader_v2.bin"
+    },
+    {
+      "id": "RDP2-SLOT-A-MARKER-01",
+      "value": "RDP2-SLOT-A-MARKER-01",
+      "storage": "slot_a_flash",
+      "symbol_start": "__rdp2_slot_marker_start",
+      "symbol_end": "__rdp2_slot_marker_end",
+      "image_base": "0x08020200",
+      "elf": "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.elf",
+      "binary": "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.bin"
+    },
+    {
+      "id": "RDP2-SLOT-B-MARKER-01",
+      "value": "RDP2-SLOT-B-MARKER-01",
+      "storage": "slot_b_flash",
+      "symbol_start": "__rdp2_slot_marker_start",
+      "symbol_end": "__rdp2_slot_marker_end",
+      "image_base": "0x08080200",
+      "elf": "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.elf",
+      "binary": "firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b.bin"
+    },
+    {
+      "id": "RDP2-SRAM-MARKER-01",
+      "value": "RDP2-SRAM-MARKER-01",
+      "storage": "sram_runtime",
+      "symbol_start": "__rdp2_sram_marker_start",
+      "symbol_end": "__rdp2_sram_marker_end",
+      "image_base": "0x20000000",
+      "elf": "firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a.elf",
+      "binary": null,
+      "initialised_by": "rdp2_research_markers_init"
+    },
+    {
+      "id": "RDP2-CONFIG-MARKER-01",
+      "value": "RDP2-CONFIG-MARKER-01",
+      "storage": "configuration_reference",
+      "symbol_start": null,
+      "symbol_end": null,
+      "image_base": null,
+      "elf": null,
+      "binary": null,
+      "reference_path": "config/rdp2_research_markers.json",
+      "target_installation": "not-installed"
+    }
+  ],
+  "metadata_note": "The STM32F429 boot-metadata record reserves zero-filled bytes and validates them. A persistent marker in those bytes would break decoding or be erased by metadata commits; the configuration marker is therefore intentionally a repository/reference marker, not a target write."
+}

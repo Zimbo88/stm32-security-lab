@@ -16,7 +16,14 @@ SECTIONS
 {
     .isr_vector : { . = ALIGN(256); KEEP(*(.isr_vector)) } > FLASH
     .text : { . = ALIGN(4); *(.text*) *(.rodata*) . = ALIGN(4); } > FLASH
-    .ramfunc : AT(ADDR(.text) + SIZEOF(.text))
+    .rdp2_marker :
+    {
+        . = ALIGN(4);
+        __rdp2_slot_marker_start = .;
+        KEEP(*(.rdp2_marker.slot))
+        __rdp2_slot_marker_end = .;
+    } > FLASH
+    .ramfunc : AT(LOADADDR(.rdp2_marker) + SIZEOF(.rdp2_marker))
     {
         . = ALIGN(4);
         _sramfunc = .;
@@ -28,6 +35,13 @@ SECTIONS
     _etext = LOADADDR(.ramfunc) + SIZEOF(.ramfunc);
     .data : AT(_etext) { . = ALIGN(4); _sdata = .; *(.data*) . = ALIGN(4); _edata = .; } > RAM
     .bss (NOLOAD) : { . = ALIGN(8); _sbss = .; *(.bss*) *(COMMON) . = ALIGN(8); _ebss = .; } > RAM
+    .rdp2_sram_marker (NOLOAD) :
+    {
+        . = ALIGN(4);
+        __rdp2_sram_marker_start = .;
+        KEEP(*(.noinit.rdp2_marker))
+        __rdp2_sram_marker_end = .;
+    } > RAM
     .noinit (NOLOAD) : { . = ALIGN(8); _snoinit = .; *(.noinit*) . = ALIGN(8); _enoinit = .; } > RAM
     _flash_image_end = LOADADDR(.data) + SIZEOF(.data);
     ASSERT(ADDR(.isr_vector) == STM32F429_SELECTED_APPLICATION_BASE, "vector table address changed")

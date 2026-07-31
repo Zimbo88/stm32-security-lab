@@ -29,7 +29,15 @@ SECTIONS
         . = ALIGN(4);
     } > FLASH
 
-    .ramfunc : AT(ADDR(.text) + SIZEOF(.text))
+    .rdp2_marker :
+    {
+        . = ALIGN(4);
+        __rdp2_boot_marker_start = .;
+        KEEP(*(.rdp2_marker.boot))
+        __rdp2_boot_marker_end = .;
+    } > FLASH
+
+    .ramfunc : AT(LOADADDR(.rdp2_marker) + SIZEOF(.rdp2_marker))
     {
         . = ALIGN(4);
         _sramfunc = .;

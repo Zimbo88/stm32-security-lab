@@ -34,9 +34,10 @@ REPRO_FLAGS := -ffile-prefix-map=$(CURDIR)=. \
  -fdebug-prefix-map=$(CURDIR)=. \
  -fmacro-prefix-map=$(CURDIR)=.
 CFLAGS := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding -fno-builtin \
-	 -ffunction-sections -fdata-sections -Wall -Wextra -Werror -fstack-usage \
-	 $(REPRO_FLAGS) -DPLATFORM_APP_BASE_OVERRIDE=0x$(SLOT_APPLICATION_BASE_HEX)UL \
-	 -DRSM_ENABLE=$(RSM_ENABLE) -DRSM_RESTRICTED_DIAGNOSTICS=$(RSM_RESTRICTED_DIAGNOSTICS) \
+		 -ffunction-sections -fdata-sections -Wall -Wextra -Werror -fstack-usage \
+		 $(REPRO_FLAGS) -DPLATFORM_APP_BASE_OVERRIDE=0x$(SLOT_APPLICATION_BASE_HEX)UL \
+		 -DRDP2_SLOT_A=$(if $(filter a,$(SLOT)),1,0) \
+		 -DRSM_ENABLE=$(RSM_ENABLE) -DRSM_RESTRICTED_DIAGNOSTICS=$(RSM_RESTRICTED_DIAGNOSTICS) \
 	 -DRSM_VECTOR_MONITOR_ENABLE=$(RSM_VECTOR_MONITOR_ENABLE) \
 	 -I$(SRC) -I$(COMMON) -I$(BOOTLOADER)/src -I$(BOOTLOADER)/include
 ASFLAGS := $(CPUFLAGS) -x assembler-with-cpp -g3 $(REPRO_FLAGS)
