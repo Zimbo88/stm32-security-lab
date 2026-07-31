@@ -14,6 +14,11 @@ CFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer
 LDFLAGS += -fsanitize=address,undefined
 endif
 
+ifeq ($(COVERAGE),1)
+CFLAGS += --coverage -O0
+LDFLAGS += --coverage
+endif
+
 SOURCES := \
 	test_update_storage.c \
 	simulated_flash.c \

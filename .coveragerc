@@ -1,0 +1,17 @@
+[run]
+branch = true
+source =
+    tools
+omit =
+    tools/secure_boot_hil/*
+    tools/stm32_rom_get.py
+    tools/bytecode_asm.py
+    tools/bytecode_vm.py
+    tools/module_*.py
+    tools/native_loader.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    raise NotImplementedError

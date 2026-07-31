@@ -79,3 +79,13 @@ audit/repository-audit.txt
 
 # RDP2 research baseline output; never commit dumps, keys, or lab captures
 baseline/rdp2-final/
+
+# Local security-testing outputs. Reviewed regression inputs live elsewhere.
+fuzz/build/
+fuzz/findings-local/
+fuzz/out/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+.hypothesis/
