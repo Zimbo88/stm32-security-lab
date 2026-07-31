@@ -136,7 +136,7 @@ Die Änderungen sind logisch nach Funktion gruppiert:
   Reset-, Trial-, Recovery-, Fallback- und Konsolentests.
 - `tools/stm32ctl/cli.py`:
   explizites signiertes `recovery`-Kommando.
-- `README.md`, `docs/platform-feature-matrix.md` und die sieben neuen
+- `README.md`, `docs/platform-feature-matrix.md` und die acht neuen
   Recovery-/Watchdog-Dokumente:
   öffentliche Architektur-, Test- und Evidenzdokumentation.
 
@@ -183,6 +183,33 @@ Die Metadatenkorruptionsmatrix ist als Policy und Hosttestgrundlage vorhanden;
 die vollständige physische Provisionierung jeder Matrixzeile ist kein Ersatz
 für den noch offenen Hardwaretest und wurde nicht als vollständig hardware-
 validiert markiert.
+
+## Qualitätsprüfungen
+
+Zusätzlich zu den funktionalen Tests wurden folgende Prüfungen ausgeführt:
+
+```text
+python3 tools/check_deterministic_build.py
+python3 tools/rdp2_marker.py inspect --output /tmp/stm32-marker-report.json
+python3 tools/rdp2_baseline.py verify --output baseline/rdp2-final
+python3 tools/check_no_private_keys.py
+bash audit/run_repository_audit.sh
+git diff --check
+```
+
+Ergebnisse:
+
+- Der deterministische Vergleich aus zwei frischen `git archive HEAD`-
+  Checkouts meldet `Deterministic build comparison passed`.
+- Die synthetische Markerprüfung meldet Erfolg; die lokale Baselineprüfung
+  verifiziert 17 Artefakte und bestätigt, dass kein privater Schlüssel kopiert
+  wurde.
+- Der Scan meldet `No tracked private key patterns found.`
+- Der Repository-Audit wurde ohne Fehler geschrieben.
+- `git diff --check` ist sauber.
+- Es wurden keine Release- oder Push-Befehle ausgeführt. Das vorhandene
+  `rdp2`-Dokumentationsmaterial und die Prüfwerkzeuge führen keine
+  Option-Byte-Schreiboperation aus.
 
 ## Hardwaretests
 
