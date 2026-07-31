@@ -1,5 +1,0 @@
-scripts/decode_exp033.py
-scripts/__pycache__/decode_exp033.cpython-312.pyc
-scripts/run_exp037_snapshot.sh
-scripts/run_exp038.sh
-scripts/run_exp039.sh

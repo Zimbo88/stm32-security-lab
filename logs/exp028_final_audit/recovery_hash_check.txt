@@ -1,5 +1,0 @@
-baseline/exp024_recovery/full_flash_1MiB.bin: OK
-baseline/exp024_recovery/sector0_bootloader_16KiB.bin: OK
-baseline/exp024_recovery/sector2_signed_image_16KiB.bin: OK
-firmware/exp022_rollback_floor/build/exp022_rollback_floor.bin: OK
-signing/exp022/signed_image_v2.bin: OK

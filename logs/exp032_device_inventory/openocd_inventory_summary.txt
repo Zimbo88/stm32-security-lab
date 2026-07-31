@@ -1,4 +1,0 @@
-Info : STLINK V2J37S7 (API v2) VID:PID 0483:3748
-Info : Target voltage: 3.187377
-Info : [stm32f4x.cpu] Cortex-M4 r0p1 processor detected
-Info : [stm32f4x.cpu] target has 6 breakpoints, 4 watchpoints

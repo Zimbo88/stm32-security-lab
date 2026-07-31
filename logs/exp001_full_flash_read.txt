@@ -1,3 +1,0 @@
-st-flash 1.8.0
-2026-07-15T19:58:56 INFO common.c: STM32F42x_F43x: 256 KiB SRAM, 1024 KiB flash in at least 16 KiB pages.
-2026-07-15T19:58:56 INFO common.c: read from address 0x08000000 size 1048576

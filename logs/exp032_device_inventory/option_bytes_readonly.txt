@@ -1,9 +1,0 @@
-STM32CubeProgrammer CLI was not available in PATH during the initial EXP032
-attempt.
-
-No STM32CubeProgrammer option-byte command was executed.
-
-The current FLASH_OPTCR and FLASH_OPTCR1 register values are read without
-modification through OpenOCD and recorded in openocd_inventory_raw.txt.
-
-No option bytes were written.

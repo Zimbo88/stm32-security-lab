@@ -1,4 +1,0 @@
-st-flash 1.8.0
-2026-07-15T21:44:02 INFO common.c: STM32F42x_F43x: 256 KiB SRAM, 1024 KiB flash in at least 16 KiB pages.
-2026-07-15T21:44:02 ERROR option_bytes.c: Option bytes read is currently not supported for connected chip
-could not read option control register (-1)
