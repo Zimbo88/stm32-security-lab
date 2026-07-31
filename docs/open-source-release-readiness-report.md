@@ -154,10 +154,23 @@ publication scan. Hardware is not touched.
 
 Two fresh checkouts of the same committed branch are required to run the
 host profile, firmware builds, candidate generation and candidate verification.
-The archive hash is compared after each build. The first in-tree rehearsal was
-run with `--allow-dirty` while the Part-4 files were being developed; that
-result is not the final reproducibility claim. The clean-checkout result and
-hashes are recorded in the final section after the commits are created.
+The archive hash is compared after each build. At commit
+`d2cd76418f0abf1ddada3525349d03ac439d481a`, two fresh checkouts produced the
+following results:
+
+```text
+checkout A: 158 passed, 1 skipped; candidate build and verification: PASS
+checkout B: 158 passed, 1 skipped; candidate build and verification: PASS
+archive A: 41bad388f663abcd847fe68a3a73fb9d3da842b5de5b450fd559b0319e2b545a
+archive B: 41bad388f663abcd847fe68a3a73fb9d3da842b5de5b450fd559b0319e2b545a
+```
+
+The first in-tree rehearsal was run with `--allow-dirty` while the Part-4
+files were being developed. A subsequent clean comparison initially exposed
+volatile verification timestamps in copied package reports; the release
+candidate tool now normalizes only those diagnostic timestamps while leaving
+the underlying verification and signatures unchanged. The clean comparison
+above was then repeated successfully.
 
 ## Hardwareevidenz
 
@@ -239,7 +252,7 @@ performed in this task.
 |---|---:|---|
 | README | 8 | Clear entry point and evidence links; independent review remains. |
 | Quickstart | 8 | Fresh-clone commands are documented and locally exercised. |
-| Buildreproduzierbarkeit | 8 | Existing deterministic checker plus deterministic archive tooling; clean dual checkout is required for final claim. |
+| Buildreproduzierbarkeit | 8 | Two fresh checkouts produced identical verified candidate archives; the workflow remains local rather than remote. |
 | CI-Design | 8 | Separate read-only jobs, timeouts and pinned actions. |
 | CI-Evidenz | 5 | Workflows are local-validated, not remotely executed here. |
 | Releasewerkzeuge | 8 | Candidate build and offline verification cover the intended artifact path. |
