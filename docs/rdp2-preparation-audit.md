@@ -60,7 +60,7 @@ STM32F429IGT6-Klasse-Board. Dabei wurden die positiven Slotwechsel und viele
 negative UART-Fälle mit ST-Link im Testumfeld validiert. Physische
 Power-Loss-Phasen und ein vollständig debuggerfreier Ablauf wurden dort nicht
 als bestanden nachgewiesen. Ein aktueller nichtmutierender UART-Handshake auf
-`/dev/ttyUSB0` antwortete am 2026-07-31 mit Timeout; deshalb wurde kein
+`/dev/ttyUSBx` antwortete am 2026-07-31 mit Timeout; deshalb wurde kein
 mutierender Hardwaretest ausgeführt.
 
 ## Referenzartefakte

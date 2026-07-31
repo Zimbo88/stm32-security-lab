@@ -7,22 +7,22 @@ format documented in `docs/uart-binary-protocol.md`.
 From the repository root, run it with the tools directory on `PYTHONPATH`:
 
 ```sh
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 info
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx info
 ```
 
 Equivalent from inside `tools/`:
 
 ```sh
-python3 -m stm32ctl --port /dev/ttyUSB0 info
+python3 -m stm32ctl --port /dev/ttyUSBx info
 ```
 
 ## Commands
 
 ```sh
-python3 -m stm32ctl --port /dev/ttyUSB0 info
-python3 -m stm32ctl --port /dev/ttyUSB0 status
-python3 -m stm32ctl --port /dev/ttyUSB0 reset
-python3 -m stm32ctl --port /dev/ttyUSB0 update --package path/to/firmware.update.bin
+python3 -m stm32ctl --port /dev/ttyUSBx info
+python3 -m stm32ctl --port /dev/ttyUSBx status
+python3 -m stm32ctl --port /dev/ttyUSBx reset
+python3 -m stm32ctl --port /dev/ttyUSBx update --package path/to/firmware.update.bin
 ```
 
 Common options:

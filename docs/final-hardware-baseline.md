@@ -24,7 +24,7 @@ Raw captures and flash images are stored only in the ignored local directory
 | Device SRAM | 256 KiB; project application profile uses 128 KiB |
 | ST-Link | ST-LINK/V2, firmware `V2J37S7` |
 | Target voltage | 3.187377 V reported by the probe |
-| UART | `/dev/ttyUSB0` locally, FTDI USB-UART, USART1 |
+| UART | `/dev/ttyUSBx` locally, FTDI USB-UART, USART1 |
 | UART settings | 115200 baud, 8N1, 3.3 V TTL |
 | UART pins | PA9 TX, PA10 RX, common GND |
 | Reset | NRST is not connected; `st-flash reset` reports an AIRCR software reset |
@@ -98,8 +98,8 @@ st-flash read /tmp/<temporary>/flash.bin 0x08000000 0x00100000
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
   -c 'init; stm32f2x options_read 0; shutdown'
 st-flash reset
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 --baud 115200 --json info
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 --baud 115200 --json status
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx --baud 115200 --json info
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx --baud 115200 --json status
 ```
 
 After a fresh reset, `stm32ctl info` returned protocol version 1, a 1024-byte

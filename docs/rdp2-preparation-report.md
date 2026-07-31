@@ -96,7 +96,7 @@ Metadaten. Private Schlüssel wurden weder kopiert noch ausgegeben.
 Tatsächlich ausgeführt:
 
 - Nur ein nichtmutierender UART-Handschlag:
-  `PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 --timeout 3
+  `PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx --timeout 3
   --retries 0 --json info` → Exitcode 4, Timeout beim Warten auf UART-Daten.
 - Keine Update-, Reset-, Erase-, Program-, Option-Byte- oder RDP-Aktion auf
   Hardware.

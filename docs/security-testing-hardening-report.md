@@ -232,7 +232,7 @@ ST-Link serial: <redacted>
 MCU: STM32F42x/F43x, chip ID 0x419
 Flash: 1048576 bytes
 SRAM: 262144 bytes
-UART: /dev/ttyUSB0, 115200 baud
+UART: /dev/ttyUSBx, 115200 baud
 ```
 
 Executed safe checks:

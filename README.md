@@ -414,7 +414,7 @@ Host update example:
 
 ```bash
 PYTHONPATH=tools python3 -m stm32ctl \
-  --port /dev/ttyUSB0 \
+  --port /dev/ttyUSBx \
   --timeout 15 \
   update \
   --package firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin \

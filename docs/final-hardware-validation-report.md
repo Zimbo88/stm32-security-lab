@@ -53,7 +53,7 @@ against the Stage-0 public key. After a safe reset, the exact update command
 was:
 
 ```sh
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 --baud 115200 \
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx --baud 115200 \
   --timeout 15 --retries 1 --json update \
   --package firmware/exp066_research_platform_core/build/part5_slot_b_v52/part5_slot_b_v52_slot_b_update_v2.bin \
   --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h \
@@ -109,7 +109,7 @@ logs.
 The new host behavior was tested against the target:
 
 ```sh
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 --baud 115200 \
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx --baud 115200 \
   --timeout 2 --retries 0 --json reset
 ```
 
@@ -227,8 +227,21 @@ Executed during this campaign:
 | `make ... SLOT=a IMAGE_VERSION=54 ... all update-package inspect-update-package verify-update-package` | PASS |
 | `st-info --probe` | PASS, ID `0x419`, 1 MiB flash, 256 KiB SRAM |
 | read-only Option Byte inspection | PASS, RDP0 / WRP open |
-| `git diff --check` | PASS at intermediate check |
+| `make PYTHON=.venv/bin/python test-fast` | PASS, 161 Python tests, C host suites and deterministic fuzz smoke |
+| `make PYTHON=.venv/bin/python test-security` | PASS, host/security profile; optional external analyzers absent |
+| `make PYTHON=.venv/bin/python sanitize` | PASS, ASan/UBSan host and fuzz smoke |
+| `python3 tools/check_documentation.py --output ...` | PASS, 0 missing local Markdown links |
+| `python3 tools/check_workflows.py --output ...` | PASS, 4 workflows structurally valid offline; not run on GitHub |
+| `python3 tools/check_deterministic_build.py` | PASS, identical hashes in the two temporary clean checkouts |
+| `python3 tools/publication_scan.py --tracked --output ...` | CLEAN for error-level findings; 369 warning-level historical paths remain for publication review |
+| `git diff --check` | PASS after final documentation edits |
 | Part 5 selected HIL corruption run | INCONCLUSIVE; flash-loader failure before selected test execution, restore verified |
+
+The publication scan's warning set includes six tracked logic-analyzer captures,
+historical raw-log directories, option-byte command examples and local device
+names in historical evidence. Device names in the current public-facing
+documentation use `/dev/ttyUSBx`; the historical artifacts must be explicitly
+reviewed or removed from a future public release branch before publication.
 
 The complete Part 1-4 host, fuzzing, coverage, sanitizer, release and CI
 results remain documented in their existing reports. Remote GitHub Actions

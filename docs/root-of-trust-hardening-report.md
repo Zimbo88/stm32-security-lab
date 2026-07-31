@@ -120,7 +120,7 @@ has no binary match requirement.
 - MCU family: STM32F42x/F43x, chip ID `0x419`, target STM32F429IGT6 profile.
 - Debug ID: `0x20036419`.
 - Flash/SRAM: 1024 KiB / 256 KiB.
-- UART: USART1 through `/dev/ttyUSB0`, 115200 baud.
+- UART: USART1 through `/dev/ttyUSBx`, 115200 baud.
 - ST-Link serial: `<redacted>`.
 - Read-only `FLASH_OPTCR`: `0x0fffaaed`; RDP Level 0 (`0xAA`).
 - Public-key fingerprint: `482dd9daac3d406f779995a50a00eb2ac9948eb412cba4403e2f81091780499a`.

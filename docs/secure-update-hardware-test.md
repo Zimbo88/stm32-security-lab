@@ -9,7 +9,7 @@ Bytes, and do not rely on the ST ROM bootloader for the update path.
 Use these shell variables in the examples:
 
 ```sh
-export PORT=/dev/ttyUSB0
+export PORT=/dev/ttyUSBx
 export PYTHONPATH=tools
 export PKG_A=firmware/exp066_research_platform_core/build/slot_a/exp066_research_platform_core_slot_a_slot_a_update_v2.bin
 export PKG_B=firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin

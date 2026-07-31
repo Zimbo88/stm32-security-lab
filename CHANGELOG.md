@@ -66,7 +66,7 @@ versioning.
   protocol as not implemented.
 - Removed stale release wording that treated the existing `v1.0.0` tag as
   unreleased.
-- Corrected stale hardware-test examples that hard-coded `/dev/ttyUSB0` inside
+- Corrected stale hardware-test examples that hard-coded a device path inside
   snippets despite defining `PORT`.
 
 ## [1.0.0] - 2026-07-19

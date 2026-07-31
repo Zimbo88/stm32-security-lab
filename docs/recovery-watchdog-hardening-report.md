@@ -33,7 +33,7 @@ Hardwareidentifikation lautet:
 | MCU | STM32F42x/F43x, Chip-ID `0x419` |
 | Flash/SRAM | 1 MiB / 256 KiB |
 | Boardzugang | ST-Link V2J37S7 für Entwicklungs- und Diagnosephasen |
-| UART | `/dev/ttyUSB0`, FT232R, für USART1 |
+| UART | `/dev/ttyUSBx`, FT232R, für USART1 |
 | Option-Byte-Lesung | `0x0fffaaed`, RDP-Byte `0xAA` = RDP0 |
 | NRST | Laut ST-Link nicht angeschlossen; Reset wurde daher über AIRCR ausgelöst |
 
@@ -219,7 +219,7 @@ Ergebnisse:
 
 Alle Hardwarelogs liegen unter
 `hil-results/recovery-watchdog/2026-07-31/`. Die verwendete Plattform war der
-identifizierte STM32F429 mit USART1 über `/dev/ttyUSB0`. Der Ausgangszustand
+identifizierte STM32F429 mit USART1 über `/dev/ttyUSBx`. Der Ausgangszustand
 wurde mit einem read-only Flash-Backup und read-only Option-Byte-Lesung
 dokumentiert. Zum Schluss wurde Stage-0 neu verifiziert geschrieben und Slot B
 als normale Version 21 hergestellt.

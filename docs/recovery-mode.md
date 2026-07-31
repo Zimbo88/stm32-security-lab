@@ -37,9 +37,9 @@ bootstrap is the only code path allowed to reinitialize its metadata sectors.
 Host commands:
 
 ```bash
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 info
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 status
-PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSB0 recovery \
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx info
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx status
+PYTHONPATH=tools python3 -m stm32ctl --port /dev/ttyUSBx recovery \
   --package path/to/signed-slot-a-update.bin \
   --public-key-header firmware/exp045_bootloader_v2/src/firmware_public_key.h
 ```
