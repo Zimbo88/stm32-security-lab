@@ -45,6 +45,7 @@ _Noreturn void boot_sequence_execute(void)
     led_show_init();
     led_show_indicate(BOOT_LED_STATE_BOOTING);
     delay_cycles(BOOT_LED_BOOT_DELAY_CYCLES);
+    boot_watchdog_refresh();
     led_show_all_off();
 
     const reset_cause_t reset_cause = reset_cause_capture();
@@ -77,6 +78,7 @@ _Noreturn void boot_sequence_execute(void)
     boot_slot_selection_result_t selection;
     const boot_slot_selection_status_t selection_status =
         boot_policy_select(reset_cause.raw_csr, &selection);
+    boot_watchdog_refresh();
     const uint32_t verification_end = performance_cycles();
 
     performance_record_verification_cycles(
@@ -113,6 +115,7 @@ _Noreturn void boot_sequence_execute(void)
         boot_result_print(selection.selected_verify_status);
     }
     boot_performance_print();
+    boot_watchdog_refresh();
 
     if (selection_status != BOOT_SLOT_SELECTION_OK) {
         uart_puts("RECOVERY ENTER reason=boot-policy-failure\n");
@@ -124,6 +127,7 @@ _Noreturn void boot_sequence_execute(void)
     uart_puts("Jumping to application...\n");
     led_show_all_off();
     delay_cycles(4000000U);
+    boot_watchdog_refresh();
 
     const verify_status_t jump_status = signed_image_jump(&selection.jump_context);
     boot_result_print(jump_status);

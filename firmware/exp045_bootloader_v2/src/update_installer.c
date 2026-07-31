@@ -342,6 +342,65 @@ static update_install_status_t candidate_package_fits(
     return UPDATE_INSTALL_OK;
 }
 
+/*
+ * The candidate version in boot metadata is not a rollback floor while an
+ * update is in progress.  It describes the image being written or tried and
+ * must not become an installed version merely because that candidate was
+ * rejected.  In the stable CONFIRMED state the metadata version is the
+ * installed version; after a rejected or interrupted candidate, the signed
+ * manifest of the confirmed active image is the floor.  Re-verify that image
+ * before accepting a replacement so a damaged or contradictory active slot
+ * fails closed instead of weakening the version policy.
+ */
+static update_install_status_t confirmed_version_for_update(
+    const update_installer_session_t *session,
+    uint32_t *confirmed_version
+)
+{
+    signed_manifest_t manifest;
+    verify_status_t verify_status;
+
+    if ((session == NULL) || (confirmed_version == NULL)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    if (session->metadata_before.state == BOOT_METADATA_STATE_CONFIRMED) {
+        /* In the stable state this field is the confirmed version. */
+        *confirmed_version = session->metadata_before.candidate_image_version;
+        return UPDATE_INSTALL_OK;
+    }
+
+    if (session->active == NULL) {
+        /* Recovery bootstrap has no confirmed image.  The signed-image
+           verifier still enforces MIN_IMAGE_VERSION. */
+        *confirmed_version = MIN_IMAGE_VERSION - 1UL;
+        return UPDATE_INSTALL_OK;
+    }
+
+    verify_status = signed_image_verify_update_slot_buffer(
+        (const uint8_t *)(uintptr_t)session->active->manifest_address,
+        (const uint8_t *)(uintptr_t)session->active->signature_address,
+        (const uint8_t *)(uintptr_t)session->active->payload_base,
+        (size_t)session->active->maximum_payload_size,
+        session->public_key,
+        session->active
+    );
+    if (verify_status != VERIFY_OK) {
+        return UPDATE_INSTALL_ERR_METADATA;
+    }
+
+    verify_status = signed_image_decode_manifest(
+        (const uint8_t *)(uintptr_t)session->active->manifest_address,
+        &manifest
+    );
+    if (verify_status != VERIFY_OK) {
+        return UPDATE_INSTALL_ERR_METADATA;
+    }
+
+    *confirmed_version = manifest.image_version;
+    return UPDATE_INSTALL_OK;
+}
+
 static update_install_status_t program_aligned_block(
     const boot_flash_t *flash,
     uint32_t address,
@@ -872,6 +931,7 @@ update_install_status_t update_installer_begin(
     update_package_status_t package_status;
     update_install_status_t install_status;
     boot_metadata_status_t metadata_status;
+    uint32_t confirmed_version = 0U;
 
     if ((session == NULL) || (header_bytes == NULL)) {
         return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
@@ -917,8 +977,15 @@ update_install_status_t update_installer_begin(
         return fail_session(session, UPDATE_INSTALL_ERR_PACKAGE);
     }
 
-    if (session->header.manifest.image_version <=
-        session->metadata_before.candidate_image_version) {
+    install_status = confirmed_version_for_update(
+        session,
+        &confirmed_version
+    );
+    if (install_status != UPDATE_INSTALL_OK) {
+        return fail_session(session, install_status);
+    }
+
+    if (session->header.manifest.image_version <= confirmed_version) {
         return fail_session(session, UPDATE_INSTALL_ERR_ROLLBACK);
     }
 
