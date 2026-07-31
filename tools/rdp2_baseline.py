@@ -254,6 +254,8 @@ def write_symbol_tables(output: Path, sources: dict[str, Path]) -> None:
 
 def create_baseline(output: Path, *, build: bool, signing_seed: Path | None) -> None:
     if build:
+        if signing_seed is not None:
+            signing_seed = signing_seed.resolve()
         build_artifacts(signing_seed)
     sources = artifact_sources()
     require_sources(sources)
