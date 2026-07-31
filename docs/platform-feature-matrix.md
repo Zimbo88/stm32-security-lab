@@ -85,3 +85,19 @@ historical status vocabulary.
 | Publication scan | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Findings require human review; allowlists are deliberately narrow. |
 | CI workflow definitions | IMPLEMENTED | LOCALLY VALIDATED | NOT RUN | DOCUMENTED | GitHub Actions have not run for this branch. |
 | Hardware compatibility matrix | IMPLEMENTED | DOCUMENTED | LIMITED VALIDATION | DOCUMENTED | Only the STM32F429IGT6-class reference target is evidenced. |
+
+## Part-5 final hardware evidence
+
+| Feature | Implemented | Host test | Hardware test | Power-loss test | Documentation | Open limit |
+|---|---|---|---|---|---|---|
+| Signed USART1 update A/B | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | NRST is not wired; reset entry used software probe reset |
+| Rollback rejection | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | Software-backed rollback floor |
+| Trial fallback and IWDG | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | LSI/temperature and power-loss timing open |
+| Rejected-candidate telemetry | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | Diagnostic identity is not attestation |
+| Metadata redundancy/corruption | IMPLEMENTED | TESTED | LIMITED VALIDATION | NOT TESTED | DOCUMENTED | Final Part-5 rerun stopped at HIL flash-loader failure |
+| Slot/image corruption | IMPLEMENTED | TESTED | LIMITED VALIDATION | NOT TESTED | DOCUMENTED | Prior HIL evidence is retained as observations/passes |
+| MPU normal operation | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | Complete retained fault-context proof remains open |
+| Debugger-free complete lifecycle | IMPLEMENTED | TESTED | LIMITED VALIDATION | NOT TESTED | DOCUMENTED | No physical NRST or controlled power path |
+| Physical power-loss resilience | DESIGNED | TESTED | NOT TESTED | BLOCKED | DOCUMENTED | Safe external power-control hardware unavailable |
+| WRP | NOT IMPLEMENTED | DOCUMENTED | NOT TESTED | NOT TESTED | DOCUMENTED | No expendable device designated |
+| RDP2 | NOT IMPLEMENTED | DOCUMENTED | NOT TESTED | NOT TESTED | DOCUMENTED | Explicit `RDP2 NO-GO` |

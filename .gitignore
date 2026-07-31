@@ -83,6 +83,9 @@ workflow-report.json
 # RDP2 research baseline output; never commit dumps, keys, or lab captures
 baseline/rdp2-final/
 
+# Final local hardware campaign output; never commit dumps, keys, or lab captures
+baseline/final-hardware-campaign/
+
 # Local security-testing outputs. Reviewed regression inputs live elsewhere.
 fuzz/build/
 fuzz/findings-local/
