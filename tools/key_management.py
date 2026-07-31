@@ -17,7 +17,6 @@ from pathlib import Path
 
 from nacl.signing import SigningKey
 
-
 SEED_SIZE = 32
 PUBLIC_KEY_SIZE = 32
 PURPOSES = {
