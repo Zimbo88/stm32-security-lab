@@ -137,7 +137,7 @@ repository distinguishes `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
 | WRP | NOT ENABLED |
 | RDP2 | NOT ENABLED / NO-GO |
 | Reproducible builds | LOCALLY VALIDATED |
-| Remote CI | PENDING UNTIL GITHUB RUN |
+| Remote CI | REMOTE CI PASSED |
 | External audit | NOT PERFORMED |
 
 Part-2 security references:
