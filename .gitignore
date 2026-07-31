@@ -88,6 +88,8 @@ workflow-report.json
 
 # RDP2 research and final hardware campaign output remain local-only and are
 # covered by the broad baseline/ rule above.
+baseline/rdp2-final/
+baseline/final-hardware-campaign/
 
 # Local security-testing outputs. Reviewed regression inputs live elsewhere.
 fuzz/build/
