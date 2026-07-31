@@ -7,7 +7,7 @@ Status values are intentionally limited to:
 
 | Feature | Status | Relevant source files | Relevant tests | Limitations | Next concrete action |
 |---|---|---|---|---|---|
-| bootloader | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2` | EXP045 build/report, host verifier tests, RDP0 HIL | Physical recovery is still incomplete. | Keep hardware evidence current for each release. |
+| bootloader | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2` | EXP045 build/report, host verifier tests, recovery/storage tests | Physical recovery pin is not selected; signed UART recovery is implemented. | Keep hardware evidence current for each release. |
 | secure firmware update | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2`, `tools/update_package.py`, `tools/stm32ctl` | update installer/protocol/storage tests, stm32ctl tests, RDP0 HIL | Research transport only; no production key custody, update authorization, RDP2, or physical recovery. | Repeat power-removal and provisioning validation before irreversible protection. |
 | UART update | TARGET_IMPLEMENTED | `update_mode.c`, `update_protocol.c`, `update_service.c`, `uart.c`, `tools/stm32ctl` | `tests/update_protocol`, `tests/uart`, `tests/test_stm32ctl.py`, RDP0 HIL | USART1 polling transport; no physical update GPIO; no authenticated operator identity. | Add only reviewed recovery/provisioning policy before production deployment. |
 | optional USB update | OPTIONAL_NOT_SELECTED | none | none | USB stack not selected for this release. | Select only after hardware USB validation plan. |
@@ -33,13 +33,16 @@ Status values are intentionally limited to:
 | ring buffer | TARGET_IMPLEMENTED | `log.c` | `tests/test_exp066_pure.py` | Fixed 32-record RAM buffer. | Hardware CLI validation. |
 | error history | TARGET_IMPLEMENTED | `log.c`, `fault.c` | EXP066 build | RAM log plus retained fault record only. | Add persistent history only outside fault context. |
 | boot log | TARGET_IMPLEMENTED | `platform.c`, `log.c` | EXP066 build | Boot log is RAM-only. | Validate reset entries over UART. |
-| reset causes | TARGET_IMPLEMENTED | `platform.c`, EXP045 reset helper | EXP066 build | EXP066 captures raw `RCC_CSR`; decoding is minimal. | Add decoded fields after hardware reset campaign. |
+| reset causes | TARGET_IMPLEMENTED | `platform.c`, EXP045 reset helper | `tests/reset_cause`, EXP066 build | Normalized priority and machine-readable Stage-0 output are implemented; physical cause coverage remains open. | Capture IWDG/software/pin evidence on the board. |
 | HardFault dump | TARGET_IMPLEMENTED | `fault.c` | EXP066 build | Retained `.noinit` only; no Flash persistence. | Validate induced fault on expendable hardware. |
 | GPIO tests | DOCUMENTED_DESIGN | `platform.c` | source allowlist tests | CLI returns bounded placeholder PASS only. | Implement non-destructive pin-state tests. |
 | timer tests | NOT_IMPLEMENTED | none | none | No timer driver/test. | Add after timer inventory. |
 | DMA tests | NOT_IMPLEMENTED | none | none | No DMA driver/test. | Add after DMA safety plan. |
 | interrupt tests | NOT_IMPLEMENTED | none | none | No interrupt self-test harness. | Add after NVIC/ISR inventory. |
-| watchdog tests | NOT_IMPLEMENTED | none | none | Watchdog is not enabled by EXP066. | Add on expendable board with recovery plan. |
+| watchdog tests | HARDWARE_VALIDATION_REQUIRED | `src/watchdog.c`, `src/test_scenarios.c` | controlled scenario builds, `tests/reset_cause`, storage tests | Software IWDG is enabled; LSI tolerance and real reset evidence remain open. | Run the documented non-power-loss hardware campaign. |
+| boot recovery and fallback | TARGET_IMPLEMENTED | `boot_slot_selection.c`, `update_mode.c`, `update_installer.c` | storage/recovery bootstrap tests, state-machine docs | No trusted fallback with both image and metadata journals lost; recovery bootstrap is signed Slot A only. | Validate recovery and fallback on the expendable board. |
+| trial boot and health gate | TARGET_IMPLEMENTED | `boot_slot_selection.c`, `platform_confirmation.c` | storage tests, controlled test-firmware builds | Default normal build has zero delay; minimum loop and watchdog predicates are enforced. | Capture real no-confirmation and watchdog trials. |
+| metadata corruption policy | TARGET_IMPLEMENTED | `boot_metadata.c`, `update_installer.c` | storage corruption and commit-boundary tests | Sequence exhaustion is fail-closed; ambiguous journals require explicit recovery bootstrap. | Complete hardware metadata-recovery evidence without power loss. |
 | clock tests | DOCUMENTED_DESIGN | `platform.c` | source allowlist tests | CLI placeholder only; no clock switching. | Add read-only clock consistency checks. |
 | device information | TARGET_IMPLEMENTED | `platform.c`, `runtime_monitor.c` | EXP066 build | Public ID/revision/UID fingerprint; raw UID is restricted. | Validate values on board. |
 | UID | TARGET_IMPLEMENTED | `platform.c`, `runtime_monitor_core.c` | RSM host tests, EXP066 build | Public CRC32 fingerprint only; raw UID restricted. | Hardware output capture. |

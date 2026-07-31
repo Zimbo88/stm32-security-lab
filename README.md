@@ -46,7 +46,7 @@ flowchart TD
     Metadata --> BootPolicy
     BootPolicy --> Verify[Manifest, SHA-512, Ed25519, vector checks]
     Verify -->|accepted| App[EXP066 research platform]
-    Verify -->|rejected| Fallback[Fallback or recovery/fatal state]
+    Verify -->|rejected| Fallback[Confirmed fallback or signed UART recovery]
     App --> Confirm[Application confirmation]
     Confirm --> Metadata
 ```
@@ -75,10 +75,13 @@ Current release-quality reference components:
 - SHA-512 payload integrity verification.
 - Redundant boot metadata with explicit states.
 - Slot A/Slot B boot selection, trial boot, confirmation, and fallback.
+- Persistent three-attempt trial policy, reset-cause accounting, independent
+  watchdog and signed UART recovery bootstrap.
 - Streaming secure-update installer with fixed RAM buffers and no heap.
 - USART1 polling RX/TX transport and deterministic `SUPD` binary protocol.
 - Read-only UART diagnostic console.
-- `stm32ctl` Python host client for `info`, `status`, `update`, and `reset`.
+- `stm32ctl` Python host client for `info`, `status`, `update`, `recovery`, and
+  `reset`.
 - Runtime Security Monitor foundation in EXP066.
 - Deterministic build checker, release artifact validation, host tests, and HIL
   tooling.
@@ -89,8 +92,13 @@ Research or experimental components:
   simulations.
 - Runtime-monitor telemetry intended for evidence and diagnostics, not as an
   isolated security enclave.
-- Physical recovery, option-byte policy, WRP/RDP provisioning, and
+- Physical recovery pin selection, option-byte policy, WRP/RDP provisioning, and
   fault-injection campaigns.
+
+Recovery and watchdog evidence is explicitly classified in
+[the hardening report](docs/recovery-watchdog-hardening-report.md). The
+repository distinguishes `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
+`DOCUMENTED ONLY` and `OPEN`; a host test is not hardware evidence.
 
 ## Main Components
 
@@ -272,6 +280,7 @@ make -C tests/update_protocol clean test
 make -C tests/uart clean test
 make -C tests/diagnostic_console clean test
 make -C tests/rsm_core clean test
+make -C tests/reset_cause clean test
 make -C tools clean test
 ```
 
