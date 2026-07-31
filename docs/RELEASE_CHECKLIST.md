@@ -3,6 +3,10 @@
 Use this checklist for public releases. Do not overwrite existing tags; if a
 tag already exists, use the next patch release tag.
 
+For the Part-4 local candidate, stop before the Git and Release section. No tag,
+push, GitHub release, Option-Byte write, RDP2 activation or WRP activation is
+performed by the repository tooling.
+
 ## Repository State
 
 - [ ] Publication branch is clean before tagging.
@@ -29,6 +33,9 @@ tag already exists, use the next patch release tag.
 - [ ] RDP2 and Option-Byte limits are stated clearly.
 - [ ] Known limitations and non-production boundaries are current.
 - [ ] Markdown links have been checked.
+- [ ] `docs/security-claims.md` maps each claim to host and hardware evidence.
+- [ ] `docs/open-source-release-readiness-report.md` is reviewed.
+- [ ] `THIRD_PARTY_NOTICES.md` and `docs/licenses.md` match the vendored inputs.
 
 ## Verification
 
@@ -47,6 +54,9 @@ tag already exists, use the next patch release tag.
 - [ ] Private-key scan passes.
 - [ ] `git diff --check` passes.
 - [ ] GitHub Actions for the pushed commit are green.
+- [ ] SBOM and release provenance are generated and verified.
+- [ ] Publication scan is clean or every finding has a written disposition.
+- [ ] Deterministic candidate archives from two clean checkouts match.
 
 ## Hardware Evidence
 
@@ -76,3 +86,11 @@ tag already exists, use the next patch release tag.
 - [ ] SHA-256 checksum file is generated.
 - [ ] Release notes are published.
 - [ ] No private seeds, private keys, flash dumps, or HIL raw logs are attached.
+
+## Part 5 evidence still open
+
+- [ ] Physical power-loss campaign.
+- [ ] UART-only end-to-end campaign after all final software changes.
+- [ ] Complete metadata-corruption matrix on hardware.
+- [ ] Final WRP decision and manual option-byte review.
+- [ ] Manual RDP2 provisioning on an expendable device, if separately approved.

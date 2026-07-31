@@ -8,7 +8,7 @@ remained RDP0 with unchanged Option Bytes for Part 2.
 The recorded development target was an STM32F429IGT6-class STM32F42x/F43x
 device with chip ID `0x419`, DBGMCU ID `0x20036419`, 1024 KiB Flash, and 256
 KiB SRAM. USART1 was `/dev/ttyUSB0` at 115200 baud. The ST-Link was
-`57FF6E067182525511261687`. A read-only `FLASH_OPTCR` observation was
+`<redacted>`. A read-only `FLASH_OPTCR` observation was
 `0x0fffaaed`, corresponding to RDP Level 0; no Option-Byte write was issued.
 The embedded public-key fingerprint was
 `482dd9daac3d406f779995a50a00eb2ac9948eb412cba4403e2f81091780499a`.

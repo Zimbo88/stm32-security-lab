@@ -3,7 +3,7 @@ Linux workstation 6.17.0-35-generic #35~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue M
 v1.8.0
 Found 1 stlink programmers
   version:    V2J37S7
-  serial:     57FF6E067182525511261687
+  serial:     <redacted>
   flash:      1048576 (pagesize: 16384)
   sram:       262144
   chipid:     0x419

@@ -67,7 +67,10 @@ Detailed architecture:
 
 ## Feature Overview
 
-Current release-quality reference components:
+Current reference components and their evidence are listed in the
+[feature matrix](docs/platform-feature-matrix.md) and [security claims](docs/security-claims.md).
+The following list describes what is implemented; it is not a production
+approval:
 
 - EXP045 Stage-0 secure bootloader for STM32F429.
 - EXP066 slot-aware research application.
@@ -91,6 +94,8 @@ Current release-quality reference components:
 - Host-only security fuzzing for UART, package, metadata and boot policy,
   Hypothesis properties, ASan/UBSan profiles, GCC analyzer and gcov coverage
   reporting. Extended campaigns remain a separate, explicitly invoked step.
+- Local release-candidate tooling with deterministic manifests, SPDX SBOM,
+  provenance, artifact verification and publication scanning.
 
 Research or experimental components:
 
@@ -124,6 +129,15 @@ Part-3 security-testing references:
 - [Key Management](docs/key-management.md)
 - [MPU Policy](docs/mpu-policy.md)
 - [Root-of-Trust Hardening Report](docs/root-of-trust-hardening-report.md)
+
+Open-source and release references:
+
+- [Project Scope](docs/project-scope.md)
+- [Quickstart](docs/quickstart.md)
+- [Documentation Index](docs/README.md)
+- [Release Artifacts](docs/release-artifacts.md)
+- [Security Claims](docs/security-claims.md)
+- [Release Readiness Report](docs/open-source-release-readiness-report.md)
 
 ## Main Components
 
@@ -203,7 +217,8 @@ python3-venv
 openocd or stlink-tools
 ```
 
-Python dependencies are listed in [requirements.txt](requirements.txt):
+Python dependencies are pinned in [requirements.txt](requirements.txt) and
+[requirements-security.txt](requirements-security.txt):
 
 ```bash
 python3 -m venv .venv-hil
@@ -343,6 +358,18 @@ python3 tools/check_no_private_keys.py
 bash audit/run_repository_audit.sh
 git diff --check
 ```
+
+Create and verify a local, test-key-only release candidate without tagging or
+publishing:
+
+```bash
+make release-candidate RELEASE_TEST_KEY=1
+make verify-release RELEASE_DIR=dist/v1.1.0-rc1-local
+```
+
+This produces a local SPDX SBOM, provenance record, sorted checksums and a
+deterministic archive. It does not flash hardware, write Option Bytes, push or
+create a GitHub release.
 
 The GitHub CI workflow runs the same host, firmware, deterministic-build, and
 private-key checks without flashing hardware.
@@ -488,7 +515,8 @@ tag.
 
 See [Release Process](docs/release_process.md),
 [Release Checklist](docs/RELEASE_CHECKLIST.md), and
-[Changelog](CHANGELOG.md).
+[Release Artifacts](docs/release-artifacts.md), [Changelog](CHANGELOG.md), and
+[Third-Party Notices](THIRD_PARTY_NOTICES.md).
 
 ## Troubleshooting
 

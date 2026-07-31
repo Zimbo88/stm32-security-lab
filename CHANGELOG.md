@@ -7,7 +7,23 @@ versioning.
 
 ## [Unreleased]
 
-- No unreleased changes are documented yet.
+### Added
+
+- Part 1 recovery, trial-boot, watchdog and signed UART recovery hardening.
+- Part 2 root-of-trust, rollback, MPU and memory-boundary documentation and
+  tests.
+- Part 3 host-only fuzzing, property tests, coverage, sanitizer and static
+  analysis profiles.
+- Part 4 open-source entry documentation, CI profiles, SBOM, provenance,
+  publication scanning and deterministic local release-candidate tooling.
+
+### Known limitations
+
+- Remote GitHub Actions have not executed for the Part 4 branch.
+- RDP2, WRP, power-loss campaigns and final hardware protection validation are
+  intentionally not complete.
+- The local candidate uses a clearly marked test key unless an external key is
+  explicitly supplied.
 
 ## [1.0.2] - 2026-07-27
 

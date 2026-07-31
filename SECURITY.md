@@ -2,8 +2,11 @@
 
 STM32 Security Lab is maintained by Mathias Zimmermann.
 
-If you discover a security issue, please use GitHub Security Advisories or
-contact the maintainer before making the issue public.
+If you discover a security issue, use GitHub Private Vulnerability Reporting:
+<https://github.com/Zimbo88/stm32-security-lab/security/advisories/new> when
+the feature is enabled. If it is unavailable, open a minimal public issue
+requesting private coordination without exploit details. Do not invent or use
+an unverified email address for this project.
 
 ## Project scope
 
@@ -45,6 +48,17 @@ public issue requesting a private coordination channel. Do not include exploit
 details, signing material, device secrets or sensitive target information in
 that issue.
 
+Include the affected commit, component, threat model, safe reproduction steps,
+expected and observed behavior, impact assessment and sanitized logs. State
+whether RDP, WRP or Option Bytes were changed. Do not perform invasive tests,
+fault injection or destructive hardware actions without explicit authorization.
+
+Reports are acknowledged when maintainers can review them. Investigation,
+fix, coordination and disclosure timing depend on severity, reproducibility,
+maintainer availability and affected hardware. No CVE assignment or fixed
+response deadline is guaranteed. Coordinate an embargo before any public
+disclosure.
+
 ## Research safety
 
 Only perform invasive testing, fault injection, option-byte modification,
@@ -61,6 +75,10 @@ before changing option bytes.
 Private signing keys and signing seeds must never be committed to the
 repository. Repository examples use placeholders or explicitly designated
 development-only material.
+
+Loss of the active signing key can make trusted updates impossible; compromise
+requires treating the key as revoked and following the documented key-loss
+response. Do not work around key loss by weakening signature verification.
 
 ## Third-party components
 

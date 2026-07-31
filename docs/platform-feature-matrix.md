@@ -73,3 +73,15 @@ historical status vocabulary.
 | rollback and quarantine | SIMULATED_ONLY | `tools/native_loader.py`, `tools/module_install.py` | EXP069/EXP070 tests | Host lifecycle/catalog simulation only. | Hardware-backed failure counters and rollback. |
 | LED platform health indication | TARGET_IMPLEMENTED | `platform_health.c`, `platform_led.c`, `platform.c` | `tests/test_exp071_health.py`, EXP066 build | HEALTHY uses LED4 only; visual timing should be rechecked per board revision. | Keep normal heartbeat distinct from warning/fatal patterns. |
 | optional retro audio | OPTIONAL_NOT_SELECTED | `platform_audio.c`, `platform_audio.h` | `tests/test_exp071_health.py` | No documented speaker/buzzer pin. | Add external piezo pin assignment before implementation. |
+
+## Part-4 release-readiness evidence
+
+| Feature | Implemented | Host test | Hardware test | Documentation | Open limit |
+|---|---|---|---|---|---|
+| Local release candidate | IMPLEMENTED | TESTED | NOT TESTED | DOCUMENTED | Test-key candidates are not hardware-installable when their key differs from Stage 0. |
+| SPDX SBOM | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Inventory is derived from pinned repository files; it is not a complete OS SBOM. |
+| Release provenance | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | SLSA-inspired local record, not a SLSA attestation. |
+| Deterministic release archive | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Remote builder and final release tag remain open. |
+| Publication scan | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Findings require human review; allowlists are deliberately narrow. |
+| CI workflow definitions | IMPLEMENTED | LOCALLY VALIDATED | NOT RUN | DOCUMENTED | GitHub Actions have not run for this branch. |
+| Hardware compatibility matrix | IMPLEMENTED | DOCUMENTED | LIMITED VALIDATION | DOCUMENTED | Only the STM32F429IGT6-class reference target is evidenced. |

@@ -7,6 +7,10 @@ Bug reports, technical discussions and contributions are welcome.
 Contributions that improve reproducibility, documentation, test coverage,
 hardware support, or defensive security analysis are welcome.
 
+Read [the project scope](docs/project-scope.md), [the quickstart](docs/quickstart.md)
+and [the development workflow](docs/development-workflow.md) first. This is a
+research reference, not a production-certified boot chain.
+
 ## Principles
 
 Changes should:
@@ -47,6 +51,25 @@ policy, flash protection, recovery, or update installation require:
 - negative tests;
 - safe-failure verification;
 - documentation of residual risk.
+
+Do not use public issues for vulnerability details. Follow `SECURITY.md` and
+GitHub Private Vulnerability Reporting when enabled. Never attach private
+keys, signing seeds, flash dumps, raw UART captures, ST-Link serial numbers or
+local HIL directories.
+
+## Evidence labels
+
+Use `HOST TESTED` only for a reproducible host command, `HARDWARE VALIDATED`
+only for observed documented hardware evidence, and `security reviewed` only
+when a maintainer has explicitly reviewed the relevant threat and diff. A
+successful build alone is not hardware or security evidence.
+
+## Pull requests and sign-off
+
+Pull requests must complete the repository template, add a changelog entry for
+user-visible behavior, and include the exact validation commands. The project
+does not currently require a DCO sign-off; authorship and license remain
+covered by the BSD 3-Clause project license and normal repository review.
 
 ## Generated files
 

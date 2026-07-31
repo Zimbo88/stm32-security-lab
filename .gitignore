@@ -76,6 +76,9 @@ audit/repository-audit.txt
 # Local publication installer backups
 .publication-backup-*/
 .publication-suite-backup-*/
+publication-scan.json
+docs-link-report.json
+workflow-report.json
 
 # RDP2 research baseline output; never commit dumps, keys, or lab captures
 baseline/rdp2-final/

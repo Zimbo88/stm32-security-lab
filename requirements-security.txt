@@ -3,3 +3,4 @@ coverage==7.6.12
 ruff==0.16.1
 mypy==2.3.0
 bandit==1.9.4
+pyyaml==6.0.2

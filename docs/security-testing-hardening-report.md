@@ -228,7 +228,7 @@ mutated cases without a mismatch. Mutation smoke killed both selected mutants.
 Hardware was present and identified read-only:
 
 ```text
-ST-Link serial: 57FF6E067182525511261687
+ST-Link serial: <redacted>
 MCU: STM32F42x/F43x, chip ID 0x419
 Flash: 1048576 bytes
 SRAM: 262144 bytes

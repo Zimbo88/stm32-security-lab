@@ -1,0 +1,51 @@
+name: Hardware test report
+description: Record a reproducible, non-secret hardware observation
+title: "[Hardware] "
+labels: ["hardware"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Remove serial numbers, private paths, keys, dumps and personal data.
+        Do not use this form for an uncoordinated vulnerability disclosure.
+  - type: input
+    id: commit
+    attributes:
+      label: Repository commit
+    validations:
+      required: true
+  - type: input
+    id: board
+    attributes:
+      label: Board and MCU
+      placeholder: STM32F429IGT6-class board, chip ID, flash size
+    validations:
+      required: true
+  - type: textarea
+    id: wiring
+    attributes:
+      label: Wiring and power
+      description: UART pins, reset method, probe type and supply; no serial numbers.
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: Reproducible commands
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Observed result and logs
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed keys, dumps, serial numbers and private paths.
+          required: true
+        - label: I did not change RDP, WRP or Option Bytes as part of this report.
+          required: true
