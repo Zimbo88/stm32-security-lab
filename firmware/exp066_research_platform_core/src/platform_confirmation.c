@@ -36,6 +36,21 @@ static void snapshot_clear(void)
     last_snapshot.metadata_status = BOOT_METADATA_ERR_NO_VALID_COPY;
 }
 
+static uint32_t trusted_metadata_image_version(
+    const boot_metadata_record_t *metadata
+)
+{
+    if (metadata == NULL) {
+        return 0UL;
+    }
+    if ((metadata->state == BOOT_METADATA_STATE_PENDING_TRIAL) ||
+        (metadata->state == BOOT_METADATA_STATE_CONFIRMED)) {
+        return metadata->candidate_image_version;
+    }
+    /* A rejected or incomplete candidate is not the running firmware. */
+    return 0UL;
+}
+
 uint8_t platform_confirmation_health_gate(
     const platform_confirmation_health_t *health
 )
@@ -168,7 +183,7 @@ platform_confirmation_status_t platform_confirmation_service(
     last_snapshot.confirmed_slot = metadata.active_slot;
     last_snapshot.candidate_slot = metadata.candidate_slot;
     last_snapshot.remaining_trial_attempts = metadata.boot_attempt_count;
-    last_snapshot.image_version = metadata.candidate_image_version;
+    last_snapshot.image_version = trusted_metadata_image_version(&metadata);
     health.metadata_allows_confirmation = metadata_allows_confirmation(
         &metadata,
         running_slot,

@@ -325,3 +325,12 @@ def test_reset_command() -> None:
     client.reset()
 
     assert serial.commands[-1] == Command.RESET
+
+
+def test_reset_command_does_not_require_ack() -> None:
+    serial = ScriptedSerial([response_frame(Command.HELLO, 0, extra=info_extra())])
+    client = Stm32Client(serial, timeout=0.01)
+    client.hello()
+    client.reset()
+
+    assert decode_frame(serial.writes[-1]).command == Command.RESET
