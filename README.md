@@ -88,6 +88,9 @@ Current release-quality reference components:
   model documentation.
 - Deterministic build checker, release artifact validation, host tests, and HIL
   tooling.
+- Host-only security fuzzing for UART, package, metadata and boot policy,
+  Hypothesis properties, ASan/UBSan profiles, GCC analyzer and gcov coverage
+  reporting. Extended campaigns remain a separate, explicitly invoked step.
 
 Research or experimental components:
 
@@ -109,6 +112,14 @@ Part-2 security references:
 - [Threat Model](docs/threat-model.md)
 - [Root of Trust](docs/root-of-trust.md)
 - [Root-of-Trust Hardening Report](docs/root-of-trust-hardening-report.md)
+
+Part-3 security-testing references:
+
+- [Security Test Surface](docs/security-test-surface.md)
+- [Fuzzing](docs/fuzzing.md)
+- [Coverage](docs/coverage.md)
+- [Security Test Profiles](docs/security-test-profiles.md)
+- [Security Testing Limitations](docs/security-testing-limitations.md)
 - [Root-of-Trust Hardware Evidence](docs/root-of-trust-hardware-validation.md)
 - [Key Management](docs/key-management.md)
 - [MPU Policy](docs/mpu-policy.md)
@@ -207,6 +218,19 @@ tests. Building signed release packages requires an external 32-byte Ed25519
 signing seed supplied by path; private seeds must remain outside Git.
 
 ## Build
+
+Run the host security profiles without touching hardware:
+
+```bash
+make test-fast
+make test-security PYTHON=/path/to/security-venv/bin/python
+make fuzz
+```
+
+`make fuzz` is intentionally not part of a normal build. It runs bounded,
+host-only parser/policy campaigns and keeps findings under the ignored
+`fuzz/findings-local/` directory. RDP, Option Bytes, WRP and physical flash
+operations are not changed by these targets.
 
 Build the bootloader:
 
