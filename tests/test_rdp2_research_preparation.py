@@ -3,6 +3,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
@@ -78,9 +80,10 @@ def test_no_automatic_rdp2_target_or_option_byte_writer():
 def test_baseline_output_is_ignored_and_declares_no_private_key():
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "baseline/rdp2-final/" in gitignore
-    manifest = json.loads(
-        (ROOT / "baseline" / "rdp2-final" / "release-manifest.json").read_text(encoding="ascii")
-    )
+    manifest_path = ROOT / "baseline" / "rdp2-final" / "release-manifest.json"
+    if not manifest_path.is_file():
+        pytest.skip("ignored local baseline is not present in a fresh checkout")
+    manifest = json.loads(manifest_path.read_text(encoding="ascii"))
     assert manifest["private_signing_key"] == {
         "copied": False,
         "printed": False,
