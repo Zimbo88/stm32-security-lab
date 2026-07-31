@@ -31,7 +31,7 @@ def sha256(path: Path) -> str:
 
 
 def git_commit() -> str:
-    return subprocess.run(  # nosec B603,B607 - fixed git argv and repository cwd
+    return subprocess.run(  # nosec B603 - fixed git argv and repository cwd
         ["git", "rev-parse", "HEAD"],
         cwd=ROOT,
         check=True,
