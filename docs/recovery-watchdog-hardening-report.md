@@ -207,6 +207,10 @@ Ergebnisse:
 - Der Scan meldet `No tracked private key patterns found.`
 - Der Repository-Audit wurde ohne Fehler geschrieben.
 - `git diff --check` ist sauber.
+- Die mit `-fstack-usage` erzeugten Dateien enthalten 519 Einträge; der
+  größte gemeldete Einzelwert beträgt 2256 Bytes (`crypto_argon2`). Eine
+  separate Worst-Case-Stackanalyse für verschachtelte Laufzeitpfade wurde
+  nicht als abgeschlossen behauptet.
 - Es wurden keine Release- oder Push-Befehle ausgeführt. Das vorhandene
   `rdp2`-Dokumentationsmaterial und die Prüfwerkzeuge führen keine
   Option-Byte-Schreiboperation aus.
