@@ -18,7 +18,7 @@ def read_exact(ser: serial.Serial, count: int) -> bytes:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", default="/dev/ttyUSB0")
+    parser.add_argument("--port", required=True, help="local UART device")
     parser.add_argument("--baud", type=int, default=115200)
     args = parser.parse_args()
 

@@ -10,7 +10,7 @@ diagnostics, and hardware-in-the-loop validation.**
        width="760">
 </p>
 
-> **Status:** hardware validated at RDP Level 0 on an STM32F429IGT6-class board<br>
+> **Status:** v1.1.0-rc1 research release candidate; hardware validated at RDP Level 0 on an STM32F429IGT6-class board<br>
 > **Target platform:** STM32F429 family, `stm32f429_1m` layout profile<br>
 > **License:** BSD 3-Clause<br>
 > **Primary focus:** defensive embedded-security research and reviewable
@@ -30,6 +30,12 @@ review, experimentation, and further hardening.
 
 Only run destructive tests on hardware you own or are explicitly authorized to
 test.
+
+This is an open-source research platform and release candidate, not a
+production-certified or formally verified security system. RDP2 and WRP are
+not enabled; the current RDP2 decision is **No-Go** because the controlled
+power-loss campaign and parts of the independent UART-only lifecycle remain
+open. Test-key firmware is not intended for provisioned devices.
 
 ## Architecture At A Glance
 
@@ -111,6 +117,29 @@ Recovery and watchdog evidence is explicitly classified in
 repository distinguishes `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
 `DOCUMENTED ONLY` and `NOT IMPLEMENTED`; a host test is not hardware evidence.
 
+### Current evidence summary
+
+| Function | Status |
+|---|---|
+| Secure Boot | HARDWARE VALIDATED |
+| Ed25519 verification | HOST AND HARDWARE TESTED |
+| SHA-512 | HOST AND HARDWARE TESTED |
+| A/B update | HARDWARE VALIDATED |
+| Wrong-key rejection | HARDWARE VALIDATED |
+| Signature rejection | HARDWARE VALIDATED |
+| Rollback rejection | HARDWARE VALIDATED |
+| Trial Boot | HARDWARE VALIDATED |
+| Watchdog fallback | HARDWARE VALIDATED |
+| UART recovery | LIMITED HARDWARE VALIDATION |
+| MPU | HARDWARE TESTED |
+| Metadata corruption | PARTIAL VALIDATION |
+| Power-loss resilience | NOT YET FULLY VALIDATED |
+| WRP | NOT ENABLED |
+| RDP2 | NOT ENABLED / NO-GO |
+| Reproducible builds | LOCALLY VALIDATED |
+| Remote CI | PENDING UNTIL GITHUB RUN |
+| External audit | NOT PERFORMED |
+
 Part-2 security references:
 
 - [Security Model](docs/security-model.md)
@@ -160,8 +189,7 @@ Open-source and release references:
 |-- config/                 Source memory-layout profile
 |-- docs/                   Architecture, validation, release, and research docs
 |-- firmware/               Bootloader, application, and experiment firmware
-|-- hardware/               Curated hardware baselines and provisioning records
-|-- logs/                   Historical experiment evidence
+|-- hardware/               Curated hardware layout and provisioning records
 |-- modules/                Module-research examples and fixtures
 |-- scripts/                Experiment helper scripts
 |-- tests/                  Python and C host tests
@@ -174,8 +202,10 @@ Open-source and release references:
 `-- README.md
 ```
 
-The numbered `expNNN_*` directories preserve the research history. The current
-hardware-validated secure-update path is EXP045 plus EXP066.
+The numbered `expNNN_*` directories preserve the research history. Raw local
+flash baselines, analyzer captures and hardware logs are intentionally excluded
+from the public tree; curated evidence is maintained under `docs/`. The
+current hardware-validated secure-update path is EXP045 plus EXP066.
 
 ## Hardware
 

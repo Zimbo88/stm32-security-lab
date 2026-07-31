@@ -169,7 +169,7 @@ def load_config(
     execution = raw.get("execution", {})
 
     configured_output = output_root or Path(str(paths.get("output_root", "hil-results")))
-    configured_uart = uart_device or Path(str(uart.get("device", "/dev/ttyUSB0")))
+    configured_uart = uart_device or Path(str(uart.get("device", "UART_DEVICE_NOT_CONFIGURED")))
     configured_baud = baud if baud is not None else int(uart.get("baud", 115200))
     configured_capture = (
         capture_seconds if capture_seconds is not None else float(uart.get("capture_seconds", 5.0))

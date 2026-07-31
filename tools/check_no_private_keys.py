@@ -23,7 +23,6 @@ SENSITIVE_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
 
 ALLOWED_PATHS = {
     "firmware/exp065_signed_app/keys/README.md",
-    "logs/exp028_final_audit/private_key_git_check.txt",
 }
 
 

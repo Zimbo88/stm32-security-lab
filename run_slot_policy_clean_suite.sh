@@ -6,7 +6,7 @@ set -Eeuo pipefail
 #
 # Automatic UART example:
 #
-#   UART_DEVICE=/dev/ttyUSB0 \
+#   UART_DEVICE=/dev/ttyUSBx \
 #   WAIT_SECONDS=5 \
 #   RESET_CYCLES=10 \
 #   ./run_slot_policy_clean_suite.sh

@@ -23,6 +23,12 @@ firmware/*/keys/*.bin
 # Local reference material
 archive/
 
+# Raw laboratory captures and hardware dumps are local-only.
+baseline/
+logs/
+logic/
+hardware/exp072_baseline/
+
 # Hardware-in-the-loop run outputs
 hil-results/
 tools/secure_boot_hil/.mypy_cache/
@@ -80,11 +86,8 @@ publication-scan.json
 docs-link-report.json
 workflow-report.json
 
-# RDP2 research baseline output; never commit dumps, keys, or lab captures
-baseline/rdp2-final/
-
-# Final local hardware campaign output; never commit dumps, keys, or lab captures
-baseline/final-hardware-campaign/
+# RDP2 research and final hardware campaign output remain local-only and are
+# covered by the broad baseline/ rule above.
 
 # Local security-testing outputs. Reviewed regression inputs live elsewhere.
 fuzz/build/

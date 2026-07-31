@@ -190,7 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="stm32ctl",
         description="Host tool for the EXP045 bootloader UART binary protocol",
     )
-    parser.add_argument("--port", required=True, help="serial port, for example /dev/ttyUSB0")
+    parser.add_argument("--port", required=True, help="local serial port, for example /dev/ttyUSBx")
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD, help="UART baudrate")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="read timeout seconds")
     parser.add_argument(

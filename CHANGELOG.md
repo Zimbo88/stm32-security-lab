@@ -5,7 +5,7 @@ All notable project changes are documented in this file.
 The format follows Keep a Changelog, and public releases use semantic
 versioning.
 
-## [Unreleased]
+## [1.1.0-rc1] - 2026-07-31
 
 ### Added
 
@@ -17,13 +17,33 @@ versioning.
 - Part 4 open-source entry documentation, CI profiles, SBOM, provenance,
   publication scanning and deterministic local release-candidate tooling.
 
+### Changed
+
+- Hardened reset command handling and rejected-candidate telemetry after final
+  STM32F429 hardware regression.
+- Removed tracked flash baselines, raw hardware logs and analyzer captures from
+  the public release tree; local campaign output is ignored.
+- Made hardware helper UART selection explicit instead of embedding a local
+  device path.
+
+### Security
+
+- Documented live wrong-key, invalid-signature, rollback, trial-fallback and
+  Stage-0-integrity evidence.
+- Added final RDP2 No-Go and WRP-not-validated status to the public evidence.
+
 ### Known limitations
 
-- Remote GitHub Actions have not executed for the Part 4 branch.
-- RDP2, WRP, power-loss campaigns and final hardware protection validation are
-  intentionally not complete.
-- The local candidate uses a clearly marked test key unless an external key is
-  explicitly supplied.
+- The controlled Power-Loss campaign and final corruption rerun are incomplete.
+- The fully independent UART-only reset/recovery lifecycle is limited by the
+  available hardware reset wiring.
+- RDP2 and WRP are disabled; no external security review or certification was
+  performed.
+- Published example firmware uses a clearly marked synthetic test key.
+
+## [Unreleased]
+
+Future changes will be recorded here after the release candidate.
 
 ## [1.0.2] - 2026-07-27
 
