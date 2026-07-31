@@ -39,8 +39,9 @@ def test_sbom_generation_is_deterministic(tmp_path: Path) -> None:
 def test_publication_scan_rejects_private_key_material(tmp_path: Path) -> None:
     candidate = tmp_path / "candidate"
     candidate.mkdir()
+    private_key_marker = "-----BEGIN " + "PRIVATE KEY-----\n"
     (candidate / "bad.txt").write_text(
-        "-----BEGIN PRIVATE KEY-----\n", encoding="ascii"
+        private_key_marker, encoding="ascii"
     )
     report = tmp_path / "report.json"
     result = run_tool("tools/publication_scan.py", str(candidate), "--output", str(report))
