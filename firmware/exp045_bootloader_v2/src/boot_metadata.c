@@ -599,6 +599,41 @@ boot_metadata_status_t boot_metadata_commit(
     return write_copy(flash, target, next);
 }
 
+boot_metadata_status_t boot_metadata_reinitialize_for_recovery(
+    const boot_flash_t *flash,
+    const boot_metadata_record_t *next
+)
+{
+    boot_metadata_record_t empty;
+
+    if ((flash == NULL) || (next == NULL)) {
+        return BOOT_METADATA_ERR_INVALID_ARGUMENT;
+    }
+    if (boot_metadata_empty(&empty) != BOOT_METADATA_OK ||
+        next->sequence != 1UL ||
+        next->state != BOOT_METADATA_STATE_WRITING ||
+        next->active_slot != BOOT_SLOT_NONE ||
+        next->candidate_slot != (uint32_t)BOOT_SLOT_A ||
+        boot_metadata_validate_transition(&empty, next) != BOOT_METADATA_OK) {
+        return BOOT_METADATA_ERR_BAD_TRANSITION;
+    }
+
+    /* Recovery mode has no trusted fallback. Rebuild only the two metadata
+       sectors, then publish WRITING in copy A with the normal commit marker. */
+    if ((boot_flash_erase_sector(
+            flash,
+            STM32F429_BOOT_METADATA_A_FIRST_SECTOR
+        ) != BOOT_FLASH_OK) ||
+        (boot_flash_erase_sector(
+            flash,
+            STM32F429_BOOT_METADATA_B_FIRST_SECTOR
+        ) != BOOT_FLASH_OK)) {
+        return BOOT_METADATA_ERR_FLASH;
+    }
+
+    return write_copy(flash, BOOT_METADATA_COPY_A, next);
+}
+
 const char *boot_metadata_status_text(boot_metadata_status_t status)
 {
     switch (status) {

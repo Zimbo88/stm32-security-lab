@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "boot_watchdog.h"
+
 typedef enum {
     UPDATE_SERVICE_ENTRY_NO_HELLO = 0,
     UPDATE_SERVICE_ENTRY_HELLO = 1
@@ -68,6 +70,7 @@ static update_service_entry_status_t wait_for_binary_hello(
     update_protocol_parser_init(&service->entry_parser);
 
     while ((idle_polls < max_idle_polls) && (byte_count < max_bytes)) {
+        boot_watchdog_refresh();
         uint8_t byte = 0U;
         const byte_reader_status_t read_status =
             byte_reader_getc_nonblocking(config->reader, &byte);
@@ -160,6 +163,7 @@ static update_service_result_t run_update_protocol(
     uint32_t frame_timeouts = 0U;
 
     for (;;) {
+        boot_watchdog_refresh();
         const update_protocol_status_t protocol_status =
             update_protocol_session_process_reader(
                 &service->protocol,

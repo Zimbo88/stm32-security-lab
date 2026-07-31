@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "boot_watchdog.h"
 #include "flash_layout.h"
 #include "image_policy.h"
 #include "monocypher.h"
@@ -104,9 +105,20 @@ static update_install_status_t select_inactive_slot(
     *active = NULL;
     *candidate = NULL;
 
-    if ((metadata->state != BOOT_METADATA_STATE_CONFIRMED) ||
-        (metadata->candidate_slot != BOOT_SLOT_NONE) ||
-        (metadata->confirmation_state != 1UL)) {
+    if (metadata->state == BOOT_METADATA_STATE_CONFIRMED) {
+        if ((metadata->candidate_slot != BOOT_SLOT_NONE) ||
+            (metadata->confirmation_state != 1UL)) {
+            return UPDATE_INSTALL_ERR_ACTIVE_STATE;
+        }
+    } else if (metadata->state == BOOT_METADATA_STATE_REJECTED_INVALID) {
+        /* A rejected candidate already fell back to active_slot. Reusing
+           that same inactive slot is safe and restores update capability. */
+        if ((metadata->active_slot == BOOT_SLOT_NONE) ||
+            (metadata->candidate_slot == BOOT_SLOT_NONE) ||
+            (metadata->confirmation_state != 0UL)) {
+            return UPDATE_INSTALL_ERR_ACTIVE_STATE;
+        }
+    } else {
         return UPDATE_INSTALL_ERR_ACTIVE_STATE;
     }
 
@@ -123,9 +135,31 @@ static update_install_status_t select_inactive_slot(
         BOOT_SLOT_LOOKUP_OK) {
         return UPDATE_INSTALL_ERR_SLOT;
     }
+    if ((metadata->state == BOOT_METADATA_STATE_REJECTED_INVALID) &&
+        (metadata->candidate_slot != candidate_slot_id)) {
+        return UPDATE_INSTALL_ERR_ACTIVE_STATE;
+    }
 
     *active = active_slot;
     *candidate = candidate_slot;
+    return UPDATE_INSTALL_OK;
+}
+
+static update_install_status_t select_recovery_slot(
+    const boot_slot_descriptor_t **active,
+    const boot_slot_descriptor_t **candidate
+)
+{
+    if ((active == NULL) || (candidate == NULL)) {
+        return UPDATE_INSTALL_ERR_INVALID_ARGUMENT;
+    }
+
+    *active = NULL;
+    *candidate = NULL;
+    if (boot_slot_lookup((uint32_t)BOOT_SLOT_A, candidate) !=
+        BOOT_SLOT_LOOKUP_OK) {
+        return UPDATE_INSTALL_ERR_SLOT;
+    }
     return UPDATE_INSTALL_OK;
 }
 
@@ -212,6 +246,7 @@ static update_install_status_t erase_candidate_slot(
     for (uint32_t sector = candidate->first_sector;
          sector <= candidate->last_sector;
          ++sector) {
+        boot_watchdog_refresh();
         update_install_status_t fault =
             maybe_fault(options, UPDATE_INSTALL_FAULT_ERASE_SECTOR, sector);
         if (fault != UPDATE_INSTALL_OK) {
@@ -221,6 +256,7 @@ static update_install_status_t erase_candidate_slot(
         if (boot_flash_erase_sector(flash, sector) != BOOT_FLASH_OK) {
             return UPDATE_INSTALL_ERR_ERASE;
         }
+        boot_watchdog_refresh();
 
         if (result != NULL) {
             result->erased_sector_count += 1UL;
@@ -333,6 +369,7 @@ static update_install_status_t program_aligned_block(
         return fault_status;
     }
 
+    boot_watchdog_refresh();
     if (boot_flash_program_aligned(flash, address, data, length) !=
         BOOT_FLASH_OK) {
         return UPDATE_INSTALL_ERR_PROGRAM;
@@ -518,6 +555,7 @@ static update_install_status_t hash_installed_payload(
     crypto_sha512_init(&ctx);
 
     while (offset < header->payload_size) {
+        boot_watchdog_refresh();
         size_t chunk = header->payload_size - offset;
         uint32_t address = 0U;
 
@@ -774,10 +812,19 @@ update_install_status_t update_installer_session_init(
     metadata_status =
         boot_metadata_recover_from_flash(flash, &current, &recovery);
     if (metadata_status != BOOT_METADATA_OK) {
-        return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
+        if ((options->recovery_bootstrap == 0U) ||
+            ((metadata_status != BOOT_METADATA_ERR_NO_VALID_COPY) &&
+             (metadata_status != BOOT_METADATA_ERR_AMBIGUOUS))) {
+            return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
+        }
+        (void)boot_metadata_empty(&current);
+        recovery.copy_a_valid = 0U;
+        recovery.copy_b_valid = 0U;
+        recovery.selected_copy = BOOT_METADATA_COPY_NONE;
+        install_status = select_recovery_slot(&active, &candidate);
+    } else {
+        install_status = select_inactive_slot(&current, &active, &candidate);
     }
-
-    install_status = select_inactive_slot(&current, &active, &candidate);
     if (install_status != UPDATE_INSTALL_OK) {
         return fail_session(session, install_status);
     }
@@ -800,10 +847,13 @@ update_install_status_t update_installer_session_init(
     session->metadata_recovery = recovery;
     session->active = active;
     session->candidate = candidate;
+    session->active_slot_id = (active == NULL)
+        ? (uint32_t)BOOT_SLOT_NONE
+        : (uint32_t)active->id;
     session->state = UPDATE_INSTALL_SESSION_INITIALIZED;
 
     if (result != NULL) {
-        result->active_slot = (uint32_t)active->id;
+        result->active_slot = session->active_slot_id;
         result->candidate_slot = (uint32_t)candidate->id;
         result->metadata_recovery = recovery;
     }
@@ -837,7 +887,12 @@ update_install_status_t update_installer_begin(
         NULL
     );
     if (metadata_status != BOOT_METADATA_OK) {
-        return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
+        if ((session->options.recovery_bootstrap == 0U) ||
+            ((metadata_status != BOOT_METADATA_ERR_NO_VALID_COPY) &&
+             (metadata_status != BOOT_METADATA_ERR_AMBIGUOUS))) {
+            return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
+        }
+        (void)boot_metadata_empty(&recovered_metadata);
     }
 
     if (metadata_matches_start(
@@ -881,16 +936,50 @@ update_install_status_t update_installer_begin(
         session->result->image_version = session->header.manifest.image_version;
     }
 
-    install_status = commit_metadata_state(
-        &session->restricted_flash,
-        &session->metadata_before,
-        BOOT_METADATA_STATE_WRITING,
-        (uint32_t)session->active->id,
-        (uint32_t)session->candidate->id,
-        session->header.manifest.image_version,
-        &session->options,
-        UPDATE_INSTALL_FAULT_METADATA_WRITING
-    );
+    if ((session->options.recovery_bootstrap != 0U) &&
+        (session->metadata_recovery.copy_a_valid == 0U) &&
+        (session->metadata_recovery.copy_b_valid == 0U)) {
+        boot_metadata_record_t writing;
+        metadata_status = boot_metadata_prepare_next(
+            &session->metadata_before,
+            BOOT_METADATA_STATE_WRITING,
+            session->active_slot_id,
+            (uint32_t)session->candidate->id,
+            session->header.manifest.image_version,
+            0U,
+            0U,
+            0U,
+            &writing
+        );
+        if (metadata_status != BOOT_METADATA_OK) {
+            return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
+        }
+        install_status = maybe_fault(
+            &session->options,
+            UPDATE_INSTALL_FAULT_METADATA_WRITING,
+            session->header.manifest.image_version
+        );
+        if (install_status == UPDATE_INSTALL_OK) {
+            metadata_status = boot_metadata_reinitialize_for_recovery(
+                &session->restricted_flash,
+                &writing
+            );
+            install_status = (metadata_status == BOOT_METADATA_OK)
+                ? UPDATE_INSTALL_OK
+                : UPDATE_INSTALL_ERR_METADATA;
+        }
+    } else {
+        install_status = commit_metadata_state(
+            &session->restricted_flash,
+            &session->metadata_before,
+            BOOT_METADATA_STATE_WRITING,
+            session->active_slot_id,
+            (uint32_t)session->candidate->id,
+            session->header.manifest.image_version,
+            &session->options,
+            UPDATE_INSTALL_FAULT_METADATA_WRITING
+        );
+    }
     if (install_status != UPDATE_INSTALL_OK) {
         return fail_session(session, install_status);
     }
@@ -903,8 +992,7 @@ update_install_status_t update_installer_begin(
     );
     if ((metadata_status != BOOT_METADATA_OK) ||
         (session->writing_metadata.state != BOOT_METADATA_STATE_WRITING) ||
-        (session->writing_metadata.active_slot !=
-            (uint32_t)session->active->id) ||
+        (session->writing_metadata.active_slot != session->active_slot_id) ||
         (session->writing_metadata.candidate_slot !=
             (uint32_t)session->candidate->id)) {
         return fail_session(session, UPDATE_INSTALL_ERR_METADATA);
@@ -1066,7 +1154,7 @@ update_install_status_t update_installer_finish(update_installer_session_t *sess
         &session->restricted_flash,
         &session->writing_metadata,
         BOOT_METADATA_STATE_CANDIDATE_READY,
-        (uint32_t)session->active->id,
+        session->active_slot_id,
         (uint32_t)session->candidate->id,
         session->header.manifest.image_version,
         &session->options,
@@ -1110,14 +1198,14 @@ update_install_status_t update_installer_abort(update_installer_session_t *sessi
         }
 
         if ((current.state == BOOT_METADATA_STATE_WRITING) &&
-            (current.active_slot == (uint32_t)session->active->id) &&
+            (current.active_slot == session->active_slot_id) &&
             (current.candidate_slot == (uint32_t)session->candidate->id) &&
             (current.candidate_image_version ==
                 session->header.manifest.image_version)) {
             metadata_status = boot_metadata_prepare_next(
                 &current,
                 BOOT_METADATA_STATE_REJECTED_INVALID,
-                (uint32_t)session->active->id,
+                session->active_slot_id,
                 (uint32_t)session->candidate->id,
                 session->header.manifest.image_version,
                 0U,

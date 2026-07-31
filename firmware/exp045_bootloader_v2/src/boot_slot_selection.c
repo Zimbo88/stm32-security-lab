@@ -253,7 +253,9 @@ static boot_slot_selection_status_t start_or_continue_trial(
             metadata->candidate_image_version,
             next_attempts,
             0U,
-            BOOT_SLOT_SELECTION_RESULT_NONE,
+            (options->trial_reset_result != 0UL)
+                ? options->trial_reset_result
+                : BOOT_SLOT_SELECTION_RESULT_NONE,
             &next
         ) != BOOT_METADATA_OK) {
         result->fallback_cause = BOOT_SLOT_SELECTION_ERR_METADATA;

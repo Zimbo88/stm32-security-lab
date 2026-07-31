@@ -58,6 +58,8 @@ typedef struct {
     void *verify_context;
     boot_slot_selection_fault_hook_t fault_hook;
     void *fault_context;
+    /* Set by Stage-0 from RCC_CSR; zero means no reset snapshot available. */
+    uint32_t trial_reset_result;
 } boot_slot_selection_options_t;
 
 typedef struct {

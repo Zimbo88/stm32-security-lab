@@ -54,6 +54,9 @@ typedef struct {
     size_t readback_buffer_size;
     update_install_fault_hook_t fault_hook;
     void *fault_context;
+    /* Only set by the automatic UART recovery loop. It permits a signed
+       Slot-A bootstrap after the metadata journal is unrecoverable. */
+    uint8_t recovery_bootstrap;
 } update_install_options_t;
 
 typedef struct {
@@ -94,6 +97,7 @@ typedef struct {
 
     const boot_slot_descriptor_t *active;
     const boot_slot_descriptor_t *candidate;
+    uint32_t active_slot_id;
 
     update_package_header_t header;
     crypto_sha512_ctx payload_hash_ctx;

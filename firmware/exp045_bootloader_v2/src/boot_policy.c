@@ -2,6 +2,7 @@
 
 #include "boot_flash_target.h"
 #include "firmware_public_key.h"
+#include "reset_cause.h"
 
 verify_status_t boot_policy_verify(void)
 {
@@ -47,6 +48,7 @@ static boot_slot_selection_status_t verify_target_slot(
 }
 
 boot_slot_selection_status_t boot_policy_select(
+    uint32_t reset_csr,
     boot_slot_selection_result_t *result
 )
 {
@@ -62,6 +64,7 @@ boot_slot_selection_status_t boot_policy_select(
         .verify_context = NULL,
         .fault_hook = NULL,
         .fault_context = NULL,
+        .trial_reset_result = reset_cause_trial_result(reset_csr),
     };
 
     return boot_slot_selection_select(&options, result);
