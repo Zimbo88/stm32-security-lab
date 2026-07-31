@@ -127,6 +127,34 @@ python3 tools/mutation_smoke.py \
   --json-output fuzz/findings-local/mutation.json                       PASS
 ```
 
+## Build- und Artefaktprüfung
+
+The target builds completed with the repository's `-Werror` settings:
+
+```text
+make -C firmware/exp045_bootloader_v2 clean all report LAYOUT_PROFILE=stm32f429_1m PASS
+make -C firmware/exp066_research_platform_core clean all SLOT=a LAYOUT_PROFILE=stm32f429_1m PASS
+make -C firmware/exp066_research_platform_core clean all SLOT=b LAYOUT_PROFILE=stm32f429_1m PASS
+```
+
+The reproducibility check also passed:
+
+```text
+/tmp/stm32-security-lab-security-venv/bin/python tools/check_deterministic_build.py PASS
+```
+
+The synthetic marker verifier passed with `all_verified: true` for the
+bootloader, both slot images, SRAM symbols and the configuration reference:
+
+```text
+/tmp/stm32-security-lab-security-venv/bin/python tools/rdp2_marker.py inspect \
+  --output /tmp/stm32-security-part3-marker-report.json                  PASS
+```
+
+The private-key scan passed. `git diff --check` passed, and the final branch
+status was clean. `make -C fuzz libfuzzer` was attempted separately but is
+documented as unavailable because `clang` is not installed.
+
 ## Fuzzingkampagnen
 
 The extended bounded campaign was executed with `make fuzz`. It used a fixed
