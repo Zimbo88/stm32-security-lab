@@ -99,6 +99,7 @@ make -C tests/update_storage clean test SANITIZE=1                      PASS
 python3 -m pytest -q                                                     PASS (175)
 python3 tools/check_no_private_keys.py                                  PASS
 python3 tools/rdp2_marker.py inspect --output /tmp/stm32-marker-report.json PASS (5 markers)
+python3 tools/check_deterministic_build.py                              PASS
 git diff --check                                                        PASS
 ```
 
@@ -131,9 +132,12 @@ openocd -f interface/stlink.cfg -f target/stm32f4x.cfg \
   -c init -c "reset halt" -c resume -c shutdown
 ```
 
-UART updates used the existing `Stm32Client`/`stm32ctl` path with 512-byte
-blocks and the embedded public-key header. OpenOCD was used only for reversible
-development reset/restore in these runs; no Option-Byte command was issued.
+UART updates used the existing `Stm32Client` framing used by `stm32ctl`, with
+512-byte blocks and the embedded public-key header. For the short normal-mode
+boot window, the hardware harness synchronized the reversible OpenOCD reset
+and the same client API; this is not claimed as a fully debugger-free run.
+OpenOCD was used only for reversible development reset/restore in these runs;
+no Option-Byte command was issued.
 
 ### Executed tests and observations
 
@@ -163,7 +167,23 @@ TEST_SCENARIO mpu_null_access
 The fallback metadata snapshot after the failure campaign was
 `state=REJECTED_INVALID`, `active_slot=A`, `candidate_slot=B`,
 `candidate_image_version=31`. The later B32/A33/B34 updates returned the board
-to a valid confirmed state.
+to a valid confirmed state. Additional reversible MPU scenario packages were
+installed into Slot A at versions 41–45. The final board state was restored
+with normal signed Slot B version 46.
+
+The additional MPU hardware observations were:
+
+| Scenario | Observed result | Evidence |
+|---|---|---|
+| `mpu_execute_sram` A41 | Trial started; invalid health path eventually fell back to B | UART and metadata readback |
+| `mpu_write_bootloader` A42 | Trial started; IWDG reset `raw=0x24000000`; metadata later `REJECTED_INVALID` | UART and metadata readback |
+| `mpu_write_metadata` A43 | Trial did not confirm; fallback selected | UART and metadata readback |
+| `mpu_stack_guard` A44 | Trial started; IWDG reset `raw=0x24000000`; subsequent fallback | UART and metadata readback |
+| `mpu_valid_application` A45 | `MPU policy=OK`, `HEALTH_GATE result=OK`, `SLOT_CONFIRMATION result=OK` | UART transcript |
+| Normal restore B46 | `Slot decision = CONFIRMED`, health gate and confirmation succeeded | UART and metadata readback |
+
+The local, uncommitted UART captures for these runs are under
+`/tmp/stm32-root-trust-mpu-hardware/` and `/tmp/mpu_*.uart.log`.
 
 One `st-flash --reset write ... 0x08000000` attempt failed in the SRAM flash
 loader after erasing Stage-0 sectors. The known-good Stage-0 binary was then
@@ -182,14 +202,18 @@ the board rather than SWD.
 
 ## Nicht getestete Punkte
 
-- All remaining MPU scenarios (`mpu_execute_sram`, protected writes and stack
-  guard) were built but not all were run on hardware.
 - The complete key-loss/compromise ceremony and any key rotation are designed
   and documented only.
 - Full stack worst-case call-graph proof and a complete static-analysis run
   remain open.
+- The retained fault record was not independently read back for every MPU
+  scenario; the hardware evidence is based on UART state, IWDG reset causes,
+  fallback metadata and the valid-control scenario.
 - Both metadata copies and both slots were not intentionally corrupted on
   hardware.
+- A direct legacy `verify-signed` invocation against the current checkout was
+  not run because no EXP065 signed artifact was present; the deterministic
+  two-checkout run executed and passed the release-artifact verification path.
 - No physical power-loss campaign, RDP2, WRP, fault injection, glitching,
   invasive analysis or external cryptographic audit was performed.
 - No post-RDP2 repair or ROM-bootloader recovery was tested.

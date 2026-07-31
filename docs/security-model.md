@@ -56,5 +56,5 @@ the fixed layout.
 | Signed image validation | `signed_image.c`, host verifier and standard vectors | `HOST TESTED` |
 | Stage-0 write boundary | restricted flash instance and storage tests | `HOST TESTED` |
 | MPU policy descriptors | `mpu_policy.c`, `tests/mpu_policy` | `HOST TESTED` |
-| MPU enforcement on target | `mpu_null_access` fault and trial fallback on STM32F429 | `HARDWARE VALIDATED` for null-access path; other scenarios open |
+| MPU enforcement on target | Complete `mpu_*` trial/control matrix and fallback observations on STM32F429 | `HARDWARE VALIDATED`; retained fault context was not read back for every scenario |
 | RDP2 irreversibility | device policy and manual checklist | `DOCUMENTED ONLY` |

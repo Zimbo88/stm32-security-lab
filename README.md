@@ -426,10 +426,10 @@ Validated on real hardware at RDP Level 0:
 - flash readback for positive update targets;
 - unchanged Option Bytes during the campaign.
 
-Part 2 additionally recorded selected hardware evidence for the MPU policy
-(`mpu_null_access`), IWDG trial reset/fallback, wrong-key/signature/manifest
-rejection, and the corrected confirmed-version rollback floor. The complete
-MPU scenario matrix and a fully debugger-free reset campaign remain open.
+Part 2 additionally recorded hardware evidence for the complete `mpu_*`
+scenario matrix, IWDG trial reset/fallback, wrong-key/signature/manifest
+rejection, and the corrected confirmed-version rollback floor. A fully
+debugger-free reset campaign remains open.
 
 Host-only validation covers parser boundaries, verifier edge cases, metadata
 transitions, deterministic build reproducibility, package verification, and

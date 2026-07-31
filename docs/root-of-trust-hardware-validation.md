@@ -14,7 +14,10 @@ The embedded public-key fingerprint was
 `482dd9daac3d406f779995a50a00eb2ac9948eb412cba4403e2f81091780499a`.
 
 The raw shell transcripts are local lab evidence and are intentionally not
-committed. The commands below are the exact test forms used.
+committed. The commands below are the exact test forms used. The normal-mode
+boot-window runs used the `Stm32Client` framing code also used by `stm32ctl`;
+the harness synchronized reset timing with OpenOCD, so they are not
+debugger-free evidence.
 
 ## Executed evidence
 
@@ -29,6 +32,12 @@ committed. The commands below are the exact test forms used.
 | Manifest mutation | signed package header field changed | target NACK `VERIFY`; no erase/commit |
 | Stage-0 vector target | package vector changed to `0x08000000` | target NACK `VERIFY`; no erase/commit |
 | Same-version rollback | valid B package version 33 while A version 33 confirmed | target NACK `ROLLBACK`; no erase/commit |
+| `mpu_execute_sram` | signed A version 41, trial fault path | trial remained unconfirmed and later fell back to B |
+| `mpu_write_bootloader` | signed A version 42, CPU write access only | IWDG reset `raw=0x24000000`, then `REJECTED_INVALID` fallback |
+| `mpu_write_metadata` | signed A version 43, CPU write access only | unconfirmed trial and fallback |
+| `mpu_stack_guard` | signed A version 44, guard access only | IWDG reset `raw=0x24000000`, then fallback |
+| `mpu_valid_application` | signed A version 45 | `MPU policy=OK`, health gate and confirmation succeeded |
+| Normal restore | signed B version 46 | normal B confirmed; final metadata copy selected B |
 
 The board was finally restored with a valid newer B package. A transient read
 during its confirmation showed the normal journal sequence (`WRITING`/trial
@@ -55,7 +64,9 @@ program a protected region; the MPU scenarios issue CPU accesses only and must
 be abandoned if the policy is not enabled.
 
 Software and host descriptors are implemented and host tested. The normal
-boot/update path, selected negative authorization cases, and the MPU null
-fault/fallback path are hardware validated on this board. The full MPU
-scenario matrix, independent UART-only recovery run, and complete production
-provisioning evidence remain open. No RDP2 or WRP validation claim is made.
+boot/update path, selected negative authorization cases, and the complete
+`mpu_*` scenario matrix are hardware validated on this board for the tested
+fallback/control behavior. The retained fault record was not independently
+read back for every scenario. An independent UART-only recovery run and
+complete production provisioning evidence remain open. No RDP2 or WRP
+validation claim is made.
