@@ -110,7 +110,12 @@ class Stm32Client:
         return parse_status(response.extra)
 
     def reset(self) -> None:
-        self.request(Command.RESET)
+        # The target requests SYSRESETREQ immediately after accepting RESET.
+        # The MCU can therefore reset before the UART ACK reaches the host.
+        # RESET is intentionally fire-and-forget; the caller observes the
+        # subsequent boot through a new session.
+        write_frame(self.transport, Command.RESET, self.sequence)
+        self._advance_sequence()
 
     def abort_update(self) -> None:
         self.request(Command.ABORT_UPDATE)

@@ -3,6 +3,7 @@
 #include "boot_slot.h"
 #include "experiment_telemetry.h"
 #include "log.h"
+#include "mpu_policy.h"
 #include "platform.h"
 #include "platform_confirmation.h"
 #include "platform_health.h"
@@ -627,7 +628,8 @@ void runtime_monitor_get_evidence(rsm_evidence_snapshot_t *snapshot)
     snapshot->vector_monitor_available = vector.available;
     snapshot->vector_monitor_status = vector.status;
     snapshot->latched_vector_failure = vector.latched_failure;
-    snapshot->stack_guard_available = 0U;
+    snapshot->stack_guard_available =
+        mpu_policy_is_enabled() != 0U ? 1U : 0U;
     snapshot->option_policy_available = 0U;
     snapshot->fault_record_valid = fault_valid() ? 1U : 0U;
 #endif
@@ -738,7 +740,9 @@ void runtime_monitor_print_public_status(void)
         rsm_bool_pass_fail(evidence.boot_self_tests_passed);
     output_status.security_flash = "unavailable";
     output_status.security_vectors = rsm_vector_public_status_name(&vector);
-    output_status.security_stack = "unavailable";
+    output_status.security_stack = evidence.stack_guard_available != 0U
+        ? "mpu_guard_enabled"
+        : "unavailable";
     output_status.security_option_policy = "unavailable";
     output_status.vector_status = rsm_vector_public_status_name(&vector);
     output_status.vector_failure_class =

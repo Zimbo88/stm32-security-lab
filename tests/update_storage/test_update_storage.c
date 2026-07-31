@@ -15,6 +15,7 @@
 #include "stm32f429_memory_layout.h"
 #include "update_installer.h"
 #include "update_package.h"
+#include "reset_cause.h"
 
 static int failures;
 
@@ -1311,7 +1312,69 @@ static update_install_options_t make_install_options_with_sizes(
     options.readback_buffer_size = readback_buffer_size;
     options.fault_hook = hook;
     options.fault_context = hook_context;
+    options.recovery_bootstrap = 0U;
     return options;
+}
+
+static update_install_options_t make_install_options(
+    uint8_t *program_buffer,
+    uint8_t *readback_buffer,
+    update_install_fault_hook_t hook,
+    void *hook_context
+);
+
+static void test_update_installer_recovery_bootstrap_slot_a(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    uint8_t package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    update_install_result_t result;
+    boot_metadata_record_t recovered;
+    const size_t package_size = build_update_package_for_slot(
+        BOOT_SLOT_A,
+        9U,
+        package,
+        sizeof(package)
+    );
+    update_install_options_t options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        NULL,
+        NULL
+    );
+    options.recovery_bootstrap = 1U;
+
+    make_installer_flash(&sim, &flash);
+    expect_install_status(
+        "recovery bootstrap installs signed Slot A",
+        UPDATE_INSTALL_OK,
+        update_installer_install(
+            &flash,
+            package,
+            package_size,
+            update_public_key,
+            &options,
+            &result
+        )
+    );
+    expect_u32("recovery bootstrap active slot", BOOT_SLOT_NONE, result.active_slot);
+    expect_u32("recovery bootstrap candidate slot", BOOT_SLOT_A, result.candidate_slot);
+    expect_metadata_status(
+        "recovery bootstrap metadata",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_metadata_record(
+        "recovery bootstrap candidate ready",
+        &recovered,
+        2U,
+        BOOT_METADATA_STATE_CANDIDATE_READY,
+        BOOT_SLOT_NONE,
+        BOOT_SLOT_A,
+        9U
+    );
 }
 
 static update_install_options_t make_install_options(
@@ -1330,6 +1393,13 @@ static update_install_options_t make_install_options(
         hook_context
     );
 }
+
+static size_t build_update_package_for_slot(
+    uint32_t slot_id,
+    uint32_t image_version,
+    uint8_t *package,
+    size_t package_capacity
+);
 
 typedef struct {
     update_install_fault_point_t point;
@@ -5105,7 +5175,7 @@ static void test_slot_selection_missing_confirmation_exhausts_attempts(void)
     );
 }
 
-static void test_slot_selection_invalid_candidate_falls_back(void)
+static void test_slot_selection_records_watchdog_trial_reset(void)
 {
     simulated_flash_t sim;
     boot_flash_t flash;
@@ -5115,6 +5185,65 @@ static void test_slot_selection_invalid_candidate_falls_back(void)
     selection_verify_context_t verify_context;
     boot_slot_selection_result_t selection;
     boot_metadata_record_t recovered;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_candidate_ready_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U
+    );
+    boot_slot_selection_options_t options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    options.trial_reset_result = RESET_CAUSE_RESULT_IWDG;
+
+    expect_selection_status(
+        "watchdog trial selection",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&options, &selection)
+    );
+    expect_metadata_status(
+        "recover watchdog trial metadata",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_u32(
+        "watchdog reset is persisted",
+        RESET_CAUSE_RESULT_IWDG,
+        recovered.result
+    );
+    (void)active;
+    (void)candidate;
+}
+
+static void test_slot_selection_invalid_candidate_falls_back(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t replacement_package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_metadata_record_t recovered;
+    update_install_result_t install_result;
 
     make_installer_flash(&sim, &flash);
     setup_selection_images(
@@ -5179,6 +5308,159 @@ static void test_slot_selection_invalid_candidate_falls_back(void)
         "bad candidate result code",
         BOOT_SLOT_SELECTION_RESULT_CANDIDATE_VERIFY_FAILED,
         recovered.result
+    );
+
+    update_install_options_t install_options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        NULL,
+        NULL
+    );
+    const size_t replacement_size = build_update_package_for_slot(
+        BOOT_SLOT_B,
+        4U,
+        replacement_package,
+        sizeof(replacement_package)
+    );
+    expect_install_status(
+        "update remains available after fallback rejection",
+        UPDATE_INSTALL_OK,
+        update_installer_install(
+            &flash,
+            replacement_package,
+            replacement_size,
+            update_public_key,
+            &install_options,
+            &install_result
+        )
+    );
+    expect_u32("fallback keeps active A for next update", BOOT_SLOT_A, install_result.active_slot);
+    expect_u32("fallback reuses rejected inactive B", BOOT_SLOT_B, install_result.candidate_slot);
+}
+
+static void test_update_after_rejected_candidate_uses_confirmed_version_floor(void)
+{
+    simulated_flash_t sim;
+    boot_flash_t flash;
+    const boot_slot_descriptor_t *active = NULL;
+    const boot_slot_descriptor_t *candidate = NULL;
+    uint8_t image_buffer[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t retry_package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t downgrade_package[TEST_PACKAGE_BUFFER_SIZE];
+    uint8_t program_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    uint8_t readback_buffer[TEST_INSTALL_PROGRAM_CHUNK];
+    selection_verify_context_t verify_context;
+    boot_slot_selection_result_t selection;
+    boot_metadata_record_t recovered;
+    update_install_result_t install_result;
+
+    make_installer_flash(&sim, &flash);
+    setup_selection_images(
+        &sim,
+        BOOT_SLOT_A,
+        2U,
+        3U,
+        &active,
+        &candidate
+    );
+    commit_candidate_ready_metadata(
+        &flash,
+        BOOT_SLOT_A,
+        2U,
+        BOOT_SLOT_B,
+        3U
+    );
+
+    /* Force the candidate verification path to reject B without changing
+       the signed version recorded for the failed candidate. */
+    sim.storage[
+        flash_offset(
+            candidate->signed_image_base +
+            SIGNED_IMAGE_HEADER_SIZE +
+            APPLICATION_VECTOR_MIN_SIZE
+        )
+    ] ^= 0x01U;
+    boot_slot_selection_options_t selection_options = make_selection_options(
+        &flash,
+        &verify_context,
+        image_buffer,
+        NULL,
+        NULL
+    );
+    expect_selection_status(
+        "rejected candidate creates fallback state",
+        BOOT_SLOT_SELECTION_OK,
+        boot_slot_selection_select(&selection_options, &selection)
+    );
+    expect_u32(
+        "rejected candidate falls back to A",
+        BOOT_SLOT_SELECTION_DECISION_FALLBACK,
+        selection.decision
+    );
+    expect_metadata_status(
+        "rejected candidate metadata is recoverable",
+        BOOT_METADATA_OK,
+        boot_metadata_recover_from_flash(&flash, &recovered, NULL)
+    );
+    expect_u32(
+        "rejected candidate keeps candidate version for diagnosis",
+        3U,
+        recovered.candidate_image_version
+    );
+
+    update_install_options_t install_options = make_install_options(
+        program_buffer,
+        readback_buffer,
+        NULL,
+        NULL
+    );
+
+    const size_t downgrade_size = build_update_package_for_slot(
+        BOOT_SLOT_B,
+        2U,
+        downgrade_package,
+        sizeof(downgrade_package)
+    );
+    expect_install_status(
+        "rejected candidate does not permit downgrade",
+        UPDATE_INSTALL_ERR_ROLLBACK,
+        update_installer_install(
+            &flash,
+            downgrade_package,
+            downgrade_size,
+            update_public_key,
+            &install_options,
+            NULL
+        )
+    );
+
+    const size_t retry_size = build_update_package_for_slot(
+        BOOT_SLOT_B,
+        3U,
+        retry_package,
+        sizeof(retry_package)
+    );
+    expect_install_status(
+        "same version as rejected candidate is retryable",
+        UPDATE_INSTALL_OK,
+        update_installer_install(
+            &flash,
+            retry_package,
+            retry_size,
+            update_public_key,
+            &install_options,
+            &install_result
+        )
+    );
+    expect_u32(
+        "retry keeps confirmed active slot",
+        BOOT_SLOT_A,
+        install_result.active_slot
+    );
+    expect_u32(
+        "retry reuses rejected candidate slot",
+        BOOT_SLOT_B,
+        install_result.candidate_slot
     );
 }
 
@@ -5681,10 +5963,13 @@ int main(void)
     test_update_installer_streaming_fault_injection();
     test_update_installer_streaming_reset_after_faults();
     test_update_installer_streaming_reset_mid_write_falls_back();
+    test_update_installer_recovery_bootstrap_slot_a();
 
     test_slot_selection_successful_upgrade_and_confirmation();
     test_slot_selection_missing_confirmation_exhausts_attempts();
+    test_slot_selection_records_watchdog_trial_reset();
     test_slot_selection_invalid_candidate_falls_back();
+    test_update_after_rejected_candidate_uses_confirmed_version_floor();
     test_slot_selection_recovers_torn_metadata_copy();
     test_slot_selection_rejects_ambiguous_or_invalid_metadata();
     test_slot_selection_power_loss_before_attempt_commit_falls_back();

@@ -9,14 +9,14 @@ description = "Hardware-in-the-loop validation framework for the STM32 secure-bo
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "pyserial>=3.5",
+  "pyserial==3.5",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "mypy>=1.8",
-  "pytest>=7.4",
-  "ruff>=0.5",
+  "mypy==2.3.0",
+  "pytest==7.4.4",
+  "ruff==0.16.1",
 ]
 plots = [
   "matplotlib>=3.8",

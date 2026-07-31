@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from nacl.signing import SigningKey
+
 ROOT = Path(__file__).resolve().parents[1]
 SIGNER_PATH = (
     ROOT
@@ -454,11 +456,20 @@ def run_build(args: argparse.Namespace) -> int:
     try:
         application = read_file(args.application, "application")
         seed = read_file(args.seed, "Ed25519 seed")
+        public_key = bytes(SigningKey(seed).verify_key)
+        public_key_fingerprint = sha256_hex(public_key)
+        print(f"public_key_fingerprint_sha256={public_key_fingerprint}")
         package, payload_hash, initial_msp, reset_vector = signer.build_update_package(
             application,
             seed,
             slot=args.slot,
             image_version=args.image_version,
+        )
+        self_verification = verify_package_bytes(
+            package,
+            public_key,
+            slot=args.slot,
+            application=application,
         )
         signer.write_output_atomically(args.output, package)
         report = success_report({
@@ -471,6 +482,10 @@ def run_build(args: argparse.Namespace) -> int:
             "payload_sha512": payload_hash.hex(),
             "initial_msp": initial_msp,
             "reset_vector": reset_vector,
+            "public_key_fingerprint_sha256": public_key_fingerprint,
+            "signature_self_verification": self_verification["verification"][
+                "signature_valid"
+            ],
         })
         write_json(args.json_output, report)
         return EXIT_OK

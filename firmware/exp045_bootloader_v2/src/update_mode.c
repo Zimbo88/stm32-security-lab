@@ -1,6 +1,7 @@
 #include "update_mode.h"
 
 #include "board_version.h"
+#include "boot_watchdog.h"
 #include "boot_flash_target.h"
 #include "diagnostic_console.h"
 #include "firmware_public_key.h"
@@ -164,6 +165,7 @@ static update_mode_entry_t wait_for_update_or_console_entry(
 
     while ((idle_polls < UPDATE_SERVICE_DEFAULT_ENTRY_IDLE_POLLS) &&
            (byte_count < UPDATE_SERVICE_DEFAULT_ENTRY_MAX_BYTES)) {
+        boot_watchdog_refresh();
         uint8_t byte = 0U;
         const byte_reader_status_t read_status =
             byte_reader_getc_nonblocking(reader, &byte);
@@ -212,7 +214,9 @@ static update_mode_entry_t wait_for_update_or_console_entry(
     return UPDATE_MODE_ENTRY_BOOT;
 }
 
-update_service_result_t update_mode_poll_and_process(void)
+static update_service_result_t update_mode_poll_and_process_mode(
+    uint8_t recovery_bootstrap
+)
 {
     byte_reader_t reader;
     update_service_config_t config;
@@ -235,6 +239,7 @@ update_service_result_t update_mode_poll_and_process(void)
         sizeof(update_mode_readback_buffer);
     config.install_options.fault_hook = NULL;
     config.install_options.fault_context = NULL;
+    config.install_options.recovery_bootstrap = recovery_bootstrap;
     config.reader = &reader;
     config.write = uart_binary_write;
     config.write_context = NULL;
@@ -268,17 +273,43 @@ update_service_result_t update_mode_poll_and_process(void)
         console_config.idle_timeout_polls =
             DIAGNOSTIC_CONSOLE_DEFAULT_IDLE_TIMEOUT_POLLS;
 
-        if (diagnostic_console_run(
+        const diagnostic_console_result_t console_result =
+            diagnostic_console_run(
                 &update_mode_console,
                 &console_config,
                 initial_line
-            ) == DIAGNOSTIC_CONSOLE_RESULT_RESET_REQUESTED) {
+            );
+        if (console_result == DIAGNOSTIC_CONSOLE_RESULT_RESET_REQUESTED) {
             return UPDATE_SERVICE_RESULT_RESET_REQUESTED;
+        }
+        if (console_result == DIAGNOSTIC_CONSOLE_RESULT_RECOVERY_REQUESTED) {
+            return UPDATE_SERVICE_RESULT_RECOVERY_REQUESTED;
         }
         return UPDATE_SERVICE_RESULT_BOOT_CONTINUE;
 
     case UPDATE_MODE_ENTRY_BOOT:
     default:
         return UPDATE_SERVICE_RESULT_BOOT_CONTINUE;
+    }
+}
+
+update_service_result_t update_mode_poll_and_process(void)
+{
+    return update_mode_poll_and_process_mode(0U);
+}
+
+_Noreturn void update_mode_run_recovery(void)
+{
+    uart_puts("RECOVERY READY signed-uart-update=required slot=A-bootstrap\n");
+    for (;;) {
+        const update_service_result_t result =
+            update_mode_poll_and_process_mode(1U);
+        if (result == UPDATE_SERVICE_RESULT_RESET_REQUESTED) {
+            /* system_reset_request() is non-returning on the target. */
+            for (;;) {
+                __asm volatile("nop");
+            }
+        }
+        uart_puts("RECOVERY WAIT signed-package-required\n");
     }
 }

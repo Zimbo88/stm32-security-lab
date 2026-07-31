@@ -11,12 +11,23 @@ MEMORY
     FLASH (rx) : ORIGIN = STM32F429_SELECTED_APPLICATION_BASE, LENGTH = STM32F429_SELECTED_APPLICATION_PAYLOAD_MAX_SIZE
     RAM (rwx)  : ORIGIN = STM32F429_MAIN_SRAM_BASE, LENGTH = STM32F429_MAIN_SRAM_SUPPORTED_SIZE
 }
+STM32_APP_STACK_RESERVE_SIZE = 0x2000;
+STM32_APP_STACK_GUARD_SIZE = 0x100;
 _estack = ORIGIN(RAM) + LENGTH(RAM);
+_stack_guard_start = _estack - STM32_APP_STACK_RESERVE_SIZE;
+_stack_guard_end = _stack_guard_start + STM32_APP_STACK_GUARD_SIZE;
 SECTIONS
 {
     .isr_vector : { . = ALIGN(256); KEEP(*(.isr_vector)) } > FLASH
     .text : { . = ALIGN(4); *(.text*) *(.rodata*) . = ALIGN(4); } > FLASH
-    .ramfunc : AT(ADDR(.text) + SIZEOF(.text))
+    .rdp2_marker :
+    {
+        . = ALIGN(4);
+        __rdp2_slot_marker_start = .;
+        KEEP(*(.rdp2_marker.slot))
+        __rdp2_slot_marker_end = .;
+    } > FLASH
+    .ramfunc : AT(LOADADDR(.rdp2_marker) + SIZEOF(.rdp2_marker))
     {
         . = ALIGN(4);
         _sramfunc = .;
@@ -28,6 +39,13 @@ SECTIONS
     _etext = LOADADDR(.ramfunc) + SIZEOF(.ramfunc);
     .data : AT(_etext) { . = ALIGN(4); _sdata = .; *(.data*) . = ALIGN(4); _edata = .; } > RAM
     .bss (NOLOAD) : { . = ALIGN(8); _sbss = .; *(.bss*) *(COMMON) . = ALIGN(8); _ebss = .; } > RAM
+    .rdp2_sram_marker (NOLOAD) :
+    {
+        . = ALIGN(4);
+        __rdp2_sram_marker_start = .;
+        KEEP(*(.noinit.rdp2_marker))
+        __rdp2_sram_marker_end = .;
+    } > RAM
     .noinit (NOLOAD) : { . = ALIGN(8); _snoinit = .; *(.noinit*) . = ALIGN(8); _enoinit = .; } > RAM
     _flash_image_end = LOADADDR(.data) + SIZEOF(.data);
     ASSERT(ADDR(.isr_vector) == STM32F429_SELECTED_APPLICATION_BASE, "vector table address changed")
@@ -40,6 +58,9 @@ SECTIONS
     ASSERT(STM32F429_SLOT_A_END <= STM32F429_SLOT_B_SIGNED_IMAGE_BASE, "Slot A and Slot B overlap")
     ASSERT(STM32F429_SLOT_B_END <= STM32F429_RECOVERY_BASE, "Slot B and recovery overlap")
     ASSERT(STM32F429_RECOVERY_END == STM32F429_FLASH_END, "recovery must end at 1 MiB flash end")
-    ASSERT(_enoinit <= ORIGIN(RAM) + LENGTH(RAM), "platform exceeds SRAM")
+    ASSERT(_enoinit <= _stack_guard_start, "static RAM overlaps reserved stack")
+    ASSERT((_stack_guard_start & (STM32_APP_STACK_GUARD_SIZE - 1)) == 0,
+        "stack guard must be MPU aligned")
+    ASSERT((_stack_guard_end <= _estack), "stack guard exceeds reserved stack")
     ASSERT((_estack & 7) == 0, "stack must be 8-byte aligned")
 }

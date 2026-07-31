@@ -10,7 +10,7 @@ diagnostics, and hardware-in-the-loop validation.**
        width="760">
 </p>
 
-> **Status:** hardware validated at RDP Level 0 on an STM32F429IGT6-class board<br>
+> **Status:** v1.1.0-rc1 research release candidate; hardware validated at RDP Level 0 on an STM32F429IGT6-class board<br>
 > **Target platform:** STM32F429 family, `stm32f429_1m` layout profile<br>
 > **License:** BSD 3-Clause<br>
 > **Primary focus:** defensive embedded-security research and reviewable
@@ -31,6 +31,12 @@ review, experimentation, and further hardening.
 Only run destructive tests on hardware you own or are explicitly authorized to
 test.
 
+This is an open-source research platform and release candidate, not a
+production-certified or formally verified security system. RDP2 and WRP are
+not enabled; the current RDP2 decision is **No-Go** because the controlled
+power-loss campaign and parts of the independent UART-only lifecycle remain
+open. Test-key firmware is not intended for provisioned devices.
+
 ## Architecture At A Glance
 
 ```mermaid
@@ -46,7 +52,7 @@ flowchart TD
     Metadata --> BootPolicy
     BootPolicy --> Verify[Manifest, SHA-512, Ed25519, vector checks]
     Verify -->|accepted| App[EXP066 research platform]
-    Verify -->|rejected| Fallback[Fallback or recovery/fatal state]
+    Verify -->|rejected| Fallback[Confirmed fallback or signed UART recovery]
     App --> Confirm[Application confirmation]
     Confirm --> Metadata
 ```
@@ -67,7 +73,10 @@ Detailed architecture:
 
 ## Feature Overview
 
-Current release-quality reference components:
+Current reference components and their evidence are listed in the
+[feature matrix](docs/platform-feature-matrix.md) and [security claims](docs/security-claims.md).
+The following list describes what is implemented; it is not a production
+approval:
 
 - EXP045 Stage-0 secure bootloader for STM32F429.
 - EXP066 slot-aware research application.
@@ -75,13 +84,24 @@ Current release-quality reference components:
 - SHA-512 payload integrity verification.
 - Redundant boot metadata with explicit states.
 - Slot A/Slot B boot selection, trial boot, confirmation, and fallback.
+- Persistent three-attempt trial policy, reset-cause accounting, independent
+  watchdog and signed UART recovery bootstrap.
 - Streaming secure-update installer with fixed RAM buffers and no heap.
 - USART1 polling RX/TX transport and deterministic `SUPD` binary protocol.
 - Read-only UART diagnostic console.
-- `stm32ctl` Python host client for `info`, `status`, `update`, and `reset`.
+- `stm32ctl` Python host client for `info`, `status`, `update`, `recovery`, and
+  `reset`.
 - Runtime Security Monitor foundation in EXP066.
+- Cortex-M4 MPU policy with Stage-0/metadata read-only mapping and stack guard.
+- Explicit root-of-trust, key lifecycle, rollback, WRP evaluation, and threat
+  model documentation.
 - Deterministic build checker, release artifact validation, host tests, and HIL
   tooling.
+- Host-only security fuzzing for UART, package, metadata and boot policy,
+  Hypothesis properties, ASan/UBSan profiles, GCC analyzer and gcov coverage
+  reporting. Extended campaigns remain a separate, explicitly invoked step.
+- Local release-candidate tooling with deterministic manifests, SPDX SBOM,
+  provenance, artifact verification and publication scanning.
 
 Research or experimental components:
 
@@ -89,8 +109,64 @@ Research or experimental components:
   simulations.
 - Runtime-monitor telemetry intended for evidence and diagnostics, not as an
   isolated security enclave.
-- Physical recovery, option-byte policy, WRP/RDP provisioning, and
+- Physical recovery pin selection, option-byte policy, WRP/RDP provisioning, and
   fault-injection campaigns.
+
+Recovery and watchdog evidence is explicitly classified in
+[the hardening report](docs/recovery-watchdog-hardening-report.md). The
+repository distinguishes `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
+`DOCUMENTED ONLY` and `NOT IMPLEMENTED`; a host test is not hardware evidence.
+
+### Current evidence summary
+
+| Function | Status |
+|---|---|
+| Secure Boot | HARDWARE VALIDATED |
+| Ed25519 verification | HOST AND HARDWARE TESTED |
+| SHA-512 | HOST AND HARDWARE TESTED |
+| A/B update | HARDWARE VALIDATED |
+| Wrong-key rejection | HARDWARE VALIDATED |
+| Signature rejection | HARDWARE VALIDATED |
+| Rollback rejection | HARDWARE VALIDATED |
+| Trial Boot | HARDWARE VALIDATED |
+| Watchdog fallback | HARDWARE VALIDATED |
+| UART recovery | LIMITED HARDWARE VALIDATION |
+| MPU | HARDWARE TESTED |
+| Metadata corruption | PARTIAL VALIDATION |
+| Power-loss resilience | NOT YET FULLY VALIDATED |
+| WRP | NOT ENABLED |
+| RDP2 | NOT ENABLED / NO-GO |
+| Reproducible builds | LOCALLY VALIDATED |
+| Remote CI | PENDING UNTIL GITHUB RUN |
+| External audit | NOT PERFORMED |
+
+Part-2 security references:
+
+- [Security Model](docs/security-model.md)
+- [Threat Model](docs/threat-model.md)
+- [Root of Trust](docs/root-of-trust.md)
+- [Root-of-Trust Hardening Report](docs/root-of-trust-hardening-report.md)
+
+Part-3 security-testing references:
+
+- [Security Test Surface](docs/security-test-surface.md)
+- [Fuzzing](docs/fuzzing.md)
+- [Coverage](docs/coverage.md)
+- [Security Test Profiles](docs/security-test-profiles.md)
+- [Security Testing Limitations](docs/security-testing-limitations.md)
+- [Root-of-Trust Hardware Evidence](docs/root-of-trust-hardware-validation.md)
+- [Key Management](docs/key-management.md)
+- [MPU Policy](docs/mpu-policy.md)
+- [Root-of-Trust Hardening Report](docs/root-of-trust-hardening-report.md)
+
+Open-source and release references:
+
+- [Project Scope](docs/project-scope.md)
+- [Quickstart](docs/quickstart.md)
+- [Documentation Index](docs/README.md)
+- [Release Artifacts](docs/release-artifacts.md)
+- [Security Claims](docs/security-claims.md)
+- [Release Readiness Report](docs/open-source-release-readiness-report.md)
 
 ## Main Components
 
@@ -113,8 +189,7 @@ Research or experimental components:
 |-- config/                 Source memory-layout profile
 |-- docs/                   Architecture, validation, release, and research docs
 |-- firmware/               Bootloader, application, and experiment firmware
-|-- hardware/               Curated hardware baselines and provisioning records
-|-- logs/                   Historical experiment evidence
+|-- hardware/               Curated hardware layout and provisioning records
 |-- modules/                Module-research examples and fixtures
 |-- scripts/                Experiment helper scripts
 |-- tests/                  Python and C host tests
@@ -127,8 +202,10 @@ Research or experimental components:
 `-- README.md
 ```
 
-The numbered `expNNN_*` directories preserve the research history. The current
-hardware-validated secure-update path is EXP045 plus EXP066.
+The numbered `expNNN_*` directories preserve the research history. Raw local
+flash baselines, analyzer captures and hardware logs are intentionally excluded
+from the public tree; curated evidence is maintained under `docs/`. The
+current hardware-validated secure-update path is EXP045 plus EXP066.
 
 ## Hardware
 
@@ -170,7 +247,8 @@ python3-venv
 openocd or stlink-tools
 ```
 
-Python dependencies are listed in [requirements.txt](requirements.txt):
+Python dependencies are pinned in [requirements.txt](requirements.txt) and
+[requirements-security.txt](requirements-security.txt):
 
 ```bash
 python3 -m venv .venv-hil
@@ -185,6 +263,19 @@ tests. Building signed release packages requires an external 32-byte Ed25519
 signing seed supplied by path; private seeds must remain outside Git.
 
 ## Build
+
+Run the host security profiles without touching hardware:
+
+```bash
+make test-fast
+make test-security PYTHON=/path/to/security-venv/bin/python
+make fuzz
+```
+
+`make fuzz` is intentionally not part of a normal build. It runs bounded,
+host-only parser/policy campaigns and keeps findings under the ignored
+`fuzz/findings-local/` directory. RDP, Option Bytes, WRP and physical flash
+operations are not changed by these targets.
 
 Build the bootloader:
 
@@ -272,6 +363,7 @@ make -C tests/update_protocol clean test
 make -C tests/uart clean test
 make -C tests/diagnostic_console clean test
 make -C tests/rsm_core clean test
+make -C tests/reset_cause clean test
 make -C tools clean test
 ```
 
@@ -296,6 +388,18 @@ python3 tools/check_no_private_keys.py
 bash audit/run_repository_audit.sh
 git diff --check
 ```
+
+Create and verify a local, test-key-only release candidate without tagging or
+publishing:
+
+```bash
+make release-candidate RELEASE_TEST_KEY=1
+make verify-release RELEASE_DIR=dist/v1.1.0-rc1-local
+```
+
+This produces a local SPDX SBOM, provenance record, sorted checksums and a
+deterministic archive. It does not flash hardware, write Option Bytes, push or
+create a GitHub release.
 
 The GitHub CI workflow runs the same host, firmware, deterministic-build, and
 private-key checks without flashing hardware.
@@ -340,7 +444,7 @@ Host update example:
 
 ```bash
 PYTHONPATH=tools python3 -m stm32ctl \
-  --port /dev/ttyUSB0 \
+  --port /dev/ttyUSBx \
   --timeout 15 \
   update \
   --package firmware/exp066_research_platform_core/build/slot_b/exp066_research_platform_core_slot_b_slot_b_update_v2.bin \
@@ -403,6 +507,11 @@ Validated on real hardware at RDP Level 0:
 - flash readback for positive update targets;
 - unchanged Option Bytes during the campaign.
 
+Part 2 additionally recorded hardware evidence for the complete `mpu_*`
+scenario matrix, IWDG trial reset/fallback, wrong-key/signature/manifest
+rejection, and the corrected confirmed-version rollback floor. A fully
+debugger-free reset campaign remains open.
+
 Host-only validation covers parser boundaries, verifier edge cases, metadata
 transitions, deterministic build reproducibility, package verification, and
 tool behavior.
@@ -436,7 +545,8 @@ tag.
 
 See [Release Process](docs/release_process.md),
 [Release Checklist](docs/RELEASE_CHECKLIST.md), and
-[Changelog](CHANGELOG.md).
+[Release Artifacts](docs/release-artifacts.md), [Changelog](CHANGELOG.md), and
+[Third-Party Notices](THIRD_PARTY_NOTICES.md).
 
 ## Troubleshooting
 

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security report
-    url: ../../security/policy
-    about: Follow the repository security policy before publishing details.
+    url: https://github.com/Zimbo88/stm32-security-lab/security/advisories/new
+    about: Use private vulnerability reporting; do not publish exploit details in an issue.

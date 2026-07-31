@@ -4,6 +4,7 @@
 
 #include "boot_flash_target.h"
 #include "boot_slot.h"
+#include "mpu_policy.h"
 
 static platform_confirmation_snapshot_t last_snapshot = {
     .running_slot = BOOT_SLOT_NONE,
@@ -35,6 +36,21 @@ static void snapshot_clear(void)
     last_snapshot.metadata_status = BOOT_METADATA_ERR_NO_VALID_COPY;
 }
 
+static uint32_t trusted_metadata_image_version(
+    const boot_metadata_record_t *metadata
+)
+{
+    if (metadata == NULL) {
+        return 0UL;
+    }
+    if ((metadata->state == BOOT_METADATA_STATE_PENDING_TRIAL) ||
+        (metadata->state == BOOT_METADATA_STATE_CONFIRMED)) {
+        return metadata->candidate_image_version;
+    }
+    /* A rejected or incomplete candidate is not the running firmware. */
+    return 0UL;
+}
+
 uint8_t platform_confirmation_health_gate(
     const platform_confirmation_health_t *health
 )
@@ -48,6 +64,11 @@ uint8_t platform_confirmation_health_gate(
             (health->core_self_checks_passed != 0U) &&
             (health->critical_initialization_failure == 0U) &&
             (health->stable_execution_point_reached != 0U) &&
+            (health->uart_diagnostics_ready != 0U) &&
+            (health->runtime_monitor_ready != 0U) &&
+            (health->mpu_policy_ready != 0U) &&
+            (health->watchdog_active != 0U) &&
+            (health->application_health_ok != 0U) &&
             (health->metadata_allows_confirmation != 0U))
         ? 1U
         : 0U;
@@ -162,7 +183,7 @@ platform_confirmation_status_t platform_confirmation_service(
     last_snapshot.confirmed_slot = metadata.active_slot;
     last_snapshot.candidate_slot = metadata.candidate_slot;
     last_snapshot.remaining_trial_attempts = metadata.boot_attempt_count;
-    last_snapshot.image_version = metadata.candidate_image_version;
+    last_snapshot.image_version = trusted_metadata_image_version(&metadata);
     health.metadata_allows_confirmation = metadata_allows_confirmation(
         &metadata,
         running_slot,
@@ -186,8 +207,13 @@ platform_confirmation_status_t platform_confirmation_service(
         return last_snapshot.last_status;
     }
 
+    /* The MPU makes the metadata journal read-only to application code. The
+       existing confirmation primitive is the sole bounded exception; it is
+       resumed immediately after the atomic metadata commit attempt. */
+    mpu_policy_suspend_for_metadata_commit();
     last_snapshot.confirm_status =
         boot_confirm_current_slot(&flash, running_slot, &result);
+    mpu_policy_resume_after_metadata_commit();
     last_snapshot.last_status =
         map_confirm_status(last_snapshot.confirm_status);
     if (last_snapshot.confirm_status == BOOT_CONFIRM_OK) {

@@ -1,7 +1,0 @@
-Found 1 stlink programmers
-  version:    V2J37S7
-  serial:     57FF6E067182525511261687
-  flash:      55087104 (pagesize: 16384)
-  sram:       262144
-  chipid:     0x419
-  dev-type:   STM32F42x_F43x

@@ -30,8 +30,8 @@ make flash
 
 ## Terminal
 
-Replace `/dev/ttyUSB0` if necessary:
+Replace `/dev/ttyUSBx` with the local UART device if necessary:
 
 ```bash
-picocom -b 115200 --imap lfcrlf /dev/ttyUSB0
+picocom -b 115200 --imap lfcrlf /dev/ttyUSBx
 ```

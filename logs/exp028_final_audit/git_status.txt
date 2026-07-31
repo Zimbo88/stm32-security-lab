@@ -1,3 +1,0 @@
-?? logic/
-?? logs/board_verification/
-?? logs/exp028_final_audit/

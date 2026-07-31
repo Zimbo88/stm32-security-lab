@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # STM32F429 Secure Boot Slot/Metadata/Recovery Test Monster v2
 #
 # Optional:
-#   UART_DEVICE=/dev/ttyACM0 WAIT_SECONDS=8 RESET_CYCLES=20 \
+#   UART_DEVICE=/dev/ttyUSBx WAIT_SECONDS=8 RESET_CYCLES=20 \
 #       ./run_slot_policy_monster_v2.sh
 #
 # Without UART_DEVICE, keep an external UART terminal/logger open.
@@ -225,12 +225,8 @@ detect_uart_device() {
 
     local candidate
 
-    for candidate in \
-        /dev/ttyACM0 \
-        /dev/ttyACM1 \
-        /dev/ttyUSB0 \
-        /dev/ttyUSB1
-    do
+    for candidate in /dev/ttyACM* /dev/ttyUSB*; do
+        [[ -e "${candidate}" ]] || continue
         if [[ -c "${candidate}" ]]; then
             UART_DEVICE="${candidate}"
             echo "Auto-detected UART device: ${UART_DEVICE}"

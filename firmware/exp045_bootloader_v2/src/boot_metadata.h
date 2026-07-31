@@ -98,6 +98,11 @@ boot_metadata_status_t boot_metadata_commit(
     const boot_flash_t *flash,
     const boot_metadata_record_t *next
 );
+/* Explicit recovery-only reinitialization for an unrecoverable journal. */
+boot_metadata_status_t boot_metadata_reinitialize_for_recovery(
+    const boot_flash_t *flash,
+    const boot_metadata_record_t *next
+);
 const char *boot_metadata_status_text(boot_metadata_status_t status);
 const char *boot_metadata_state_text(boot_metadata_state_t state);
 

@@ -15,13 +15,14 @@ PRIVATE_KEY_PATTERNS: tuple[re.Pattern[bytes], ...] = (
 
 SENSITIVE_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(^|/)firmware_signing_seed\.bin$"),
+    re.compile(r"(^|/).*\.seed$"),
+    re.compile(r"(^|/)keys/[^/]+\.bin$"),
     re.compile(r"(^|/).*_private\.pem$"),
     re.compile(r"(^|/).*\.key$"),
 )
 
 ALLOWED_PATHS = {
     "firmware/exp065_signed_app/keys/README.md",
-    "logs/exp028_final_audit/private_key_git_check.txt",
 }
 
 

@@ -379,6 +379,21 @@ static void test_reboot_requests_reset(void)
     expect_no_flash_writes("reboot flash writes", &context);
 }
 
+static void test_recovery_requests_signed_mode(void)
+{
+    static const uint8_t input[] = "recovery\n";
+    test_context_t context;
+
+    expect_result(
+        "recovery command",
+        DIAGNOSTIC_CONSOLE_RESULT_RECOVERY_REQUESTED,
+        run_console(NULL, input, sizeof(input) - 1U, &context)
+    );
+    expect_contains("recovery output", &context, "recovery\n");
+    expect_u32("recovery no reset", 0U, context.reset.count);
+    expect_no_flash_writes("recovery flash writes", &context);
+}
+
 static void test_readonly_information_commands(void)
 {
     static const uint8_t input[] =
@@ -413,6 +428,7 @@ int main(void)
     test_timeout();
     test_transition_to_boot();
     test_reboot_requests_reset();
+    test_recovery_requests_signed_mode();
     test_readonly_information_commands();
 
     if (failures != 0) {

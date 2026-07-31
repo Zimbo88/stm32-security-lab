@@ -7,9 +7,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   host-and-firmware:
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
       PYTHON_VERSION: "3.12"
     steps:

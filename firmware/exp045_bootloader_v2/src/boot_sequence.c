@@ -5,12 +5,14 @@
 #include "boot_mode.h"
 #include "boot_policy.h"
 #include "boot_result.h"
+#include "boot_watchdog.h"
 #include "delay.h"
 #include "led_show.h"
 #include "performance.h"
 #include "recovery_policy.h"
 #include "reset_cause.h"
 #include "signed_image.h"
+#include "update_mode.h"
 #include "uart.h"
 
 #define BOOT_LED_BOOT_DELAY_CYCLES 700000U
@@ -38,16 +40,17 @@ static void boot_performance_print(void)
 
 _Noreturn void boot_sequence_execute(void)
 {
+    boot_watchdog_refresh();
     performance_init(board_clock_get_sysclk_hz());
     led_show_init();
     led_show_indicate(BOOT_LED_STATE_BOOTING);
     delay_cycles(BOOT_LED_BOOT_DELAY_CYCLES);
+    boot_watchdog_refresh();
     led_show_all_off();
 
     const reset_cause_t reset_cause = reset_cause_capture();
     boot_info_print_banner();
     reset_cause_print(&reset_cause);
-    reset_cause_clear();
 
     const boot_mode_t mode = boot_mode_detect();
     const recovery_policy_status_t recovery_status =
@@ -74,7 +77,8 @@ _Noreturn void boot_sequence_execute(void)
     const uint32_t verification_start = performance_cycles();
     boot_slot_selection_result_t selection;
     const boot_slot_selection_status_t selection_status =
-        boot_policy_select(&selection);
+        boot_policy_select(reset_cause.raw_csr, &selection);
+    boot_watchdog_refresh();
     const uint32_t verification_end = performance_cycles();
 
     performance_record_verification_cycles(
@@ -111,15 +115,19 @@ _Noreturn void boot_sequence_execute(void)
         boot_result_print(selection.selected_verify_status);
     }
     boot_performance_print();
+    boot_watchdog_refresh();
 
     if (selection_status != BOOT_SLOT_SELECTION_OK) {
-        boot_result_halt();
+        uart_puts("RECOVERY ENTER reason=boot-policy-failure\n");
+        reset_cause_clear();
+        update_mode_run_recovery();
     }
 
     uart_puts("Signature and payload hash accepted.\n");
     uart_puts("Jumping to application...\n");
     led_show_all_off();
     delay_cycles(4000000U);
+    boot_watchdog_refresh();
 
     const verify_status_t jump_status = signed_image_jump(&selection.jump_context);
     boot_result_print(jump_status);

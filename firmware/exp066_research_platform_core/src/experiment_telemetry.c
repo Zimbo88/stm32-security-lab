@@ -69,6 +69,23 @@ static uint8_t address_in_range(uint32_t address, uint32_t base, uint32_t end)
     return ((address >= base) && (address < end)) ? 1U : 0U;
 }
 
+static uint32_t trusted_metadata_image_version(
+    const boot_metadata_record_t *metadata
+)
+{
+    if (metadata == NULL) {
+        return 0UL;
+    }
+    if ((metadata->state == BOOT_METADATA_STATE_PENDING_TRIAL) ||
+        (metadata->state == BOOT_METADATA_STATE_CONFIRMED)) {
+        return metadata->candidate_image_version;
+    }
+    /* WRITING, CANDIDATE_READY and REJECTED_INVALID do not identify the
+       trusted running image.  Do not expose a rejected candidate version
+       through the public telemetry surface. */
+    return 0UL;
+}
+
 static void capture_core_registers(void)
 {
     __asm volatile("mrs %0,msp" : "=r"(report.msp));
@@ -139,7 +156,7 @@ void experiment_telemetry_refresh_metadata(void)
     report.confirmed_slot = metadata.active_slot;
     report.candidate_slot = metadata.candidate_slot;
     report.remaining_trial_attempts = metadata.boot_attempt_count;
-    report.image_version = metadata.candidate_image_version;
+    report.image_version = trusted_metadata_image_version(&metadata);
     report.last_update_result = metadata.result;
     report.commit_marker = (uint32_t)recovery.selected_copy;
 

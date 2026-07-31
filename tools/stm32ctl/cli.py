@@ -149,6 +149,11 @@ def run_update(args: argparse.Namespace) -> int:
         public_key_header=args.public_key_header,
     )
 
+    if args.command == "recovery" and package.slot != "a":
+        raise Stm32CtlError(
+            "recovery bootstrap requires a signed Slot-A package"
+        )
+
     if not args.quiet:
         print(
             f"verified package: slot {package.slot}, image version {package.image_version}, "
@@ -185,7 +190,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="stm32ctl",
         description="Host tool for the EXP045 bootloader UART binary protocol",
     )
-    parser.add_argument("--port", required=True, help="serial port, for example /dev/ttyUSB0")
+    parser.add_argument("--port", required=True, help="local serial port, for example /dev/ttyUSBx")
     parser.add_argument("--baud", type=int, default=DEFAULT_BAUD, help="UART baudrate")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="read timeout seconds")
     parser.add_argument(
@@ -204,17 +209,35 @@ def build_parser() -> argparse.ArgumentParser:
     status = subparsers.add_parser("status", help="query protocol and installer status")
     status.set_defaults(func=run_status)
 
+    def add_update_arguments(command_parser: argparse.ArgumentParser) -> None:
+        command_parser.add_argument(
+            "--package", required=True, type=Path, help="update package file"
+        )
+        command_parser.add_argument(
+            "--block-size", type=int, help="WRITE_BLOCK data bytes per frame"
+        )
+        command_parser.add_argument(
+            "--public-key-hex", help="32-byte Ed25519 public key as hex"
+        )
+        command_parser.add_argument(
+            "--public-key-header",
+            type=Path,
+            help="C header containing the bootloader Ed25519 public key",
+        )
+        command_parser.add_argument(
+            "--quiet", action="store_true", help="suppress progress output"
+        )
+
     update = subparsers.add_parser("update", help="stream a verified update package")
-    update.add_argument("--package", required=True, type=Path, help="update package file")
-    update.add_argument("--block-size", type=int, help="WRITE_BLOCK data bytes per frame")
-    update.add_argument("--public-key-hex", help="32-byte Ed25519 public key as hex")
-    update.add_argument(
-        "--public-key-header",
-        type=Path,
-        help="C header containing the bootloader Ed25519 public key",
-    )
-    update.add_argument("--quiet", action="store_true", help="suppress progress output")
+    add_update_arguments(update)
     update.set_defaults(func=run_update)
+
+    recovery = subparsers.add_parser(
+        "recovery",
+        help="bootstrap recovery with a signed Slot-A package",
+    )
+    add_update_arguments(recovery)
+    recovery.set_defaults(func=run_update)
 
     reset = subparsers.add_parser("reset", help="request a controlled target reset")
     reset.set_defaults(func=run_reset)

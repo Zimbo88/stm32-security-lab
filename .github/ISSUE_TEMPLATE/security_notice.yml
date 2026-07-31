@@ -1,0 +1,19 @@
+name: Security coordination notice
+description: Request private coordination for a suspected security issue
+title: "[Security coordination] "
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not disclose exploit details, keys, dumps or device identifiers in
+        a public issue. Use GitHub Private Vulnerability Reporting at
+        https://github.com/Zimbo88/stm32-security-lab/security/advisories/new
+        when enabled. This template only requests private coordination.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Non-sensitive summary
+      description: State only that private coordination is requested.
+    validations:
+      required: true

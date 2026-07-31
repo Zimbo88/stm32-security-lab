@@ -25,7 +25,7 @@ Safe by default:
   - writes timestamped logs under hil-results/.
 
 Options:
-  --port PORT                 UART port, for example /dev/ttyUSB0.
+  --port PORT                 UART port, for example /dev/ttyUSBx.
   --package PATH              Signed update package to verify or send.
   --public-key-header PATH    Public key header for local package verification.
   --block-size BYTES          stm32ctl update block size, default 512.

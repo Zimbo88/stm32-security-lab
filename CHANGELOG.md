@@ -5,9 +5,45 @@ All notable project changes are documented in this file.
 The format follows Keep a Changelog, and public releases use semantic
 versioning.
 
+## [1.1.0-rc1] - 2026-07-31
+
+### Added
+
+- Part 1 recovery, trial-boot, watchdog and signed UART recovery hardening.
+- Part 2 root-of-trust, rollback, MPU and memory-boundary documentation and
+  tests.
+- Part 3 host-only fuzzing, property tests, coverage, sanitizer and static
+  analysis profiles.
+- Part 4 open-source entry documentation, CI profiles, SBOM, provenance,
+  publication scanning and deterministic local release-candidate tooling.
+
+### Changed
+
+- Hardened reset command handling and rejected-candidate telemetry after final
+  STM32F429 hardware regression.
+- Removed tracked flash baselines, raw hardware logs and analyzer captures from
+  the public release tree; local campaign output is ignored.
+- Made hardware helper UART selection explicit instead of embedding a local
+  device path.
+
+### Security
+
+- Documented live wrong-key, invalid-signature, rollback, trial-fallback and
+  Stage-0-integrity evidence.
+- Added final RDP2 No-Go and WRP-not-validated status to the public evidence.
+
+### Known limitations
+
+- The controlled Power-Loss campaign and final corruption rerun are incomplete.
+- The fully independent UART-only reset/recovery lifecycle is limited by the
+  available hardware reset wiring.
+- RDP2 and WRP are disabled; no external security review or certification was
+  performed.
+- Published example firmware uses a clearly marked synthetic test key.
+
 ## [Unreleased]
 
-- No unreleased changes are documented yet.
+Future changes will be recorded here after the release candidate.
 
 ## [1.0.2] - 2026-07-27
 
@@ -50,7 +86,7 @@ versioning.
   protocol as not implemented.
 - Removed stale release wording that treated the existing `v1.0.0` tag as
   unreleased.
-- Corrected stale hardware-test examples that hard-coded `/dev/ttyUSB0` inside
+- Corrected stale hardware-test examples that hard-coded a device path inside
   snippets despite defining `PORT`.
 
 ## [1.0.0] - 2026-07-19

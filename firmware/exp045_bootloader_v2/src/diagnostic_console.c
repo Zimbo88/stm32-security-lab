@@ -262,7 +262,7 @@ static uint8_t command_help(const diagnostic_console_config_t *config)
     return console_puts(
         config,
         "commands: help version info slots metadata flashinfo "
-        "resetcause performance status boot reboot\n"
+        "resetcause performance status boot reboot recovery\n"
     );
 }
 
@@ -537,6 +537,11 @@ static diagnostic_console_result_t execute_line(
         return ok != 0U
             ? DIAGNOSTIC_CONSOLE_RESULT_RESET_REQUESTED
             : DIAGNOSTIC_CONSOLE_RESULT_IO_ERROR;
+    } else if (str_equal(argv[0], "recovery") != 0U) {
+        ok = console_puts(config, "recovery\n");
+        return ok != 0U
+            ? DIAGNOSTIC_CONSOLE_RESULT_RECOVERY_REQUESTED
+            : DIAGNOSTIC_CONSOLE_RESULT_IO_ERROR;
     } else {
         ok = console_puts(config, "ERR unknown\n");
     }
@@ -634,6 +639,7 @@ diagnostic_console_result_t diagnostic_console_run(
 
         result = execute_line(console, config);
         if ((result == DIAGNOSTIC_CONSOLE_RESULT_RESET_REQUESTED) ||
+            (result == DIAGNOSTIC_CONSOLE_RESULT_RECOVERY_REQUESTED) ||
             (console->boot_requested != 0U) ||
             (result == DIAGNOSTIC_CONSOLE_RESULT_IO_ERROR)) {
             return result;
@@ -657,6 +663,7 @@ diagnostic_console_result_t diagnostic_console_run(
 
         result = execute_line(console, config);
         if ((result == DIAGNOSTIC_CONSOLE_RESULT_RESET_REQUESTED) ||
+            (result == DIAGNOSTIC_CONSOLE_RESULT_RECOVERY_REQUESTED) ||
             (result == DIAGNOSTIC_CONSOLE_RESULT_IO_ERROR)) {
             return result;
         }
@@ -676,6 +683,8 @@ const char *diagnostic_console_result_text(
     case DIAGNOSTIC_CONSOLE_RESULT_RESET_REQUESTED: return "RESET REQUESTED";
     case DIAGNOSTIC_CONSOLE_RESULT_TIMEOUT:         return "TIMEOUT";
     case DIAGNOSTIC_CONSOLE_RESULT_IO_ERROR:        return "IO ERROR";
+    case DIAGNOSTIC_CONSOLE_RESULT_RECOVERY_REQUESTED:
+        return "RECOVERY REQUESTED";
     default:                                        return "UNKNOWN";
     }
 }

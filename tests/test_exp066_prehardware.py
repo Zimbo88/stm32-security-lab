@@ -142,6 +142,31 @@ def test_confirmation_health_gate_and_existing_api_usage() -> None:
     assert "boot_flash_target_init_metadata" in source
 
 
+def test_rejected_candidate_version_is_not_reported_as_running_image() -> None:
+    telemetry_source = (
+        ROOT
+        / "firmware"
+        / "exp066_research_platform_core"
+        / "src"
+        / "experiment_telemetry.c"
+    ).read_text(encoding="ascii")
+    confirmation_source = (
+        ROOT
+        / "firmware"
+        / "exp066_research_platform_core"
+        / "src"
+        / "platform_confirmation.c"
+    ).read_text(encoding="ascii")
+
+    assert "trusted_metadata_image_version" in telemetry_source
+    assert "report.image_version = trusted_metadata_image_version(&metadata);" in telemetry_source
+    assert "trusted_metadata_image_version" in confirmation_source
+    assert (
+        "last_snapshot.image_version = trusted_metadata_image_version(&metadata);"
+        in confirmation_source
+    )
+
+
 def test_boot_policy_uses_metadata_writable_flash_backend() -> None:
     source = (
         ROOT

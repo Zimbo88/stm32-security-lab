@@ -2,6 +2,9 @@
 
 Describe the technical purpose of this change.
 
+Link the relevant issue or ADR and state whether this changes a security
+claim, memory layout, protocol, firmware format or release behavior.
+
 ## Security impact
 
 - [ ] No security-relevant behavior changes
@@ -24,6 +27,9 @@ Explain the impact and residual risk:
 - [ ] Documentation updated
 - [ ] Diff reviewed for private information
 - [ ] Generated artifacts excluded
+- [ ] Changelog updated when user-visible
+- [ ] Publication scan and private-key scan passed
+- [ ] `git diff --check` passed
 
 Commands and results:
 
@@ -36,4 +42,6 @@ Target board, MCU revision, probe, and serial setup used for validation:
 - [ ] The change fails safely
 - [ ] Negative tests are included where relevant
 - [ ] No private signing material is included
+- [ ] No flash dump, raw hardware log or device serial is included
+- [ ] No Option-Byte, RDP or WRP write automation is added
 - [ ] Public text is written in English

@@ -186,6 +186,10 @@ def test_build_inspect_verify_and_install_sim(tmp_path: Path) -> None:
     assert built["target_layout"]["layout_profile"] == "stm32f429_1m"
     assert built["target_layout"]["flash_size"] == 0x00100000
     assert built["target_layout"]["slots"]["b"]["payload_base"] == 0x08080200
+    assert built["public_key_fingerprint_sha256"] == hashlib.sha256(
+        bytes.fromhex(PUBLIC_KEY_HEX)
+    ).hexdigest()
+    assert built["signature_self_verification"] is True
 
     result = run_tool(
         "inspect",

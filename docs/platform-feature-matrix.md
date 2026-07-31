@@ -1,13 +1,13 @@
 # Platform feature matrix
 
-Status values are intentionally limited to:
-`TARGET_IMPLEMENTED`, `HOST_TOOL_IMPLEMENTED`, `SIMULATED_ONLY`,
-`DOCUMENTED_DESIGN`, `NOT_IMPLEMENTED`, `HARDWARE_VALIDATION_REQUIRED`, and
-`OPTIONAL_NOT_SELECTED`.
+Part-2 security entries use the strict evidence vocabulary
+`DESIGNED`, `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
+`DOCUMENTED ONLY`, and `NOT IMPLEMENTED`. Older experiment rows retain their
+historical status vocabulary.
 
 | Feature | Status | Relevant source files | Relevant tests | Limitations | Next concrete action |
 |---|---|---|---|---|---|
-| bootloader | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2` | EXP045 build/report, host verifier tests, RDP0 HIL | Physical recovery is still incomplete. | Keep hardware evidence current for each release. |
+| bootloader | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2` | EXP045 build/report, host verifier tests, recovery/storage tests | Physical recovery pin is not selected; signed UART recovery is implemented. | Keep hardware evidence current for each release. |
 | secure firmware update | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2`, `tools/update_package.py`, `tools/stm32ctl` | update installer/protocol/storage tests, stm32ctl tests, RDP0 HIL | Research transport only; no production key custody, update authorization, RDP2, or physical recovery. | Repeat power-removal and provisioning validation before irreversible protection. |
 | UART update | TARGET_IMPLEMENTED | `update_mode.c`, `update_protocol.c`, `update_service.c`, `uart.c`, `tools/stm32ctl` | `tests/update_protocol`, `tests/uart`, `tests/test_stm32ctl.py`, RDP0 HIL | USART1 polling transport; no physical update GPIO; no authenticated operator identity. | Add only reviewed recovery/provisioning policy before production deployment. |
 | optional USB update | OPTIONAL_NOT_SELECTED | none | none | USB stack not selected for this release. | Select only after hardware USB validation plan. |
@@ -20,7 +20,7 @@ Status values are intentionally limited to:
 | NVIC diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Only bank-0 curated read-only registers. | Expand only after interrupt inventory. |
 | SCB diagnostics | TARGET_IMPLEMENTED | `platform.c`, `fault.c` | EXP066 build | Curated fault/status registers only. | Validate fault snapshots on hardware. |
 | SysTick diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only; SysTick is not configured as scheduler. | Decide whether to enable real tick source. |
-| MPU diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only status, no MPU policy enforcement. | Hardware MPU isolation experiment. |
+| MPU policy and diagnostics | IMPLEMENTED / HOST TESTED / HARDWARE VALIDATED | `src/mpu_policy.c`, `platform.c` | `tests/mpu_policy`, EXP066 builds, complete `mpu_*` trial/control matrix | Hardware evidence covers fallback/control behavior; retained fault context was not read back for every scenario; MPU is not TrustZone. | Add independent fault-context capture and repeat per board revision. |
 | FLASH register diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only curated registers only. | Decode fields after reference manual review. |
 | DBGMCU diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only IDCODE only. | Validate expected device ID on hardware. |
 | PWR diagnostics | NOT_IMPLEMENTED | none | source allowlist tests | PWR clock/register sampling not selected. | Add only with clock-safe read policy. |
@@ -33,13 +33,20 @@ Status values are intentionally limited to:
 | ring buffer | TARGET_IMPLEMENTED | `log.c` | `tests/test_exp066_pure.py` | Fixed 32-record RAM buffer. | Hardware CLI validation. |
 | error history | TARGET_IMPLEMENTED | `log.c`, `fault.c` | EXP066 build | RAM log plus retained fault record only. | Add persistent history only outside fault context. |
 | boot log | TARGET_IMPLEMENTED | `platform.c`, `log.c` | EXP066 build | Boot log is RAM-only. | Validate reset entries over UART. |
-| reset causes | TARGET_IMPLEMENTED | `platform.c`, EXP045 reset helper | EXP066 build | EXP066 captures raw `RCC_CSR`; decoding is minimal. | Add decoded fields after hardware reset campaign. |
+| reset causes | TARGET_IMPLEMENTED | `platform.c`, EXP045 reset helper | `tests/reset_cause`, EXP066 build | Normalized priority and machine-readable Stage-0 output are implemented; physical cause coverage remains open. | Capture IWDG/software/pin evidence on the board. |
 | HardFault dump | TARGET_IMPLEMENTED | `fault.c` | EXP066 build | Retained `.noinit` only; no Flash persistence. | Validate induced fault on expendable hardware. |
 | GPIO tests | DOCUMENTED_DESIGN | `platform.c` | source allowlist tests | CLI returns bounded placeholder PASS only. | Implement non-destructive pin-state tests. |
 | timer tests | NOT_IMPLEMENTED | none | none | No timer driver/test. | Add after timer inventory. |
 | DMA tests | NOT_IMPLEMENTED | none | none | No DMA driver/test. | Add after DMA safety plan. |
 | interrupt tests | NOT_IMPLEMENTED | none | none | No interrupt self-test harness. | Add after NVIC/ISR inventory. |
-| watchdog tests | NOT_IMPLEMENTED | none | none | Watchdog is not enabled by EXP066. | Add on expendable board with recovery plan. |
+| watchdog tests | HARDWARE_VALIDATION_REQUIRED | `src/watchdog.c`, `src/test_scenarios.c` | controlled scenario builds, `tests/reset_cause`, storage tests | Software IWDG is enabled; LSI tolerance and real reset evidence remain open. | Run the documented non-power-loss hardware campaign. |
+| boot recovery and fallback | TARGET_IMPLEMENTED | `boot_slot_selection.c`, `update_mode.c`, `update_installer.c` | storage/recovery bootstrap tests, state-machine docs | No trusted fallback with both image and metadata journals lost; recovery bootstrap is signed Slot A only. | Validate recovery and fallback on the expendable board. |
+| root of trust | IMPLEMENTED / HOST TESTED / HARDWARE VALIDATED (selected) | `signed_image.c`, embedded public key | host verifier, RFC8032/SHA-512 vectors, valid A/B and negative UART authorization runs | One software-embedded key; no hardware anchor or rotation. | Independent crypto review and complete hardware campaign. |
+| Stage-0 update boundary | IMPLEMENTED / HOST TESTED | `update_installer.c`, `boot_flash_target.c` | storage protected-range tests | WRP not activated. | Manual WRP evaluation only. |
+| key lifecycle | IMPLEMENTED / HOST TESTED / DOCUMENTED ONLY | `tools/key_management.py`, `keys/README.md` | `tests/test_key_management.py`, wrong-key hardware rejection | No HSM, revocation, or in-field rotation. | Establish offline ceremony before production use. |
+| stack guard | IMPLEMENTED / HOST TESTED / HARDWARE VALIDATED | application linker, `mpu_policy.c` | `tests/mpu_policy`, `mpu_stack_guard` trial/IWDG/fallback run | Whole-path stack proof remains open; MPU is not TrustZone. | Add call-graph budget analysis. |
+| trial boot and health gate | TARGET_IMPLEMENTED | `boot_slot_selection.c`, `platform_confirmation.c` | storage tests, controlled test-firmware builds | Default normal build has zero delay; minimum loop and watchdog predicates are enforced. | Capture real no-confirmation and watchdog trials. |
+| metadata corruption policy | TARGET_IMPLEMENTED | `boot_metadata.c`, `update_installer.c` | storage corruption and commit-boundary tests | Sequence exhaustion is fail-closed; ambiguous journals require explicit recovery bootstrap. | Complete hardware metadata-recovery evidence without power loss. |
 | clock tests | DOCUMENTED_DESIGN | `platform.c` | source allowlist tests | CLI placeholder only; no clock switching. | Add read-only clock consistency checks. |
 | device information | TARGET_IMPLEMENTED | `platform.c`, `runtime_monitor.c` | EXP066 build | Public ID/revision/UID fingerprint; raw UID is restricted. | Validate values on board. |
 | UID | TARGET_IMPLEMENTED | `platform.c`, `runtime_monitor_core.c` | RSM host tests, EXP066 build | Public CRC32 fingerprint only; raw UID restricted. | Hardware output capture. |
@@ -50,6 +57,11 @@ Status values are intentionally limited to:
 | runtime vector-table monitor | TARGET_IMPLEMENTED | `runtime_monitor_vector.c`, `runtime_monitor.c` | RSM host tests, EXP066 build | Checks VTOR, MSP, core handlers, reserved entries, Thumb bits, and active-slot Flash range; no reset or recovery action. | Hardware UART capture and controlled vector test hook. |
 | UART CLI | TARGET_IMPLEMENTED | `platform.c`, `uart.c` | `tests/test_exp066_pure.py` | Blocking TX remains; RX is bounded. | Hardware CLI soak test. |
 | binary protocol | TARGET_IMPLEMENTED | `firmware/exp045_bootloader_v2/src/update_protocol.c`, `tools/stm32ctl/protocol.py` | `tests/update_protocol`, `tests/test_stm32ctl.py`, RDP0 UART update tests | Protocol version 1; no `slots` or `metadata` binary commands. | Preserve wire compatibility or version any future change. |
+| parser fuzzing | IMPLEMENTED / TESTED / LIMITED CAMPAIGN | `fuzz/harnesses`, `fuzz/scripts/run_campaign.py` | ASan/UBSan deterministic UART, metadata, package and policy modes; optional libFuzzer target | Host-only; current environment lacks clang/libFuzzer and the extended campaign is not a formal proof. | Run extended libFuzzer/AFL++ campaigns in Part 4. |
+| property-based security tests | IMPLEMENTED / TESTED | `tests/test_security_properties.py`, `fuzz/harnesses/host_fuzz_driver.c` | Hypothesis round-trip/mutation properties and C policy model | Bounded examples; reference model is test-only. | Add broader state generation and fuzz corpus triage. |
+| C/Python coverage | IMPLEMENTED / COVERAGE MEASURED | `.coveragerc`, `tools/collect_c_coverage.py` | Python branch coverage and gcov line/branch reports | Coverage is not a security proof; vendored crypto excluded from project gate. | Establish CI thresholds after baseline review. |
+| sanitizer profile | IMPLEMENTED / TESTED | `fuzz/Makefile`, existing C Makefiles | ASan/UBSan fail-fast smoke and host suites | Target-only register/flash paths are not sanitizer-executable. | Add compiler-matrix CI in Part 4. |
+| static analysis | IMPLEMENTED / STATICALLY ANALYZED | `tools/run_static_analysis.py` | GCC `-fanalyzer` | cppcheck/clang-tidy/scan-build unavailable in current environment. | Provision reproducible analyzer image. |
 | optional USB CDC | OPTIONAL_NOT_SELECTED | none | none | USB not selected. | Add only after USB hardware/clock plan. |
 | optional Ethernet | OPTIONAL_NOT_SELECTED | none | none | Ethernet not selected. | Add only if PHY wiring is confirmed. |
 | LCD | NOT_IMPLEMENTED | none | none | No LTDC/LCD driver. | Hardware inventory and safe driver plan. |
@@ -61,3 +73,31 @@ Status values are intentionally limited to:
 | rollback and quarantine | SIMULATED_ONLY | `tools/native_loader.py`, `tools/module_install.py` | EXP069/EXP070 tests | Host lifecycle/catalog simulation only. | Hardware-backed failure counters and rollback. |
 | LED platform health indication | TARGET_IMPLEMENTED | `platform_health.c`, `platform_led.c`, `platform.c` | `tests/test_exp071_health.py`, EXP066 build | HEALTHY uses LED4 only; visual timing should be rechecked per board revision. | Keep normal heartbeat distinct from warning/fatal patterns. |
 | optional retro audio | OPTIONAL_NOT_SELECTED | `platform_audio.c`, `platform_audio.h` | `tests/test_exp071_health.py` | No documented speaker/buzzer pin. | Add external piezo pin assignment before implementation. |
+
+## Part-4 release-readiness evidence
+
+| Feature | Implemented | Host test | Hardware test | Documentation | Open limit |
+|---|---|---|---|---|---|
+| Local release candidate | IMPLEMENTED | TESTED | NOT TESTED | DOCUMENTED | Test-key candidates are not hardware-installable when their key differs from Stage 0. |
+| SPDX SBOM | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Inventory is derived from pinned repository files; it is not a complete OS SBOM. |
+| Release provenance | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | SLSA-inspired local record, not a SLSA attestation. |
+| Deterministic release archive | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Remote builder and final release tag remain open. |
+| Publication scan | IMPLEMENTED | TESTED | NOT APPLICABLE | DOCUMENTED | Findings require human review; allowlists are deliberately narrow. |
+| CI workflow definitions | IMPLEMENTED | LOCALLY VALIDATED | NOT RUN | DOCUMENTED | GitHub Actions have not run for this branch. |
+| Hardware compatibility matrix | IMPLEMENTED | DOCUMENTED | LIMITED VALIDATION | DOCUMENTED | Only the STM32F429IGT6-class reference target is evidenced. |
+
+## Part-5 final hardware evidence
+
+| Feature | Implemented | Host test | Hardware test | Power-loss test | Documentation | Open limit |
+|---|---|---|---|---|---|---|
+| Signed USART1 update A/B | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | NRST is not wired; reset entry used software probe reset |
+| Rollback rejection | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | Software-backed rollback floor |
+| Trial fallback and IWDG | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | LSI/temperature and power-loss timing open |
+| Rejected-candidate telemetry | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | Diagnostic identity is not attestation |
+| Metadata redundancy/corruption | IMPLEMENTED | TESTED | LIMITED VALIDATION | NOT TESTED | DOCUMENTED | Final Part-5 rerun stopped at HIL flash-loader failure |
+| Slot/image corruption | IMPLEMENTED | TESTED | LIMITED VALIDATION | NOT TESTED | DOCUMENTED | Prior HIL evidence is retained as observations/passes |
+| MPU normal operation | IMPLEMENTED | TESTED | HARDWARE VALIDATED | NOT TESTED | DOCUMENTED | Complete retained fault-context proof remains open |
+| Debugger-free complete lifecycle | IMPLEMENTED | TESTED | LIMITED VALIDATION | NOT TESTED | DOCUMENTED | No physical NRST or controlled power path |
+| Physical power-loss resilience | DESIGNED | TESTED | NOT TESTED | BLOCKED | DOCUMENTED | Safe external power-control hardware unavailable |
+| WRP | NOT IMPLEMENTED | DOCUMENTED | NOT TESTED | NOT TESTED | DOCUMENTED | No expendable device designated |
+| RDP2 | NOT IMPLEMENTED | DOCUMENTED | NOT TESTED | NOT TESTED | DOCUMENTED | Explicit `RDP2 NO-GO` |

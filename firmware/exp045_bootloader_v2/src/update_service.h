@@ -9,7 +9,7 @@
 #include "update_installer.h"
 #include "update_protocol.h"
 
-#define UPDATE_SERVICE_DEFAULT_ENTRY_IDLE_POLLS          200000UL
+#define UPDATE_SERVICE_DEFAULT_ENTRY_IDLE_POLLS          800000UL
 #define UPDATE_SERVICE_DEFAULT_ENTRY_MAX_BYTES \
     (UPDATE_PROTOCOL_MAX_FRAME_SIZE * 2U)
 #define UPDATE_SERVICE_DEFAULT_FRAME_BYTE_TIMEOUT_POLLS  200000UL
@@ -17,7 +17,8 @@
 
 typedef enum {
     UPDATE_SERVICE_RESULT_BOOT_CONTINUE = 0,
-    UPDATE_SERVICE_RESULT_RESET_REQUESTED = 1
+    UPDATE_SERVICE_RESULT_RESET_REQUESTED = 1,
+    UPDATE_SERVICE_RESULT_RECOVERY_REQUESTED = 2
 } update_service_result_t;
 
 typedef void (*update_service_reset_fn_t)(void *context);

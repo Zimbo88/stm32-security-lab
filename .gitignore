@@ -16,9 +16,18 @@ __pycache__/
 # Private signing keys
 *_private.pem
 *.key
+*.seed
+keys/*.bin
+firmware/*/keys/*.bin
 
 # Local reference material
 archive/
+
+# Raw laboratory captures and hardware dumps are local-only.
+baseline/
+logs/
+logic/
+hardware/exp072_baseline/
 
 # Hardware-in-the-loop run outputs
 hil-results/
@@ -73,3 +82,21 @@ audit/repository-audit.txt
 # Local publication installer backups
 .publication-backup-*/
 .publication-suite-backup-*/
+publication-scan.json
+docs-link-report.json
+workflow-report.json
+
+# RDP2 research and final hardware campaign output remain local-only and are
+# covered by the broad baseline/ rule above.
+baseline/rdp2-final/
+baseline/final-hardware-campaign/
+
+# Local security-testing outputs. Reviewed regression inputs live elsewhere.
+fuzz/build/
+fuzz/findings-local/
+fuzz/out/
+coverage/
+htmlcov/
+.coverage
+.coverage.*
+.hypothesis/

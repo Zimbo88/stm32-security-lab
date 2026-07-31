@@ -39,7 +39,7 @@ PYTHON="$PWD/.venv-hil/bin/python" tools/secure_boot_hil/scripts/run_host_checks
 ```bash
 secure-boot-hil run \
   --repo-root ~/stm32-security-lab \
-  --uart /dev/ttyUSB0 \
+  --uart /dev/ttyUSBx \
   --baud 115200 \
   --capture-seconds 5 \
   --reset-cycles 10 \
@@ -52,7 +52,7 @@ secure-boot-hil run \
 ```bash
 secure-boot-hil run \
   --repo-root ~/stm32-security-lab \
-  --uart /dev/ttyUSB0 \
+  --uart /dev/ttyUSBx \
   --baud 115200 \
   --capture-seconds 5 \
   --reset-cycles 10 \

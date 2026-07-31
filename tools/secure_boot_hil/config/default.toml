@@ -10,11 +10,10 @@ make = "make"
 st_flash = "st-flash"
 
 [uart]
-device = "/dev/ttyUSB0"
+device = "UART_DEVICE_NOT_CONFIGURED"
 baud = 115200
 capture_seconds = 5.0
 
 [execution]
 reset_cycles = 10
 command_timeout_seconds = 120.0
-
