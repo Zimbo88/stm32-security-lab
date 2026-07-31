@@ -15,6 +15,8 @@ PRIVATE_KEY_PATTERNS: tuple[re.Pattern[bytes], ...] = (
 
 SENSITIVE_PATH_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(^|/)firmware_signing_seed\.bin$"),
+    re.compile(r"(^|/).*\.seed$"),
+    re.compile(r"(^|/)keys/[^/]+\.bin$"),
     re.compile(r"(^|/).*_private\.pem$"),
     re.compile(r"(^|/).*\.key$"),
 )
