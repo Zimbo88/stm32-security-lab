@@ -83,6 +83,9 @@ Current release-quality reference components:
 - `stm32ctl` Python host client for `info`, `status`, `update`, `recovery`, and
   `reset`.
 - Runtime Security Monitor foundation in EXP066.
+- Cortex-M4 MPU policy with Stage-0/metadata read-only mapping and stack guard.
+- Explicit root-of-trust, key lifecycle, rollback, WRP evaluation, and threat
+  model documentation.
 - Deterministic build checker, release artifact validation, host tests, and HIL
   tooling.
 
@@ -98,7 +101,18 @@ Research or experimental components:
 Recovery and watchdog evidence is explicitly classified in
 [the hardening report](docs/recovery-watchdog-hardening-report.md). The
 repository distinguishes `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
-`DOCUMENTED ONLY` and `OPEN`; a host test is not hardware evidence.
+`DOCUMENTED ONLY` and `NOT IMPLEMENTED`; a host test is not hardware evidence.
+
+Part-2 security references:
+
+- [Security Model](docs/security-model.md)
+- [Threat Model](docs/threat-model.md)
+- [Root of Trust](docs/root-of-trust.md)
+- [Root-of-Trust Hardening Report](docs/root-of-trust-hardening-report.md)
+- [Root-of-Trust Hardware Evidence](docs/root-of-trust-hardware-validation.md)
+- [Key Management](docs/key-management.md)
+- [MPU Policy](docs/mpu-policy.md)
+- [Root-of-Trust Hardening Report](docs/root-of-trust-hardening-report.md)
 
 ## Main Components
 
@@ -411,6 +425,11 @@ Validated on real hardware at RDP Level 0:
 - UART CRC, sequence, partial-frame, and random-byte negative cases;
 - flash readback for positive update targets;
 - unchanged Option Bytes during the campaign.
+
+Part 2 additionally recorded selected hardware evidence for the MPU policy
+(`mpu_null_access`), IWDG trial reset/fallback, wrong-key/signature/manifest
+rejection, and the corrected confirmed-version rollback floor. The complete
+MPU scenario matrix and a fully debugger-free reset campaign remain open.
 
 Host-only validation covers parser boundaries, verifier edge cases, metadata
 transitions, deterministic build reproducibility, package verification, and

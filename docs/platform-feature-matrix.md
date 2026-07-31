@@ -1,9 +1,9 @@
 # Platform feature matrix
 
-Status values are intentionally limited to:
-`TARGET_IMPLEMENTED`, `HOST_TOOL_IMPLEMENTED`, `SIMULATED_ONLY`,
-`DOCUMENTED_DESIGN`, `NOT_IMPLEMENTED`, `HARDWARE_VALIDATION_REQUIRED`, and
-`OPTIONAL_NOT_SELECTED`.
+Part-2 security entries use the strict evidence vocabulary
+`DESIGNED`, `IMPLEMENTED`, `HOST TESTED`, `HARDWARE VALIDATED`,
+`DOCUMENTED ONLY`, and `NOT IMPLEMENTED`. Older experiment rows retain their
+historical status vocabulary.
 
 | Feature | Status | Relevant source files | Relevant tests | Limitations | Next concrete action |
 |---|---|---|---|---|---|
@@ -20,7 +20,7 @@ Status values are intentionally limited to:
 | NVIC diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Only bank-0 curated read-only registers. | Expand only after interrupt inventory. |
 | SCB diagnostics | TARGET_IMPLEMENTED | `platform.c`, `fault.c` | EXP066 build | Curated fault/status registers only. | Validate fault snapshots on hardware. |
 | SysTick diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only; SysTick is not configured as scheduler. | Decide whether to enable real tick source. |
-| MPU diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only status, no MPU policy enforcement. | Hardware MPU isolation experiment. |
+| MPU policy and diagnostics | IMPLEMENTED / HOST TESTED / HARDWARE VALIDATED (selected) | `src/mpu_policy.c`, `platform.c` | `tests/mpu_policy`, EXP066 build, `mpu_null_access` trial/fallback run | Null-access enforcement is evidenced; MPU is not TrustZone and the remaining scenario matrix is open. | Run remaining reversible `mpu_*` scenarios. |
 | FLASH register diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only curated registers only. | Decode fields after reference manual review. |
 | DBGMCU diagnostics | TARGET_IMPLEMENTED | `platform.c` | EXP066 build | Read-only IDCODE only. | Validate expected device ID on hardware. |
 | PWR diagnostics | NOT_IMPLEMENTED | none | source allowlist tests | PWR clock/register sampling not selected. | Add only with clock-safe read policy. |
@@ -41,6 +41,10 @@ Status values are intentionally limited to:
 | interrupt tests | NOT_IMPLEMENTED | none | none | No interrupt self-test harness. | Add after NVIC/ISR inventory. |
 | watchdog tests | HARDWARE_VALIDATION_REQUIRED | `src/watchdog.c`, `src/test_scenarios.c` | controlled scenario builds, `tests/reset_cause`, storage tests | Software IWDG is enabled; LSI tolerance and real reset evidence remain open. | Run the documented non-power-loss hardware campaign. |
 | boot recovery and fallback | TARGET_IMPLEMENTED | `boot_slot_selection.c`, `update_mode.c`, `update_installer.c` | storage/recovery bootstrap tests, state-machine docs | No trusted fallback with both image and metadata journals lost; recovery bootstrap is signed Slot A only. | Validate recovery and fallback on the expendable board. |
+| root of trust | IMPLEMENTED / HOST TESTED / HARDWARE VALIDATED (selected) | `signed_image.c`, embedded public key | host verifier, RFC8032/SHA-512 vectors, valid A/B and negative UART authorization runs | One software-embedded key; no hardware anchor or rotation. | Independent crypto review and complete hardware campaign. |
+| Stage-0 update boundary | IMPLEMENTED / HOST TESTED | `update_installer.c`, `boot_flash_target.c` | storage protected-range tests | WRP not activated. | Manual WRP evaluation only. |
+| key lifecycle | IMPLEMENTED / HOST TESTED / DOCUMENTED ONLY | `tools/key_management.py`, `keys/README.md` | `tests/test_key_management.py`, wrong-key hardware rejection | No HSM, revocation, or in-field rotation. | Establish offline ceremony before production use. |
+| stack guard | IMPLEMENTED / HOST TESTED | application linker, `mpu_policy.c` | `tests/mpu_policy` | Whole-path stack proof and target guard-fault run remain open. | Capture stack/MPU hardware evidence. |
 | trial boot and health gate | TARGET_IMPLEMENTED | `boot_slot_selection.c`, `platform_confirmation.c` | storage tests, controlled test-firmware builds | Default normal build has zero delay; minimum loop and watchdog predicates are enforced. | Capture real no-confirmation and watchdog trials. |
 | metadata corruption policy | TARGET_IMPLEMENTED | `boot_metadata.c`, `update_installer.c` | storage corruption and commit-boundary tests | Sequence exhaustion is fail-closed; ambiguous journals require explicit recovery bootstrap. | Complete hardware metadata-recovery evidence without power loss. |
 | clock tests | DOCUMENTED_DESIGN | `platform.c` | source allowlist tests | CLI placeholder only; no clock switching. | Add read-only clock consistency checks. |
