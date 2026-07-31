@@ -33,7 +33,11 @@
 .type vector_table,%object
 vector_table:
 .word _estack
+#if defined(TEST_SCENARIO_trial_invalid_vector)
+.word 0xFFFFFFFF
+#else
 .word Reset_Handler
+#endif
 .word NMI_Handler
 .word HardFault_Handler
 .word MemManage_Handler

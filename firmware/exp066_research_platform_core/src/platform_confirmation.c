@@ -48,6 +48,10 @@ uint8_t platform_confirmation_health_gate(
             (health->core_self_checks_passed != 0U) &&
             (health->critical_initialization_failure == 0U) &&
             (health->stable_execution_point_reached != 0U) &&
+            (health->uart_diagnostics_ready != 0U) &&
+            (health->runtime_monitor_ready != 0U) &&
+            (health->watchdog_active != 0U) &&
+            (health->application_health_ok != 0U) &&
             (health->metadata_allows_confirmation != 0U))
         ? 1U
         : 0U;

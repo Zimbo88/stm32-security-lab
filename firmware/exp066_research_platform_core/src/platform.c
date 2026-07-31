@@ -7,7 +7,9 @@
 #include "platform_health.h"
 #include "research_markers.h"
 #include "runtime_monitor.h"
+#include "test_scenarios.h"
 #include "uart.h"
+#include "watchdog.h"
 
 #define REG32(a) (*(volatile uint32_t *)(a))
 #define REG16(a) (*(volatile uint16_t *)(a))
@@ -66,6 +68,8 @@
 #define LOG_EVENT_LED_TEST 5U
 #define LOG_EVENT_EASTER_EGG 6U
 #define LOG_EVENT_CONFIRMATION 7U
+#define LOG_EVENT_WATCHDOG 8U
+#define LOG_EVENT_HEALTH_GATE 9U
 
 #ifndef PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS
 #define PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS 0UL
@@ -80,6 +84,10 @@ static uint8_t early_platform_init_done;
 static uint8_t critical_initialization_failure;
 static uint8_t stable_execution_point_reached;
 static uint8_t confirmation_terminal;
+static uint8_t uart_diagnostics_ready;
+static uint8_t runtime_monitor_ready;
+static uint8_t watchdog_ready;
+static uint8_t last_reported_confirmation_status = 0xFFU;
 
 static void newline(void)
 {
@@ -593,9 +601,12 @@ static void dispatch_command(const char *command)
 void platform_init(void)
 {
     rsm_config_t rsm_config;
+    rsm_status_t runtime_status;
 
     rdp2_research_markers_init();
     uart_init();
+    uart_diagnostics_ready = 1U;
+    test_scenario_init();
     log_init();
     platform_health_init();
 
@@ -633,7 +644,40 @@ void platform_init(void)
 
     rsm_config.reset_csr = boot_reset_csr;
     rsm_config.boot_self_tests_passed = mandatory_self_tests_passed;
-    (void)runtime_monitor_init(&rsm_config);
+    runtime_status = runtime_monitor_init(&rsm_config);
+    runtime_monitor_ready = (runtime_status == RSM_STATUS_OK) ? 1U : 0U;
+    if (runtime_monitor_ready == 0U) {
+        critical_initialization_failure = 1U;
+    } else {
+        runtime_monitor_log_event(
+            RSM_EVENT_RESET_CAUSE_CAPTURED,
+            RSM_SEVERITY_INFO,
+            &boot_reset_csr,
+            (uint8_t)sizeof(boot_reset_csr)
+        );
+    }
+
+    watchdog_ready = platform_watchdog_init();
+    if (watchdog_ready == 0U) {
+        critical_initialization_failure = 1U;
+        runtime_monitor_log_event(
+            RSM_EVENT_WATCHDOG_INIT_FAILED,
+            RSM_SEVERITY_CRITICAL,
+            0,
+            0U
+        );
+        uart_puts("WATCHDOG init=FAIL\n");
+    } else {
+        runtime_monitor_log_event(
+            RSM_EVENT_WATCHDOG_INITIALIZED,
+            RSM_SEVERITY_INFO,
+            0,
+            0U
+        );
+        uart_puts("WATCHDOG init=OK timeout_ms_nominal=");
+        uart_put_u32(PLATFORM_IWDG_TIMEOUT_NOMINAL_MS);
+        uart_puts("\n");
+    }
 }
 
 uint32_t platform_millis(void)
@@ -680,6 +724,7 @@ void platform_idle(void)
     platform_health_service_tick();
     runtime_monitor_periodic();
     platform_cli_poll();
+    test_scenario_service(ticks);
 
 #if PLATFORM_CONFIRMATION_LAB_BOOT_DELAY_TICKS == 0UL
     stable_execution_point_reached = 1U;
@@ -696,10 +741,34 @@ void platform_idle(void)
         health.critical_initialization_failure =
             critical_initialization_failure;
         health.stable_execution_point_reached =
-            stable_execution_point_reached;
+            (stable_execution_point_reached != 0U) &&
+            (test_scenario_stable(ticks) != 0U);
         health.metadata_allows_confirmation = 0U;
+        health.uart_diagnostics_ready = uart_diagnostics_ready;
+        health.runtime_monitor_ready = runtime_monitor_ready;
+        health.watchdog_active = watchdog_ready;
+        health.application_health_ok = test_scenario_health_ok();
 
         confirmation = platform_confirmation_service(VTOR, &health);
+        if ((uint8_t)confirmation != last_reported_confirmation_status) {
+            uart_puts("HEALTH_GATE result=");
+            uart_puts(platform_confirmation_status_text(confirmation));
+            uart_puts("\n");
+            if (confirmation == PLATFORM_CONFIRMATION_OK) {
+                uart_puts("SLOT_CONFIRMATION result=OK\n");
+            }
+            last_reported_confirmation_status = (uint8_t)confirmation;
+        }
+        runtime_monitor_log_event(
+            confirmation == PLATFORM_CONFIRMATION_OK
+                ? RSM_EVENT_HEALTH_GATE_PASSED
+                : RSM_EVENT_HEALTH_GATE_FAILED,
+            confirmation == PLATFORM_CONFIRMATION_OK
+                ? RSM_SEVERITY_INFO
+                : RSM_SEVERITY_WARNING,
+            &confirmation,
+            (uint8_t)sizeof(confirmation)
+        );
         if (confirmation != PLATFORM_CONFIRMATION_NOT_HEALTHY) {
             confirmation_terminal = 1U;
             log_write(
@@ -714,6 +783,10 @@ void platform_idle(void)
             experiment_telemetry_set_confirmation_result((uint32_t)confirmation);
         }
     }
+
+    /* Refresh follows a complete bounded unit of progress. Failure scenarios
+       deliberately stop before this point so IWDG remains meaningful. */
+    platform_watchdog_refresh();
 }
 
 int main(void)

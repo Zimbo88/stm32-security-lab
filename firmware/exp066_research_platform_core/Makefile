@@ -8,6 +8,8 @@ LAYOUT_PROFILE ?= stm32f429_1m
 RSM_ENABLE ?= 1
 RSM_RESTRICTED_DIAGNOSTICS ?= 0
 RSM_VECTOR_MONITOR_ENABLE ?= 1
+TEST_SCENARIO ?= normal
+IMAGE_VERSION ?= 2
 ifneq ($(LAYOUT_PROFILE),$(STM32F429_LAYOUT_PROFILE))
 $(error generated layout profile $(STM32F429_LAYOUT_PROFILE) does not match requested $(LAYOUT_PROFILE))
 endif
@@ -39,6 +41,7 @@ CFLAGS := $(CPUFLAGS) -std=c11 -Os -g3 -ffreestanding -fno-builtin \
 		 -DRDP2_SLOT_A=$(if $(filter a,$(SLOT)),1,0) \
 		 -DRSM_ENABLE=$(RSM_ENABLE) -DRSM_RESTRICTED_DIAGNOSTICS=$(RSM_RESTRICTED_DIAGNOSTICS) \
 	 -DRSM_VECTOR_MONITOR_ENABLE=$(RSM_VECTOR_MONITOR_ENABLE) \
+	 -DTEST_SCENARIO_$(TEST_SCENARIO)=1 \
 	 -I$(SRC) -I$(COMMON) -I$(BOOTLOADER)/src -I$(BOOTLOADER)/include
 ASFLAGS := $(CPUFLAGS) -x assembler-with-cpp -g3 $(REPRO_FLAGS)
 LDFLAGS := $(CPUFLAGS) -T linker.ld -nostdlib -Wl,--gc-sections \
@@ -52,7 +55,8 @@ BOOTLOADER_SOURCES := \
 	$(BOOTLOADER)/src/boot_flash_target.c \
 	$(BOOTLOADER)/src/boot_metadata.c \
 	$(BOOTLOADER)/src/boot_slot.c \
-	$(BOOTLOADER)/src/minilib.c
+	$(BOOTLOADER)/src/minilib.c \
+	$(BOOTLOADER)/src/system_reset.c
 OBJECTS := $(BUILD)/startup.o \
 	$(patsubst $(SRC)/%.c,$(BUILD)/%.o,$(SOURCES)) \
 	$(patsubst $(BOOTLOADER)/src/%.c,$(BUILD)/bootloader_%.o,$(BOOTLOADER_SOURCES))
@@ -77,7 +81,7 @@ ifneq ($(strip $(PUBLIC_KEY_HEADER)),)
 PUBLIC_KEY_VERIFY_DEPS := $(PUBLIC_KEY_HEADER)
 endif
 
-.PHONY: all clean report signed verify-signed update-package inspect-update-package verify-update-package verify-layout require-signing-seed require-public-key slot-a slot-b slot-releases FORCE
+.PHONY: all clean report signed verify-signed update-package inspect-update-package verify-update-package verify-layout require-signing-seed require-public-key slot-a slot-b slot-releases test-scenario FORCE
 all: $(BIN) $(HEX) verify-layout
 	@echo "MCU: $(STM32F429_MCU)"
 	@echo "Layout profile: $(STM32F429_LAYOUT_PROFILE)"
@@ -142,6 +146,7 @@ $(UPDATE_PACKAGE) $(UPDATE_PACKAGE_BUILD_REPORT) &: $(BIN) $(UPDATE_PACKAGE_TOOL
 	    --application $(BIN) \
 	    --seed "$(SIGNING_SEED)" \
 	    --slot $(SLOT) \
+	    --image-version $(IMAGE_VERSION) \
 	    --output $(UPDATE_PACKAGE) \
 	    --json-output $(UPDATE_PACKAGE_BUILD_REPORT)
 $(UPDATE_PACKAGE_INSPECT_REPORT): $(UPDATE_PACKAGE) $(UPDATE_PACKAGE_TOOL)
@@ -193,6 +198,11 @@ slot-a:
 slot-b:
 	$(MAKE) SLOT=b BUILD=build/slot_b PROJECT=$(PROJECT)_slot_b clean all update-package inspect-update-package verify-update-package
 slot-releases: slot-a slot-b
+test-scenario:
+	@test "$(TEST_SCENARIO)" != "normal" || { echo "ERROR: TEST_SCENARIO must name a failure scenario"; exit 1; }
+	$(MAKE) SLOT=$(SLOT) TEST_SCENARIO=$(TEST_SCENARIO) \
+	    BUILD=build/test_$(TEST_SCENARIO) \
+	    PROJECT=$(PROJECT)_$(TEST_SCENARIO) clean all
 clean:
 	rm -rf $(BUILD)
 FORCE:
