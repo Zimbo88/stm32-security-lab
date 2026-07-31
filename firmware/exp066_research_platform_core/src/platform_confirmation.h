@@ -26,6 +26,7 @@ typedef struct {
     uint8_t metadata_allows_confirmation;
     uint8_t uart_diagnostics_ready;
     uint8_t runtime_monitor_ready;
+    uint8_t mpu_policy_ready;
     uint8_t watchdog_active;
     uint8_t application_health_ok;
 } platform_confirmation_health_t;

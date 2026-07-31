@@ -5,6 +5,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 HOST_VERIFIER = ROOT / "tests" / "host_verifier"
+MPU_POLICY = ROOT / "tests" / "mpu_policy"
 
 
 def run_make(*args: str) -> subprocess.CompletedProcess[str]:
@@ -35,4 +36,14 @@ def test_host_signed_image_verifier_with_sanitizers_when_supported() -> None:
     ):
         pytest.skip("host compiler does not support requested sanitizers")
 
+    assert_success(result)
+
+
+def test_host_mpu_policy_descriptors() -> None:
+    result = subprocess.run(
+        ["make", "-C", str(MPU_POLICY), "clean", "test"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     assert_success(result)

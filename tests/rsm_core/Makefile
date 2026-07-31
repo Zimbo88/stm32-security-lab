@@ -19,7 +19,8 @@ LOG_SOURCES := test_rsm_log.c \
 RUNTIME_SOURCES := test_runtime_monitor_host.c \
 	../../firmware/exp066_research_platform_core/src/runtime_monitor.c \
 	../../firmware/exp066_research_platform_core/src/runtime_monitor_core.c \
-	../../firmware/exp066_research_platform_core/src/runtime_monitor_vector.c
+	../../firmware/exp066_research_platform_core/src/runtime_monitor_vector.c \
+	../../firmware/exp066_research_platform_core/src/mpu_policy.c
 
 .PHONY: test clean
 
@@ -48,26 +49,26 @@ $(LOG_TARGET): $(LOG_SOURCES) | $(BUILD)
 		$(LOG_SOURCES) -o $@
 
 $(RUNTIME_DEFAULT_TARGET): $(RUNTIME_SOURCES) | $(BUILD)
-	$(CC) $(CFLAGS) -DRSM_HOST_TEST -I../../firmware/common \
+	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DMPU_POLICY_HOST_TEST -I../../firmware/common \
 		-I../../firmware/exp045_bootloader_v2/src \
 		-I../../firmware/exp045_bootloader_v2/include \
 		$(RUNTIME_SOURCES) -o $@
 
 $(RUNTIME_DISABLED_TARGET): $(RUNTIME_SOURCES) | $(BUILD)
-	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DRSM_ENABLE=0 -I../../firmware/common \
+	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DMPU_POLICY_HOST_TEST -DRSM_ENABLE=0 -I../../firmware/common \
 		-I../../firmware/exp045_bootloader_v2/src \
 		-I../../firmware/exp045_bootloader_v2/include \
 		$(RUNTIME_SOURCES) -o $@
 
 $(RUNTIME_VECTOR_DISABLED_TARGET): $(RUNTIME_SOURCES) | $(BUILD)
-	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DRSM_VECTOR_MONITOR_ENABLE=0 \
+	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DMPU_POLICY_HOST_TEST -DRSM_VECTOR_MONITOR_ENABLE=0 \
 		-I../../firmware/common \
 		-I../../firmware/exp045_bootloader_v2/src \
 		-I../../firmware/exp045_bootloader_v2/include \
 		$(RUNTIME_SOURCES) -o $@
 
 $(RUNTIME_RESTRICTED_TARGET): $(RUNTIME_SOURCES) | $(BUILD)
-	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DRSM_RESTRICTED_DIAGNOSTICS=1 \
+	$(CC) $(CFLAGS) -DRSM_HOST_TEST -DMPU_POLICY_HOST_TEST -DRSM_RESTRICTED_DIAGNOSTICS=1 \
 		-I../../firmware/common \
 		-I../../firmware/exp045_bootloader_v2/src \
 		-I../../firmware/exp045_bootloader_v2/include \

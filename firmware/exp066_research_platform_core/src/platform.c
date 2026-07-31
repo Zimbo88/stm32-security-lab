@@ -2,6 +2,7 @@
 
 #include "experiment_telemetry.h"
 #include "log.h"
+#include "mpu_policy.h"
 #include "platform_confirmation.h"
 #include "platform_audio.h"
 #include "platform_health.h"
@@ -86,6 +87,7 @@ static uint8_t stable_execution_point_reached;
 static uint8_t confirmation_terminal;
 static uint8_t uart_diagnostics_ready;
 static uint8_t runtime_monitor_ready;
+static uint8_t mpu_policy_ready;
 static uint8_t watchdog_ready;
 static uint8_t last_reported_confirmation_status = 0xFFU;
 
@@ -657,6 +659,28 @@ void platform_init(void)
         );
     }
 
+    mpu_policy_ready = mpu_policy_init();
+    if (mpu_policy_ready == 0U) {
+        critical_initialization_failure = 1U;
+        runtime_monitor_log_event(
+            RSM_EVENT_MPU_POLICY_FAILED,
+            RSM_SEVERITY_CRITICAL,
+            0,
+            0U
+        );
+        uart_puts("MPU policy=FAIL\n");
+    } else {
+        runtime_monitor_log_event(
+            RSM_EVENT_MPU_POLICY_INITIALIZED,
+            RSM_SEVERITY_INFO,
+            0,
+            0U
+        );
+        uart_puts("MPU policy=OK regions=5 stack_guard=");
+        uart_put_hex32(mpu_policy_stack_guard_start());
+        uart_puts("\n");
+    }
+
     watchdog_ready = platform_watchdog_init();
     if (watchdog_ready == 0U) {
         critical_initialization_failure = 1U;
@@ -746,6 +770,7 @@ void platform_idle(void)
         health.metadata_allows_confirmation = 0U;
         health.uart_diagnostics_ready = uart_diagnostics_ready;
         health.runtime_monitor_ready = runtime_monitor_ready;
+        health.mpu_policy_ready = mpu_policy_ready;
         health.watchdog_active = watchdog_ready;
         health.application_health_ok = test_scenario_health_ok();
 

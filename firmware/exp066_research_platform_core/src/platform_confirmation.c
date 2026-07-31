@@ -4,6 +4,7 @@
 
 #include "boot_flash_target.h"
 #include "boot_slot.h"
+#include "mpu_policy.h"
 
 static platform_confirmation_snapshot_t last_snapshot = {
     .running_slot = BOOT_SLOT_NONE,
@@ -50,6 +51,7 @@ uint8_t platform_confirmation_health_gate(
             (health->stable_execution_point_reached != 0U) &&
             (health->uart_diagnostics_ready != 0U) &&
             (health->runtime_monitor_ready != 0U) &&
+            (health->mpu_policy_ready != 0U) &&
             (health->watchdog_active != 0U) &&
             (health->application_health_ok != 0U) &&
             (health->metadata_allows_confirmation != 0U))
@@ -190,8 +192,13 @@ platform_confirmation_status_t platform_confirmation_service(
         return last_snapshot.last_status;
     }
 
+    /* The MPU makes the metadata journal read-only to application code. The
+       existing confirmation primitive is the sole bounded exception; it is
+       resumed immediately after the atomic metadata commit attempt. */
+    mpu_policy_suspend_for_metadata_commit();
     last_snapshot.confirm_status =
         boot_confirm_current_slot(&flash, running_slot, &result);
+    mpu_policy_resume_after_metadata_commit();
     last_snapshot.last_status =
         map_confirm_status(last_snapshot.confirm_status);
     if (last_snapshot.confirm_status == BOOT_CONFIRM_OK) {
