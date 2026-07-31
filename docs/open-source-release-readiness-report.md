@@ -34,8 +34,9 @@ dual CC0-1.0/2-clause-BSD licensing is recorded in the notices.
   the pinned requirement files and the vendored Monocypher archive.
 - Added `tools/release_candidate.py` and
   `tools/verify_release_candidate.py`. They build and verify a local
-  `v1.1.0-rc1-local` directory and deterministic archive. They never flash,
-  write Option Bytes, set RDP/WRP, tag, push or create a GitHub release.
+  `v1.1.0-rc1-local` directory and deterministic archive, normalizing only
+  volatile diagnostic timestamps in copied verification reports. They never
+  flash, write Option Bytes, set RDP/WRP, tag, push or create a GitHub release.
 - Added `tools/check_documentation.py` and `tools/check_workflows.py` for
   offline link and workflow-structure checks.
 - Added publication scanning with explicit handling for tracked historical
@@ -149,6 +150,36 @@ The candidate verification checks exact artifact hashes, SBOM and provenance
 hashes, public-key length/fingerprint, marker completion, legacy signature,
 both slot package signatures, SHA256SUMS, archive hash/file set and the
 publication scan. Hardware is not touched.
+
+A final local candidate named `v1.1.0-rc1-local-final` was generated from
+commit `f9805f8fbdf8e7ef75e6b8345c35bfe6b33410ba` with the synthetic CI test
+key. Its manifest records `dirty: false` and `hardware_installable: false`.
+Representative hashes are:
+
+```text
+archive: 0fa475e9ef1ba971073eac92f807ec3aaf41d8366a0c4030bbf936c079753b6c
+SBOM:    b4689b0184feb64f5e8442625b943559b891881f32aa9db810551ab95802bbb2
+```
+
+The candidate verifier returned `result: ok`.
+
+## Lokale Prüfergebnisse
+
+The final local simulation used the documented profiles and returned success:
+
+```text
+make test-fast: 159 passed; all C host suites and fuzz smoke passed
+make test-security: 159 passed; ASan/UBSan, 10,000 iterations per fuzz mode,
+                    coverage, GCC-fanalyzer, Ruff, mypy, Bandit,
+                    mutation smoke and private-key scan passed
+documentation links: 0 missing
+workflow structure: 4 workflows parsed and valid
+tracked publication scan: clean, 382 review warnings, 0 errors
+```
+
+The static-analysis runner reports GCC `-fanalyzer` success. `cppcheck`,
+`clang-tidy`, `scan-build`, `valgrind` and `actionlint` were not installed in
+the local environment and were not claimed as executed.
 
 ## Reproduzierbarkeit
 
