@@ -44,7 +44,7 @@ def sha256(path: Path) -> str:
 
 
 def git(*args: str) -> str:
-    result = subprocess.run(  # nosec B603,B607 - fixed git argv and repository cwd
+    result = subprocess.run(  # nosec B603 B607 - fixed git argv and repository cwd
         ["git", *args], cwd=ROOT, check=True, capture_output=True, text=True
     )
     return result.stdout.strip()
@@ -68,6 +68,17 @@ def copy(source: Path, destination: Path) -> None:
         raise CandidateError(f"missing build artifact: {source}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(source, destination)
+
+
+def copy_report(source: Path, destination: Path) -> None:
+    """Copy a report while normalizing its known verification timestamp."""
+    if source.name.endswith("_package_verify.json"):
+        value = json.loads(source.read_text(encoding="ascii"))
+        if isinstance(value, dict) and "verification_timestamp_utc" in value:
+            value["verification_timestamp_utc"] = "<normalized>"
+            write_json(destination, value)
+            return
+    copy(source, destination)
 
 
 def read_embedded_key() -> bytes:
@@ -161,7 +172,7 @@ def stage_artifacts(output: Path) -> list[Path]:
     staged: list[Path] = []
     for relative, source in mapping.items():
         destination = output / relative
-        copy(source, destination)
+        copy_report(source, destination)
         staged.append(destination)
     return staged
 
